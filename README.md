@@ -222,7 +222,7 @@ dream preset load gaming    # Restore it
 
 Dream Server exists because of the incredible people, projects, and communities that make open-source AI possible. We are grateful to every contributor, maintainer, and tinkerer whose work powers this stack.
 
-Thanks to [kyuz0](https://github.com/kyuz0) for [amd-strix-halo-toolboxes](https://github.com/kyuz0/amd-strix-halo-toolboxes) — pre-built ROCm containers for Strix Halo that saved us from having to build our own. And to [lhl](https://github.com/lhl) for [strix-halo-testing](https://github.com/lhl/strix-halo-testing) — the foundational Strix Halo AI research and rocWMMA performance work that the broader community builds on.
+Thanks to [kyuz0](https://github.com/kyuz0) for [amd-strix-halo-toolboxes](https://github.com/kyuz0/amd-strix-halo-toolboxes) — pre-built ROCm containers for Strix Halo that saved us a lot of pain from having to build our own. And to [lhl](https://github.com/lhl) for [strix-halo-testing](https://github.com/lhl/strix-halo-testing) — the foundational Strix Halo AI research and rocWMMA performance work that the broader community builds on.
 
 ### Projects that make Dream Server possible
 
