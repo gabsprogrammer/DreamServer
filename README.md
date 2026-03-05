@@ -51,6 +51,11 @@ curl -fsSL https://raw.githubusercontent.com/Light-Heart-Labs/DreamServer/main/d
 
 Open **http://localhost:3000** and start chatting.
 
+> **No GPU?** Dream Server also runs in cloud mode — same full stack, powered by OpenAI/Anthropic/Together APIs instead of local inference:
+> ```bash
+> ./install.sh --cloud
+> ```
+
 > **Port conflicts?** Every port is configurable via environment variables. See [`.env.example`](dream-server/.env.example) for the full list, or override at install time:
 > ```bash
 > WEBUI_PORT=9090 ./install.sh
@@ -102,7 +107,7 @@ For a working setup today, use Linux.
 ## What You Get
 
 ### Chat & Inference
-- **Open WebUI** — full-featured chat interface with conversation history, web search, and document upload
+- **Open WebUI** — full-featured chat interface with conversation history, web search, document upload, and [30+ languages](https://docs.openwebui.com)
 - **llama-server** — high-performance LLM inference with continuous batching, auto-selected for your GPU
 - **LiteLLM** — API gateway supporting local/cloud/hybrid modes
 
@@ -155,7 +160,7 @@ Override tier selection: `./install.sh --tier 3`
 
 ## Bootstrap Mode
 
-No staring at download bars. Dream Server uses bootstrap mode by default:
+No waiting for large downloads. Dream Server uses bootstrap mode by default:
 
 1. Downloads a tiny 1.5B model in under a minute
 2. You start chatting immediately
@@ -166,7 +171,7 @@ No staring at download bars. Dream Server uses bootstrap mode by default:
 
 ![Installer downloading modules](docs/images/installer-download.png)
 
-*The installer pulls all services in parallel — "Take a break for ten minutes. I've got this."*
+*The installer pulls all services in parallel. Downloads are resume-capable — interrupted downloads pick up where they left off.*
 
 </div>
 
