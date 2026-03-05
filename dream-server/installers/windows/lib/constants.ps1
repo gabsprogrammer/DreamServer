@@ -37,6 +37,16 @@ $script:MIN_DOCKER_VERSION = "4.20.0"
 # Minimum NVIDIA driver version for CUDA in Docker Desktop
 $script:MIN_NVIDIA_DRIVER = 570
 
+# OpenCode (host-level AI coding IDE, not a Docker service)
+$script:OPENCODE_VERSION = "1.2.18"
+$script:OPENCODE_ZIP = "opencode-windows-x64.zip"
+$script:OPENCODE_URL = "https://github.com/anomalyco/opencode/releases/download/v$($script:OPENCODE_VERSION)/$($script:OPENCODE_ZIP)"
+$script:OPENCODE_DIR = Join-Path $env:USERPROFILE ".opencode"
+$script:OPENCODE_BIN = Join-Path (Join-Path $env:USERPROFILE ".opencode") "bin"
+$script:OPENCODE_EXE = Join-Path (Join-Path $env:USERPROFILE ".opencode") "bin\opencode.exe"
+$script:OPENCODE_CONFIG_DIR = Join-Path (Join-Path $env:USERPROFILE ".config") "opencode"
+$script:OPENCODE_PORT = 3003
+
 # Timing
 $script:INSTALL_START = Get-Date
 

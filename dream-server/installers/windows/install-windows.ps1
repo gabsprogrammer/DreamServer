@@ -331,6 +331,11 @@ if ($DryRun) {
         Write-AI "[DRY RUN] Would use CUDA 13 image: ghcr.io/ggml-org/llama.cpp:server-cuda13"
     }
     Write-AI "[DRY RUN] Would run: docker compose up -d"
+    if (-not $Cloud) {
+        Write-AI "[DRY RUN] Would install OpenCode v$($script:OPENCODE_VERSION) to $($script:OPENCODE_EXE)"
+        Write-AI "[DRY RUN] Would configure OpenCode for local llama-server (port $($script:OPENCODE_PORT))"
+        Write-AI "[DRY RUN] Would add OpenCode to Windows Startup folder"
+    }
 } else {
     # Change to install directory for docker compose
     Push-Location $InstallDir
@@ -608,6 +613,136 @@ if ($DryRun) {
         $flagsFile = Join-Path $InstallDir ".compose-flags"
         Write-Utf8NoBom -Path $flagsFile -Content ($composeFlags -join " ")
 
+        # ── Install OpenCode (host-level AI coding IDE) ──
+        if (-not $Cloud) {
+            Write-Chapter "OPENCODE (IDE)"
+
+            # Download OpenCode binary if not already present
+            if (-not (Test-Path $script:OPENCODE_EXE)) {
+                Write-AI "Installing OpenCode v$($script:OPENCODE_VERSION)..."
+                $ocZipPath = Join-Path $env:TEMP $script:OPENCODE_ZIP
+                if (-not (Test-Path $ocZipPath)) {
+                    $dlOk = Show-ProgressDownload -Url $script:OPENCODE_URL `
+                        -Destination $ocZipPath -Label "Downloading OpenCode"
+                    if (-not $dlOk) {
+                        Write-AIWarn "OpenCode download failed -- skipping (install later manually)"
+                    }
+                }
+                if (Test-Path $ocZipPath) {
+                    New-Item -ItemType Directory -Path $script:OPENCODE_BIN -Force | Out-Null
+                    Expand-Archive -Path $ocZipPath -DestinationPath $script:OPENCODE_BIN -Force
+                    if (Test-Path $script:OPENCODE_EXE) {
+                        Write-AISuccess "Extracted opencode.exe"
+                    } else {
+                        # Zip may contain a subdirectory -- find the exe
+                        $ocFound = Get-ChildItem -Path $script:OPENCODE_BIN -Recurse -Filter "opencode.exe" |
+                            Select-Object -First 1
+                        if ($ocFound -and $ocFound.DirectoryName -ne $script:OPENCODE_BIN) {
+                            Move-Item -Path $ocFound.FullName -Destination $script:OPENCODE_EXE -Force
+                        }
+                        if (Test-Path $script:OPENCODE_EXE) {
+                            Write-AISuccess "Extracted opencode.exe"
+                        } else {
+                            Write-AIWarn "opencode.exe not found after extraction -- skipping"
+                        }
+                    }
+                }
+            } else {
+                Write-AISuccess "OpenCode already installed"
+            }
+
+            # Generate OpenCode config (points to local llama-server)
+            if (Test-Path $script:OPENCODE_EXE) {
+                New-Item -ItemType Directory -Path $script:OPENCODE_CONFIG_DIR -Force | Out-Null
+                $ocConfigFile = Join-Path $script:OPENCODE_CONFIG_DIR "opencode.json"
+                if (-not (Test-Path $ocConfigFile)) {
+                    $llamaPort = $(if ($gpuInfo.Backend -eq "amd") { "8080" } else { "11434" })
+                    $ocConfig = @"
+{
+  "`$schema": "https://opencode.ai/config.json",
+  "model": "llama-server/$($tierConfig.LlmModel)",
+  "provider": {
+    "llama-server": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "llama-server (local)",
+      "options": {
+        "baseURL": "http://127.0.0.1:${llamaPort}/v1",
+        "apiKey": "no-key"
+      },
+      "models": {
+        "$($tierConfig.LlmModel)": {
+          "name": "$($tierConfig.LlmModel)",
+          "limit": {
+            "context": $($tierConfig.MaxContext),
+            "output": 32768
+          }
+        }
+      }
+    }
+  }
+}
+"@
+                    Write-Utf8NoBom -Path $ocConfigFile -Content $ocConfig
+                    Write-AISuccess "Configured OpenCode for local llama-server (model: $($tierConfig.LlmModel))"
+                } else {
+                    Write-AISuccess "OpenCode config already exists -- skipping"
+                }
+
+                # Read OPENCODE_SERVER_PASSWORD from .env (generated earlier in Step 4)
+                $ocPassword = ""
+                $envPath = Join-Path $InstallDir ".env"
+                if (Test-Path $envPath) {
+                    $envLines = [System.IO.File]::ReadAllLines($envPath)
+                    foreach ($line in $envLines) {
+                        if ($line -match "^OPENCODE_SERVER_PASSWORD=(.*)") {
+                            $ocPassword = $Matches[1]
+                            break
+                        }
+                    }
+                }
+
+                # Create VBS launcher for hidden startup (no console window)
+                # NOTE: WshShell.Run expands %USERPROFILE% natively, no ExpandEnvironmentStrings needed
+                $vbsContent = @"
+' Dream Server -- OpenCode Web Server (hidden startup)
+' Launches opencode.exe in web mode without a visible console window
+Set WshShell = CreateObject("WScript.Shell")
+WshShell.CurrentDirectory = WshShell.ExpandEnvironmentStrings("%USERPROFILE%\.opencode")
+"@
+                if ($ocPassword) {
+                    $vbsContent += "`r`nWshShell.Environment(""Process"")(""OPENCODE_SERVER_PASSWORD"") = ""$ocPassword"""
+                }
+                $vbsContent += @"
+
+WshShell.Run """%USERPROFILE%\.opencode\bin\opencode.exe"" web --port $($script:OPENCODE_PORT) --hostname 0.0.0.0", 0, False
+"@
+                $vbsPath = Join-Path $script:OPENCODE_DIR "start-opencode.vbs"
+                Write-Utf8NoBom -Path $vbsPath -Content $vbsContent
+
+                # Copy to Windows Startup folder
+                $startupDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Startup"
+                $startupVbs = Join-Path $startupDir "DreamServer-OpenCode.vbs"
+                Copy-Item -Path $vbsPath -Destination $startupVbs -Force
+                Write-AISuccess "Added OpenCode to Windows Startup"
+
+                # Stop any existing OpenCode process before starting fresh
+                $existingOc = Get-Process -Name "opencode" -ErrorAction SilentlyContinue
+                if ($existingOc) {
+                    Stop-Process -Name "opencode" -Force -ErrorAction SilentlyContinue
+                    Start-Sleep -Seconds 1
+                }
+
+                # Start OpenCode now (set password env var before launch)
+                Write-AI "Starting OpenCode web server on port $($script:OPENCODE_PORT)..."
+                if ($ocPassword) { $env:OPENCODE_SERVER_PASSWORD = $ocPassword }
+                $ocProc = Start-Process -FilePath $script:OPENCODE_EXE `
+                    -ArgumentList "web --port $($script:OPENCODE_PORT) --hostname 0.0.0.0" `
+                    -WindowStyle Hidden -PassThru
+                if ($ocPassword) { Remove-Item Env:\OPENCODE_SERVER_PASSWORD -ErrorAction SilentlyContinue }
+                Write-AISuccess "OpenCode started (PID $($ocProc.Id))"
+            }
+        }
+
     } finally {
         Pop-Location
     }
@@ -637,6 +772,9 @@ if ($enableVoice) {
 }
 if ($enableWorkflows) {
     $healthChecks += @{ Name = "n8n (Workflows)"; Url = "http://localhost:5678/healthz" }
+}
+if (-not $Cloud -and (Test-Path $script:OPENCODE_EXE)) {
+    $healthChecks += @{ Name = "OpenCode (IDE)"; Url = "http://localhost:$($script:OPENCODE_PORT)/" }
 }
 
 Write-AI "Running health checks..."
