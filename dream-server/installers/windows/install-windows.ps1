@@ -241,8 +241,22 @@ if ($DryRun) {
         Write-AI "Running in-place, skipping file copy"
     }
 
+    # Copy dream.ps1 CLI to install root so users can run .\dream.ps1
+    $dreamSrc = Join-Path $ScriptDir "dream.ps1"
+    $dreamDst = Join-Path $InstallDir "dream.ps1"
+    if (Test-Path $dreamSrc) {
+        Copy-Item -Path $dreamSrc -Destination $dreamDst -Force
+        # Also copy the lib/ directory dream.ps1 needs
+        $libSrc = Join-Path $ScriptDir "lib"
+        $libDst = Join-Path $InstallDir "lib"
+        New-Item -ItemType Directory -Path $libDst -Force | Out-Null
+        Copy-Item -Path (Join-Path $libSrc "*") -Destination $libDst -Recurse -Force
+        Write-AISuccess "Installed dream.ps1 CLI"
+    }
+
     # Generate .env
-    $dreamMode = if ($Cloud) { "cloud" } else { "local" }
+    # NOTE: $(if ...) syntax required for PS 5.1 compatibility
+    $dreamMode = $(if ($Cloud) { "cloud" } else { "local" })
     $envResult = New-DreamEnv -InstallDir $InstallDir -TierConfig $tierConfig `
         -Tier $selectedTier -GpuBackend $gpuInfo.Backend -DreamMode $dreamMode
     Write-AISuccess "Generated .env with secure secrets"
@@ -253,11 +267,11 @@ if ($DryRun) {
 
     # Generate OpenClaw configs (if enabled)
     if ($enableOpenClaw) {
-        $providerUrl = if ($gpuInfo.Backend -eq "amd") {
+        $providerUrl = $(if ($gpuInfo.Backend -eq "amd") {
             "http://host.docker.internal:8080"
         } else {
             "http://llama-server:8080"
-        }
+        })
         New-OpenClawConfig -InstallDir $InstallDir `
             -LlmModel $tierConfig.LlmModel `
             -MaxContext $tierConfig.MaxContext `
@@ -269,7 +283,7 @@ if ($DryRun) {
     # Create llama-server models.ini (empty — populated later)
     $modelsIni = Join-Path $InstallDir "config" "llama-server" "models.ini"
     if (-not (Test-Path $modelsIni)) {
-        Set-Content -Path $modelsIni -Value "# Dream Server model registry" -Encoding UTF8
+        Write-Utf8NoBom -Path $modelsIni -Content "# Dream Server model registry"
     }
 }
 
@@ -391,43 +405,79 @@ if ($DryRun) {
         # ── Assemble Docker Compose flags ──
         $composeFlags = @("-f", "docker-compose.base.yml")
 
-        if ($gpuInfo.Backend -eq "nvidia" -and -not $Cloud) {
+        if ($Cloud) {
+            # Cloud mode: disable llama-server (no GPU overlay, no local model)
+            $composeFlags += @("-f", "installers/windows/docker-compose.windows-amd.yml")
+        } elseif ($gpuInfo.Backend -eq "nvidia") {
             $composeFlags += @("-f", "docker-compose.nvidia.yml")
-        } elseif ($gpuInfo.Backend -eq "amd" -and -not $Cloud) {
-            $amdOverlay = Join-Path "installers" "windows" "docker-compose.windows-amd.yml"
-            $composeFlags += @("-f", $amdOverlay)
+        } elseif ($gpuInfo.Backend -eq "amd") {
+            $composeFlags += @("-f", "installers/windows/docker-compose.windows-amd.yml")
         }
 
-        # Discover enabled extension compose fragments
+        # Discover enabled extension compose fragments via manifests
+        # Mirrors resolve-compose-stack.sh: reads manifest.yaml, checks schema_version
+        # and gpu_backends before including a service's compose file.
         $extDir = Join-Path $InstallDir "extensions" "services"
-        if (Test-Path $extDir) {
-            $extServices = Get-ChildItem -Path $extDir -Directory
-            foreach ($svcDir in $extServices) {
-                $composePath = Join-Path $svcDir.FullName "compose.yaml"
-                if (Test-Path $composePath) {
-                    # Check if service should be enabled based on feature flags
-                    $svcName = $svcDir.Name
-                    $skip = $false
-                    switch ($svcName) {
-                        "whisper"    { if (-not $enableVoice) { $skip = $true } }
-                        "tts"        { if (-not $enableVoice) { $skip = $true } }
-                        "n8n"        { if (-not $enableWorkflows) { $skip = $true } }
-                        "qdrant"     { if (-not $enableRag) { $skip = $true } }
-                        "embeddings" { if (-not $enableRag) { $skip = $true } }
-                        "openclaw"   { if (-not $enableOpenClaw) { $skip = $true } }
-                    }
-                    if (-not $skip) {
-                        $relPath = $composePath.Substring($InstallDir.Length + 1) -replace "\\", "/"
-                        $composeFlags += @("-f", $relPath)
+        $currentBackend = $(if ($Cloud) { "none" } else { $gpuInfo.Backend })
 
-                        # GPU-specific overlay for this extension
-                        if ($gpuInfo.Backend -eq "nvidia" -and -not $Cloud) {
-                            $gpuOverlay = Join-Path $svcDir.FullName "compose.nvidia.yaml"
-                            if (Test-Path $gpuOverlay) {
-                                $relOverlay = $gpuOverlay.Substring($InstallDir.Length + 1) -replace "\\", "/"
-                                $composeFlags += @("-f", $relOverlay)
-                            }
-                        }
+        if (Test-Path $extDir) {
+            $extServices = Get-ChildItem -Path $extDir -Directory | Sort-Object Name
+            foreach ($svcDir in $extServices) {
+                # Read manifest (YAML parsed as simple key-value — no YAML lib needed)
+                $manifestPath = Join-Path $svcDir.FullName "manifest.yaml"
+                if (-not (Test-Path $manifestPath)) {
+                    $manifestPath = Join-Path $svcDir.FullName "manifest.yml"
+                }
+                if (-not (Test-Path $manifestPath)) { continue }
+
+                $manifestLines = Get-Content $manifestPath -ErrorAction SilentlyContinue
+                if (-not $manifestLines) { continue }
+
+                # Quick manifest validation: must contain schema_version: dream.services.v1
+                $hasSchema = $manifestLines | Where-Object { $_ -match "schema_version:\s*dream\.services\.v1" }
+                if (-not $hasSchema) { continue }
+
+                # Check gpu_backends compatibility
+                $backendsLine = $manifestLines | Where-Object { $_ -match "gpu_backends:" }
+                if ($backendsLine -and $currentBackend -ne "none") {
+                    $backendsStr = ($backendsLine -split "gpu_backends:")[1]
+                    if ($backendsStr -notmatch $currentBackend -and $backendsStr -notmatch "all") {
+                        continue  # Service not compatible with current GPU
+                    }
+                }
+
+                # Find compose file reference in manifest
+                $composeFile = "compose.yaml"  # default
+                $composeRefLine = $manifestLines | Where-Object { $_ -match "compose_file:" }
+                if ($composeRefLine) {
+                    $composeFile = (($composeRefLine -split "compose_file:")[1]).Trim().Trim('"').Trim("'")
+                }
+
+                $composePath = Join-Path $svcDir.FullName $composeFile
+                if (-not (Test-Path $composePath)) { continue }
+
+                # Check feature flags
+                $svcName = $svcDir.Name
+                $skip = $false
+                switch ($svcName) {
+                    "whisper"    { if (-not $enableVoice) { $skip = $true } }
+                    "tts"        { if (-not $enableVoice) { $skip = $true } }
+                    "n8n"        { if (-not $enableWorkflows) { $skip = $true } }
+                    "qdrant"     { if (-not $enableRag) { $skip = $true } }
+                    "embeddings" { if (-not $enableRag) { $skip = $true } }
+                    "openclaw"   { if (-not $enableOpenClaw) { $skip = $true } }
+                }
+                if ($skip) { continue }
+
+                $relPath = $composePath.Substring($InstallDir.Length + 1) -replace "\\", "/"
+                $composeFlags += @("-f", $relPath)
+
+                # GPU-specific overlay for this extension (filesystem discovery)
+                if ($currentBackend -eq "nvidia") {
+                    $gpuOverlay = Join-Path $svcDir.FullName "compose.nvidia.yaml"
+                    if (Test-Path $gpuOverlay) {
+                        $relOverlay = $gpuOverlay.Substring($InstallDir.Length + 1) -replace "\\", "/"
+                        $composeFlags += @("-f", $relOverlay)
                     }
                 }
             }
@@ -448,9 +498,9 @@ if ($DryRun) {
         }
         Write-AISuccess "Docker services started"
 
-        # Save compose flags for dream.ps1
+        # Save compose flags for dream.ps1 (BOM-free for reliable parsing)
         $flagsFile = Join-Path $InstallDir ".compose-flags"
-        Set-Content -Path $flagsFile -Value ($composeFlags -join " ") -Encoding UTF8
+        Write-Utf8NoBom -Path $flagsFile -Content ($composeFlags -join " ")
 
     } finally {
         Pop-Location
@@ -542,6 +592,7 @@ if ($SummaryJsonPath) {
         healthy     = $allHealthy
         timestamp   = (Get-Date -Format "o")
     }
-    $summary | ConvertTo-Json -Depth 3 | Set-Content -Path $SummaryJsonPath -Encoding UTF8
+    $jsonContent = $summary | ConvertTo-Json -Depth 3
+    Write-Utf8NoBom -Path $SummaryJsonPath -Content $jsonContent
     Write-AI "Summary written to $SummaryJsonPath"
 }

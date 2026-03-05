@@ -25,7 +25,7 @@ param(
     [string]$Command = "help",
 
     [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
-    [string[]]$Args
+    [string[]]$Arguments
 )
 
 $ErrorActionPreference = "Stop"
@@ -257,7 +257,7 @@ function Invoke-Status {
         if (Test-Path $script:LLAMA_SERVER_PID_FILE) {
             $nativeStatus = Get-NativeLlamaStatus
             if ($nativeStatus.Running) {
-                $healthStr = if ($nativeStatus.Healthy) { "healthy" } else { "loading" }
+                $healthStr = $(if ($nativeStatus.Healthy) { "healthy" } else { "loading" })
                 Write-AISuccess "llama-server (native): running PID $($nativeStatus.Pid) ($healthStr)"
             } else {
                 Write-AIWarn "llama-server (native): not running (stale PID cleaned)"
@@ -534,16 +534,16 @@ function Show-Help {
 
 switch ($Command.ToLower()) {
     "status"  { Invoke-Status }
-    "start"   { Invoke-Start -Service ($Args | Select-Object -First 1) }
-    "stop"    { Invoke-Stop -Service ($Args | Select-Object -First 1) }
-    "restart" { Invoke-Restart -Service ($Args | Select-Object -First 1) }
+    "start"   { Invoke-Start -Service ($Arguments | Select-Object -First 1) }
+    "stop"    { Invoke-Stop -Service ($Arguments | Select-Object -First 1) }
+    "restart" { Invoke-Restart -Service ($Arguments | Select-Object -First 1) }
     "logs"    {
-        $svc = $Args | Select-Object -First 1
-        $n = if ($Args.Count -ge 2) { [int]$Args[1] } else { 100 }
+        $svc = $Arguments | Select-Object -First 1
+        $n = $(if ($Arguments.Count -ge 2) { [int]$Arguments[1] } else { 100 })
         Invoke-Logs -Service $svc -Lines $n
     }
     "config"  {
-        $action = ($Args | Select-Object -First 1)
+        $action = ($Arguments | Select-Object -First 1)
         if ($action -eq "edit") {
             Test-Install
             & notepad (Join-Path $InstallDir ".env")
@@ -551,7 +551,7 @@ switch ($Command.ToLower()) {
             Invoke-ConfigShow
         }
     }
-    "chat"    { Invoke-Chat -Message ($Args -join " ") }
+    "chat"    { Invoke-Chat -Message ($Arguments -join " ") }
     "update"  { Invoke-Update }
     "version" { Write-Host "Dream Server v$($script:DS_VERSION) (Windows)" -ForegroundColor Green }
     "help"    { Show-Help }

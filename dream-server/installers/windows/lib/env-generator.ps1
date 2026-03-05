@@ -12,6 +12,20 @@
 #   All secrets use cryptographic RNG — never use Get-Random for secrets.
 # ============================================================================
 
+function Write-Utf8NoBom {
+    <#
+    .SYNOPSIS
+        Write text to file as UTF-8 WITHOUT BOM. PS 5.1's Set-Content -Encoding UTF8
+        writes a BOM which corrupts Docker Compose .env parsing and YAML files.
+    #>
+    param(
+        [string]$Path,
+        [string]$Content
+    )
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
+}
+
 function New-SecureHex {
     <#
     .SYNOPSIS
@@ -76,29 +90,52 @@ function New-DreamEnv {
     # Determine LLM API URL based on backend
     # AMD on Windows: llama-server runs natively, containers reach it via host.docker.internal
     # NVIDIA: llama-server runs in Docker, containers reach it via service name
-    $llmApiUrl = if ($GpuBackend -eq "amd") {
+    # NOTE: $(if ...) syntax required for PS 5.1 compatibility
+    $llmApiUrl = $(if ($GpuBackend -eq "amd") {
         "http://host.docker.internal:8080"
     } elseif ($DreamMode -eq "cloud") {
         "http://litellm:4000"
     } else {
         "http://llama-server:8080"
-    }
+    })
 
-    # Timezone
-    $tz = try {
+    # Timezone — convert Windows timezone ID to IANA for Docker containers
+    $tz = $(try {
         $tzInfo = [System.TimeZoneInfo]::Local
-        # Convert Windows timezone to IANA (best effort)
-        # Common mappings; Docker containers expect IANA
-        switch -Wildcard ($tzInfo.Id) {
-            "*Eastern*"  { "America/New_York" }
-            "*Central*"  { "America/Chicago" }
-            "*Mountain*" { "America/Denver" }
-            "*Pacific*"  { "America/Los_Angeles" }
-            "*UTC*"      { "UTC" }
-            "*GMT*"      { "Europe/London" }
-            default      { "UTC" }
+        # .NET 6+ has TimeZoneInfo.TryConvertWindowsIdToIanaId; fall back to common mappings
+        $ianaId = $null
+        try {
+            # Works on .NET 6+ / PS 7+
+            $ianaId = [System.TimeZoneInfo]::TryConvertWindowsIdToIanaId($tzInfo.Id, [ref]$null)
+        } catch { }
+        if ($ianaId) { $ianaId } else {
+            switch -Wildcard ($tzInfo.Id) {
+                "*Eastern*"    { "America/New_York" }
+                "*Central*"    { "America/Chicago" }
+                "*Mountain*"   { "America/Denver" }
+                "*Pacific*"    { "America/Los_Angeles" }
+                "*Alaska*"     { "America/Anchorage" }
+                "*Hawaii*"     { "Pacific/Honolulu" }
+                "*UTC*"        { "UTC" }
+                "*GMT*"        { "Europe/London" }
+                "*W. Europe*"  { "Europe/Berlin" }
+                "*Romance*"    { "Europe/Paris" }
+                "*India*"      { "Asia/Kolkata" }
+                "*China*"      { "Asia/Shanghai" }
+                "*Tokyo*"      { "Asia/Tokyo" }
+                "*Korea*"      { "Asia/Seoul" }
+                "*AUS Eastern*"  { "Australia/Sydney" }
+                "*E. South America*" { "America/Sao_Paulo" }
+                "*SE Asia*"    { "Asia/Bangkok" }
+                "*Arab*"       { "Asia/Riyadh" }
+                "*Egypt*"      { "Africa/Cairo" }
+                "*South Africa*" { "Africa/Johannesburg" }
+                "*E. Europe*"  { "Europe/Bucharest" }
+                "*FLE*"        { "Europe/Kiev" }
+                default        { "UTC" }
+            }
         }
-    } catch { "UTC" }
+    } catch { "UTC" })
 
     $timestamp = Get-Date -Format "o"
 
@@ -123,7 +160,6 @@ GGUF_FILE=$($TierConfig.GgufFile)
 MAX_CONTEXT=$($TierConfig.MaxContext)
 CTX_SIZE=$($TierConfig.MaxContext)
 GPU_BACKEND=$GpuBackend
-LLAMA_SERVER_PORT=8080
 
 #=== Ports ===
 LLAMA_SERVER_PORT=8080
@@ -169,7 +205,7 @@ TIMEZONE=$tz
     # Those are Linux-only for AMD ROCm container device access
 
     $envPath = Join-Path $InstallDir ".env"
-    Set-Content -Path $envPath -Value $envContent -Encoding UTF8 -Force
+    Write-Utf8NoBom -Path $envPath -Content $envContent
 
     # Restrict .env to current user only (Windows ACL equivalent of chmod 600)
     try {
@@ -235,7 +271,7 @@ engines:
 "@
 
     $settingsPath = Join-Path $configDir "settings.yml"
-    Set-Content -Path $settingsPath -Value $config -Encoding UTF8 -Force
+    Write-Utf8NoBom -Path $settingsPath -Content $config
     return $settingsPath
 }
 
@@ -306,7 +342,7 @@ function New-OpenClawConfig {
   }
 }
 "@
-    Set-Content -Path (Join-Path $homeDir "openclaw.json") -Value $homeConfig -Encoding UTF8 -Force
+    Write-Utf8NoBom -Path (Join-Path $homeDir "openclaw.json") -Content $homeConfig
 
     # Auth profiles
     $authProfiles = @"
@@ -323,7 +359,7 @@ function New-OpenClawConfig {
   "usageStats": {}
 }
 "@
-    Set-Content -Path (Join-Path $agentDir "auth-profiles.json") -Value $authProfiles -Encoding UTF8 -Force
+    Write-Utf8NoBom -Path (Join-Path $agentDir "auth-profiles.json") -Content $authProfiles
 
     # Models config
     $modelsConfig = @"
@@ -354,7 +390,7 @@ function New-OpenClawConfig {
   }
 }
 "@
-    Set-Content -Path (Join-Path $agentDir "models.json") -Value $modelsConfig -Encoding UTF8 -Force
+    Write-Utf8NoBom -Path (Join-Path $agentDir "models.json") -Content $modelsConfig
 
     # Workspace directory (must exist before Docker Compose)
     $workspaceDir = Join-Path $InstallDir "config" "openclaw" "workspace" "memory"

@@ -18,7 +18,7 @@ function Write-DreamBanner {
 
 "@
     Write-Host $banner -ForegroundColor Green
-    Write-Host "  DREAMGATE Windows Installer v$DS_VERSION" -ForegroundColor White
+    Write-Host "  DREAMGATE Windows Installer v$($script:DS_VERSION)" -ForegroundColor White
     Write-Host "  One command to a full local AI stack." -ForegroundColor DarkGray
     Write-Host ""
 }

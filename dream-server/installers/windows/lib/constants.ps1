@@ -13,7 +13,8 @@
 $script:DS_VERSION = "2.0.0-strix-halo"
 
 # Install location (override via $env:DREAM_HOME)
-$script:DS_INSTALL_DIR = if ($env:DREAM_HOME) { $env:DREAM_HOME } else { Join-Path $env:USERPROFILE "dream-server" }
+# NOTE: $(if ...) syntax required for PS 5.1 compatibility (bare if-as-expression is PS 7+ only)
+$script:DS_INSTALL_DIR = $(if ($env:DREAM_HOME) { $env:DREAM_HOME } else { Join-Path $env:USERPROFILE "dream-server" })
 
 # Logging
 $script:DS_LOG_FILE = Join-Path $env:TEMP "dream-server-install.log"

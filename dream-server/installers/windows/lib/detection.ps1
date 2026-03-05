@@ -101,7 +101,7 @@ function Get-GpuInfo {
                 Name          = $gpuName
                 VramMB        = $effectiveVramMB
                 Count         = @($gpus).Count
-                MemoryType    = if ($isUnified) { "unified" } else { "discrete" }
+                MemoryType    = $(if ($isUnified) { "unified" } else { "discrete" })
                 DeviceId      = $deviceId
                 DriverVersion = $driverVer
                 DriverMajor   = 0
