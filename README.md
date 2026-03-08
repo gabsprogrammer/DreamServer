@@ -2,7 +2,7 @@
 
 # Dream Server
 
-### One command to a full local AI stack.
+### One command to a fully local AI stack.
 
 **LLM inference, chat UI, voice agents, workflow automation, RAG, image generation, and privacy tools — all running on your hardware. No cloud. No subscriptions. No configuration.**
 
