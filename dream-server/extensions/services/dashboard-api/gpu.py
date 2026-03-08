@@ -110,7 +110,11 @@ def get_gpu_info_amd() -> Optional[GPUInfo]:
 
 
 def get_gpu_info_nvidia() -> Optional[GPUInfo]:
-    """Get GPU metrics from nvidia-smi."""
+    """Get GPU metrics from nvidia-smi.
+
+    Handles multi-GPU systems by summing VRAM across all GPUs and
+    reporting aggregate utilization and peak temperature.
+    """
     success, output = run_command([
         "nvidia-smi",
         "--query-gpu=name,memory.used,memory.total,utilization.gpu,temperature.gpu,power.draw",
@@ -120,27 +124,78 @@ def get_gpu_info_nvidia() -> Optional[GPUInfo]:
     if not success or not output:
         return None
 
+    # nvidia-smi returns one line per GPU; split before parsing
+    lines = [l.strip() for l in output.strip().splitlines() if l.strip()]
+    if not lines:
+        return None
+
     try:
-        parts = [p.strip() for p in output.split(",")]
-        if len(parts) >= 5:
-            mem_used = int(parts[1])
-            mem_total = int(parts[2])
+        gpus = []
+        for line in lines:
+            parts = [p.strip() for p in line.split(",")]
+            if len(parts) < 5:
+                continue
             power_w = None
             if len(parts) >= 6 and parts[5] not in ("[N/A]", "[Not Supported]", "N/A", "Not Supported", ""):
                 try:
                     power_w = round(float(parts[5]), 1)
                 except (ValueError, TypeError):
                     pass
+            gpus.append({
+                "name": parts[0],
+                "mem_used": int(parts[1]),
+                "mem_total": int(parts[2]),
+                "util": int(parts[3]),
+                "temp": int(parts[4]),
+                "power_w": power_w,
+            })
+
+        if not gpus:
+            return None
+
+        if len(gpus) == 1:
+            g = gpus[0]
+            mem_used, mem_total = g["mem_used"], g["mem_total"]
             return GPUInfo(
-                name=parts[0],
+                name=g["name"],
                 memory_used_mb=mem_used,
                 memory_total_mb=mem_total,
                 memory_percent=round(mem_used / mem_total * 100, 1) if mem_total > 0 else 0,
-                utilization_percent=int(parts[3]),
-                temperature_c=int(parts[4]),
-                power_w=power_w,
+                utilization_percent=g["util"],
+                temperature_c=g["temp"],
+                power_w=g["power_w"],
                 gpu_backend="nvidia",
             )
+
+        # Multi-GPU: aggregate across all GPUs
+        mem_used = sum(g["mem_used"] for g in gpus)
+        mem_total = sum(g["mem_total"] for g in gpus)
+        avg_util = round(sum(g["util"] for g in gpus) / len(gpus))
+        max_temp = max(g["temp"] for g in gpus)
+        total_power: Optional[float] = None
+        power_values = [g["power_w"] for g in gpus if g["power_w"] is not None]
+        if power_values:
+            total_power = round(sum(power_values), 1)
+
+        # Build a display name: "RTX 4090 × 2" or "RTX 3090 + RTX 4090"
+        names = [g["name"] for g in gpus]
+        if len(set(names)) == 1:
+            display_name = f"{names[0]} \u00d7 {len(gpus)}"
+        else:
+            display_name = " + ".join(names[:2])
+            if len(names) > 2:
+                display_name += f" + {len(names) - 2} more"
+
+        return GPUInfo(
+            name=display_name,
+            memory_used_mb=mem_used,
+            memory_total_mb=mem_total,
+            memory_percent=round(mem_used / mem_total * 100, 1) if mem_total > 0 else 0,
+            utilization_percent=avg_util,
+            temperature_c=max_temp,
+            power_w=total_power,
+            gpu_backend="nvidia",
+        )
     except (ValueError, IndexError):
         pass
 

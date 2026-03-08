@@ -93,13 +93,28 @@ detect_gpu() {
         if raw=$(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null) && [[ -n "$raw" ]]; then
             GPU_INFO="$raw"
             GPU_NAME=$(echo "$GPU_INFO" | head -1 | cut -d',' -f1 | xargs)
-            GPU_VRAM=$(echo "$GPU_INFO" | head -1 | cut -d',' -f2 | grep -oP '\d+' | head -1)
             GPU_COUNT=$(echo "$GPU_INFO" | wc -l)
-            # Extract PCI device ID
+            # Sum VRAM across all GPUs (each line = one GPU)
+            GPU_VRAM=$(echo "$GPU_INFO" | cut -d',' -f2 | grep -oP '\d+' | awk '{s+=$1} END {print s+0}')
+            # Extract PCI device ID from first GPU
             local pci_id
             pci_id=$(nvidia-smi --query-gpu=pci.device_id --format=csv,noheader 2>/dev/null | head -1 | xargs)
             [[ -n "$pci_id" ]] && GPU_DEVICE_ID="${pci_id:0:6}"
-            log "GPU: $GPU_NAME (${GPU_VRAM}MB VRAM) x${GPU_COUNT}"
+            if [[ $GPU_COUNT -gt 1 ]]; then
+                # Build a display name for multi-GPU (e.g. "RTX 3090 + RTX 4090" or "RTX 4090 × 2")
+                local first_name second_name
+                first_name=$(echo "$GPU_INFO" | sed -n '1p' | cut -d',' -f1 | xargs)
+                second_name=$(echo "$GPU_INFO" | sed -n '2p' | cut -d',' -f1 | xargs)
+                if [[ "$first_name" == "$second_name" ]]; then
+                    GPU_NAME="${first_name} × ${GPU_COUNT}"
+                else
+                    GPU_NAME="${first_name} + ${second_name}"
+                    [[ $GPU_COUNT -gt 2 ]] && GPU_NAME="${GPU_NAME} + $((GPU_COUNT - 2)) more"
+                fi
+                log "GPU: ${GPU_COUNT}x NVIDIA (${GPU_VRAM}MB total VRAM) — ${GPU_NAME}"
+            else
+                log "GPU: $GPU_NAME (${GPU_VRAM}MB VRAM)"
+            fi
             return 0
         fi
     fi
