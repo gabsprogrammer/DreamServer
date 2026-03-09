@@ -14,11 +14,20 @@ import base64
 import time
 import os
 
-# HVAC LiveKit credentials - UPDATE THESE FROM YOUR HVAC LIVEKIT PROJECT
-# Create a new project at https://cloud.livekit.io
-API_KEY = 'APIRUdt5f4Hp87o'
-API_SECRET = 'bTpgs0RC42jjluOevB9D64zcYhZFG7qEdU0T1m1QMNX'
-LIVEKIT_URL = 'wss://grace-hvac-jtcdy0sb.livekit.cloud'
+# HVAC LiveKit credentials — read from environment variables.
+# Create a new project at https://cloud.livekit.io and set these:
+#   export LIVEKIT_API_KEY="your-api-key"
+#   export LIVEKIT_API_SECRET="your-api-secret"
+#   export LIVEKIT_URL="wss://your-project.livekit.cloud"
+API_KEY = os.environ.get('LIVEKIT_API_KEY', '')
+API_SECRET = os.environ.get('LIVEKIT_API_SECRET', '')
+LIVEKIT_URL = os.environ.get('LIVEKIT_URL', 'ws://localhost:7880')
+
+if not API_KEY or not API_SECRET:
+    raise RuntimeError(
+        "LIVEKIT_API_KEY and LIVEKIT_API_SECRET must be set as environment variables. "
+        "Create a project at https://cloud.livekit.io to obtain credentials."
+    )
 
 def base64url_encode(data):
     """Base64URL encode without padding"""
