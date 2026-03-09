@@ -253,8 +253,6 @@ Dream Server exists because of the incredible people, projects, and communities 
 
 Thanks to [kyuz0](https://github.com/kyuz0) for [amd-strix-halo-toolboxes](https://github.com/kyuz0/amd-strix-halo-toolboxes) — pre-built ROCm containers for Strix Halo that saved us a lot of pain from having to build our own. And to [lhl](https://github.com/lhl) for [strix-halo-testing](https://github.com/lhl/strix-halo-testing) — the foundational Strix Halo AI research and rocWMMA performance work that the broader community builds on.
 
-Thanks to [latentcollapse](https://github.com/latentcollapse) (Matt C) for security audit and hardening contributions — OpenClaw localhost binding fix, multi-GPU VRAM detection, AMD dashboard hardening, and the Agent Policy Engine (APE) extension.
-
 ### Projects that make Dream Server possible
 
 *   [llama.cpp (ggerganov)](https://github.com/ggml-org/llama.cpp) — LLM inference engine
@@ -273,6 +271,11 @@ Thanks to [latentcollapse](https://github.com/latentcollapse) (Matt C) for secur
 *   [Kokoro FastAPI (remsky)](https://github.com/remsky/Kokoro-FastAPI) — Text-to-speech
 *   [Speaches](https://github.com/speaches-ai/speaches) — Speech-to-text
 *   [Strix Halo Home Lab](https://strixhalo-homelab.d7.wtf/) — Community knowledge base
+
+### Community Contributors
+
+*   [Yasin Bursali (yasinBursali)](https://github.com/yasinBursali) — Fixed CI workflow discovery, added dashboard-api router test coverage with security-focused tests (auth enforcement, path traversal protection), and documented all 14 undocumented extension services
+*   [latentcollapse (Matt C)](https://github.com/latentcollapse) — Security audit and hardening: OpenClaw localhost binding fix, multi-GPU VRAM detection, AMD dashboard hardening, and the Agent Policy Engine (APE) extension
 
 If we missed anyone, [open an issue](https://github.com/Light-Heart-Labs/DreamServer/issues). We want to get this right.
 
