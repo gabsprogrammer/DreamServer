@@ -115,7 +115,7 @@ else
       "npm": "@ai-sdk/openai-compatible",
       "name": "llama-server (local)",
       "options": {
-        "baseURL": "http://127.0.0.1:${OLLAMA_PORT:-11434}/v1",
+        "baseURL": "http://127.0.0.1:${OLLAMA_PORT:-8080}/v1",
         "apiKey": "no-key"
       },
       "models": {
