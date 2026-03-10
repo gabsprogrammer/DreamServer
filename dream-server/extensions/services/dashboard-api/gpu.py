@@ -268,6 +268,9 @@ def get_gpu_info_apple() -> Optional[GPUInfo]:
         except ValueError:
             return None
         # Use /proc/meminfo for used memory (best available proxy inside container)
+        # Note: used_mb reflects Docker Desktop VM memory pressure, not the host Mac's.
+        # Total is correctly overridden by HOST_RAM_GB. See issue #102 for a future
+        # host-metrics collector that would fix used_mb.
         used_mb = 0
         try:
             with open("/proc/meminfo") as f:
