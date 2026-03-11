@@ -22,8 +22,6 @@ intents:
       - head
       - tail
       - wc
-      - python3
-      - node
       - echo
       - pwd
       - env
