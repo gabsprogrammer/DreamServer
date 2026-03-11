@@ -399,12 +399,150 @@ cmd_doctor() {
     check_install
     cd "$INSTALL_DIR"
 
-    local report="${1:-/tmp/dream-doctor-report.json}"
-    if [[ -x "$INSTALL_DIR/scripts/dream-doctor.sh" ]]; then
-        "$INSTALL_DIR/scripts/dream-doctor.sh" "$report"
-    else
+    local json_mode="false"
+    local report_file="/tmp/dream-doctor-report.json"
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json)
+                json_mode="true"
+                shift
+                ;;
+            --report)
+                report_file="$2"
+                shift 2
+                ;;
+            *)
+                report_file="$1"
+                shift
+                ;;
+        esac
+    done
+
+    if [[ ! -x "$INSTALL_DIR/scripts/dream-doctor.sh" ]]; then
         error "dream-doctor script not found at $INSTALL_DIR/scripts/dream-doctor.sh"
     fi
+
+    # Run doctor script (suppresses its output)
+    "$INSTALL_DIR/scripts/dream-doctor.sh" "$report_file" >/dev/null 2>&1
+
+    if [[ ! -f "$report_file" ]]; then
+        error "Doctor report not generated at $report_file"
+    fi
+
+    # JSON mode: just output the report
+    if [[ "$json_mode" == "true" ]]; then
+        cat "$report_file"
+        return 0
+    fi
+
+    # Parse and display operator-friendly output
+    local exit_code=0
+
+    echo -e "${BLUE}━━━ Dream Server Diagnostics ━━━${NC}"
+    echo ""
+
+    # Use Python to parse JSON and display results
+    exit_code=$(python3 - "$report_file" <<'PY'
+import json
+import sys
+
+RED = '\033[0;31m'
+GREEN = '\033[0;32m'
+YELLOW = '\033[1;33m'
+BLUE = '\033[0;34m'
+CYAN = '\033[0;36m'
+NC = '\033[0m'
+
+report_file = sys.argv[1]
+try:
+    with open(report_file, 'r') as f:
+        report = json.load(f)
+except Exception as e:
+    print(f"{RED}✗{NC} Failed to parse report: {e}")
+    sys.exit(1)
+
+# Runtime checks
+runtime = report.get('runtime', {})
+print(f"{CYAN}Runtime Environment:{NC}")
+checks = [
+    ('Docker CLI', runtime.get('docker_cli', False)),
+    ('Docker Daemon', runtime.get('docker_daemon', False)),
+    ('Docker Compose', runtime.get('compose_cli', False)),
+    ('Dashboard HTTP', runtime.get('dashboard_http', False)),
+    ('WebUI HTTP', runtime.get('webui_http', False)),
+]
+
+has_failures = False
+for name, status in checks:
+    if status:
+        print(f"  {GREEN}✓{NC} {name}")
+    else:
+        print(f"  {RED}✗{NC} {name}")
+        has_failures = True
+
+print()
+
+# Preflight checks
+preflight = report.get('preflight', {})
+pf_checks = preflight.get('checks', [])
+blockers = []
+warnings = []
+
+if pf_checks:
+    print(f"{CYAN}Preflight Checks:{NC}")
+    for check in pf_checks:
+        name = check.get('name', 'Unknown')
+        status = check.get('status', 'unknown')
+        message = check.get('message', '')
+
+        if status == 'pass':
+            print(f"  {GREEN}✓{NC} {name}")
+        elif status == 'warn':
+            print(f"  {YELLOW}⚠{NC} {name}: {message}")
+            warnings.append((name, message))
+        elif status == 'blocker':
+            print(f"  {RED}✗{NC} {name}: {message}")
+            blockers.append((name, message))
+            has_failures = True
+        else:
+            print(f"  {YELLOW}?{NC} {name}: {message}")
+    print()
+
+# Summary
+summary = report.get('summary', {})
+blocker_count = summary.get('preflight_blockers', 0)
+warning_count = summary.get('preflight_warnings', 0)
+runtime_ready = summary.get('runtime_ready', False)
+
+print(f"{CYAN}Summary:{NC}")
+if blocker_count > 0:
+    print(f"  {RED}✗{NC} {blocker_count} blocker(s) found")
+if warning_count > 0:
+    print(f"  {YELLOW}⚠{NC} {warning_count} warning(s) found")
+if blocker_count == 0 and warning_count == 0 and runtime_ready:
+    print(f"  {GREEN}✓{NC} All checks passed")
+
+print()
+
+# Autofix hints
+hints = report.get('autofix_hints', [])
+if hints:
+    print(f"{CYAN}Suggested Fixes:{NC}")
+    for i, hint in enumerate(hints[:6], 1):
+        print(f"  {i}. {hint}")
+    print()
+
+# Exit code: 1 if blockers or runtime failures, 0 otherwise
+if has_failures or blocker_count > 0:
+    sys.exit(1)
+else:
+    sys.exit(0)
+PY
+)
+
+    return $exit_code
 }
 
 #=============================================================================
@@ -910,7 +1048,7 @@ ${CYAN}Commands:${NC}
   config [show|edit]  View or edit configuration
   chat "<message>"    Quick chat with the LLM
   benchmark           Run a quick performance test
-  doctor [report]     Run diagnostics and write JSON report
+  doctor [--json]     Run diagnostics (use --json for raw report)
   help                Show this help
 
 ${CYAN}Preset Commands:${NC}
