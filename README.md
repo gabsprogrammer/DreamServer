@@ -161,11 +161,11 @@ The installer detects your GPU and picks the optimal model automatically. No man
 
 | VRAM | Model | Example GPUs |
 |------|-------|--------------|
-| 8–11 GB | Qwen 2.5 7B (Q4_K_M) | RTX 4060 Ti, RTX 3060 12GB |
-| 12–20 GB | Qwen 2.5 14B (Q4_K_M) | RTX 3090, RTX 4080 |
-| 20–40 GB | Qwen 2.5 32B (Q4_K_M) | RTX 4090, A6000 |
-| 40+ GB | Qwen 2.5 72B (Q4_K_M) | A100, multi-GPU |
-| 90+ GB | Qwen3 Coder Next 80B MoE | Multi-GPU A100/H100 |
+| 8–11 GB | Qwen3 8B (Q4_K_M) | RTX 4060 Ti, RTX 3060 12GB |
+| 12–20 GB | Qwen3 8B (Q4_K_M) | RTX 3090, RTX 4080 |
+| 20–40 GB | Qwen3 14B (Q4_K_M) | RTX 4090, A6000 |
+| 40+ GB | Qwen3 30B-A3B (MoE, Q4_K_M) | A100, multi-GPU |
+| 90+ GB | Qwen3 Coder Next (80B MoE, Q4_K_M) | Multi-GPU A100/H100 |
 
 ### AMD Strix Halo (Unified Memory)
 
