@@ -6,6 +6,15 @@
 
 name: dream-server
 
+# ============================================
+# Standardized Logging Policy
+# ============================================
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   # ============================================
   # LLM Inference — llama-server (GPU-agnostic stub)
@@ -34,6 +43,7 @@ services:
       - --metrics
     security_opt:
       - no-new-privileges:true
+    logging: *default-logging
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
       interval: 15s
@@ -48,6 +58,10 @@ services:
     image: ghcr.io/open-webui/open-webui:v0.7.2
     container_name: dream-webui
     restart: unless-stopped
+    depends_on:
+      llama-server:
+        condition: service_healthy
+    logging: *default-logging
     security_opt:
       - no-new-privileges:true
     environment:
@@ -128,6 +142,7 @@ services:
       - "127.0.0.1:${DASHBOARD_API_PORT:-3002}:3002"
     security_opt:
       - no-new-privileges:true
+    logging: *default-logging
     environment:
       - DREAM_INSTALL_DIR=/dream-server
       - DREAM_DATA_DIR=/data
@@ -170,6 +185,7 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+    logging: *default-logging
     environment:
       - DASHBOARD_API_KEY=${DASHBOARD_API_KEY:-}
     volumes:
