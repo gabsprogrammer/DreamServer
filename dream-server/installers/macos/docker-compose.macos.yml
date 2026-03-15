@@ -14,9 +14,12 @@ services:
     environment:
       - OLLAMA_URL=http://host.docker.internal:8080
       - OLLAMA_HOST=host.docker.internal
-      # Override GPU_BACKEND so manifest filter discovers services.
-      # gpu.py detection returns None gracefully (no nvidia-smi in Docker on Mac).
-      - GPU_BACKEND=nvidia
+      - OLLAMA_PORT=8080        # llama-server runs natively on macOS at this port
+      # gpu.py routes to get_gpu_info_apple() which reads HOST_* env vars.
+      # config.py defaults include 'apple' so all manifests are discovered.
+      - GPU_BACKEND=apple
+      # Static host hardware info written to .env by install-macos.sh (Phase 2).
+      - HOST_RAM_GB=${HOST_RAM_GB:-0}   # explicit override; base.yml also carries this for other platforms
 
   open-webui:
     environment:
