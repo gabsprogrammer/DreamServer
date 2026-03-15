@@ -2,7 +2,7 @@
 
 Quick answers to common questions.
 
-> **Looking for troubleshooting?** See the main [`FAQ.md`](../FAQ.md) for installation issues, service logs, and technical fixes.
+> **Looking for install/runtime troubleshooting?** See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) and [INSTALL-TROUBLESHOOTING.md](INSTALL-TROUBLESHOOTING.md).
 
 ---
 
