@@ -56,6 +56,8 @@ generate_dream_env() {
     dashboard_api_key=$(new_secure_hex 32)
     local openclaw_token
     openclaw_token=$(new_secure_hex 24)
+    local qdrant_api_key
+    qdrant_api_key=$(new_secure_hex 32)
     local opencode_password
     opencode_password=$(new_secure_base64 16)
     local searxng_secret
@@ -112,6 +114,7 @@ LITELLM_KEY=${litellm_key}
 LIVEKIT_API_KEY=${livekit_api_key}
 LIVEKIT_API_SECRET=${livekit_secret}
 OPENCLAW_TOKEN=${openclaw_token}
+QDRANT_API_KEY=${qdrant_api_key}
 
 #=== OpenCode Settings ===
 OPENCODE_PORT=3003
