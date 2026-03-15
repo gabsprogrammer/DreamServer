@@ -84,10 +84,10 @@ if command -v docker >/dev/null 2>&1; then
 fi
 
 if command -v curl >/dev/null 2>&1; then
-    if curl -sf "http://localhost:${_DASHBOARD_PORT}" >/dev/null 2>&1; then
+    if curl -sf --max-time 10 "http://localhost:${_DASHBOARD_PORT}" >/dev/null 2>&1; then
         DASHBOARD_HTTP="true"
     fi
-    if curl -sf "http://localhost:${_WEBUI_PORT}" >/dev/null 2>&1; then
+    if curl -sf --max-time 10 "http://localhost:${_WEBUI_PORT}" >/dev/null 2>&1; then
         WEBUI_HTTP="true"
     fi
 fi

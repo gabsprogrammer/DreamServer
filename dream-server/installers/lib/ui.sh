@@ -194,23 +194,50 @@ spin_task() {
   return $rc
 }
 
-# Pull wrapper that prints consistent success/fail lines
+# Pull wrapper that prints consistent success/fail lines with retry logic
 pull_with_progress() {
   local img=$1
   local label=$2
   local count=$3
   local total=$4
+  local max_attempts=3
+  local pull_pid
 
-  $DOCKER_CMD pull "$img" >> "$LOG_FILE" 2>&1 &
-  local pull_pid=$!
+  for attempt in $(seq 1 $max_attempts); do
+    if [[ $attempt -gt 1 ]]; then
+      printf "  ${AMB}⟳${NC} [$count/$total] Retry attempt $attempt of $max_attempts for $label\n"
+      local backoff=$((5 * (2 ** (attempt - 2))))
+      sleep "$backoff"
+    fi
 
-  if spin_task $pull_pid "[$count/$total] $label"; then
-    printf "\r  ${BGRN}✓${NC} [$count/$total] %-60s\n" "$label"
-    return 0
-  else
-    printf "\r  ${RED}✗${NC} [$count/$total] %-60s\n" "$label"
-    return 1
-  fi
+    local attempt_log
+    attempt_log=$(mktemp)
+
+    $DOCKER_CMD pull "$img" >"$attempt_log" 2>&1 &
+    pull_pid=$!
+
+    if spin_task "$pull_pid" "[$count/$total] $label"; then
+      cat "$attempt_log" >> "$LOG_FILE" 2>&1 || true
+      rm -f "$attempt_log"
+      printf "\r  ${BGRN}✓${NC} [$count/$total] %-60s\n" "$label"
+      return 0
+    else
+      cat "$attempt_log" >> "$LOG_FILE" 2>&1 || true
+
+      if grep -qiE 'unauthorized|denied|not[[:space:]-]?found|\b404\b|no space left on device|cannot connect to the docker daemon|is the docker daemon running' "$attempt_log"; then
+        rm -f "$attempt_log"
+        printf "\r  ${RED}✗${NC} [$count/$total] %-60s (non-retryable error)\n" "$label"
+        return 1
+      fi
+
+      rm -f "$attempt_log"
+      printf "\r  ${RED}✗${NC} [$count/$total] %-60s (attempt $attempt failed)\n" "$label"
+    fi
+  done
+
+  # All attempts failed
+  printf "  ${RED}✗${NC} [$count/$total] Failed after $max_attempts attempts: $label\n"
+  return 1
 }
 
 # Health check with "systems online" vibe + lore every 8s

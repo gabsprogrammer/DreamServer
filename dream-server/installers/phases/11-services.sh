@@ -40,37 +40,96 @@ else
     # Ensure model directory exists
     mkdir -p "$INSTALL_DIR/data/models"
 
-    # Download GGUF model if not already present (with retry)
+    # Download GGUF model if not already present (with retry and integrity verification)
     GGUF_DIR="$INSTALL_DIR/data/models"
-    if [[ "${DREAM_MODE:-local}" != "cloud" && ! -f "$GGUF_DIR/$GGUF_FILE" && -n "$GGUF_URL" ]]; then
-        ai "Downloading GGUF model: $GGUF_FILE"
-        signal "This is the big one. I've got it — sit back."
-        echo ""
-
-        # Retry loop: up to 3 attempts with resume support (-c flag)
-        _dl_success=false
-        for _attempt in 1 2 3; do
-            [[ $_attempt -gt 1 ]] && ai "Retry attempt $_attempt of 3..."
-            wget -c -q -O "$GGUF_DIR/$GGUF_FILE.part" "$GGUF_URL" \
-                >> "$INSTALL_DIR/logs/model-download.log" 2>&1 &
-            dl_pid=$!
-
-            if spin_task $dl_pid "Downloading $GGUF_FILE"; then
-                mv "$GGUF_DIR/$GGUF_FILE.part" "$GGUF_DIR/$GGUF_FILE"
-                printf "\r  ${BGRN}✓${NC} %-60s\n" "Model downloaded: $GGUF_FILE"
-                _dl_success=true
-                break
+    if [[ "${DREAM_MODE:-local}" != "cloud" && -n "$GGUF_URL" ]]; then
+        # Check if model exists and verify integrity
+        if [[ -f "$GGUF_DIR/$GGUF_FILE" ]]; then
+            if [[ -n "$GGUF_SHA256" ]]; then
+                if command -v sha256sum &>/dev/null; then
+                    ai "Verifying model integrity (SHA256)..."
+                    ACTUAL_HASH=$(sha256sum "$GGUF_DIR/$GGUF_FILE" 2>/dev/null | awk '{print $1}')
+                    if [[ -n "$ACTUAL_HASH" && "$ACTUAL_HASH" == "$GGUF_SHA256" ]]; then
+                        ai_ok "Model verified: $GGUF_FILE"
+                    elif [[ -z "$ACTUAL_HASH" ]]; then
+                        ai_warn "Could not compute checksum for existing model file"
+                        ai_ok "GGUF model already present: $GGUF_FILE (verification skipped)"
+                    else
+                        ai_warn "Model file is corrupt (SHA256 mismatch)."
+                        ai "  Expected: $GGUF_SHA256"
+                        ai "  Got:      $ACTUAL_HASH"
+                        ai "Removing corrupt file and re-downloading..."
+                        rm -f "$GGUF_DIR/$GGUF_FILE"
+                    fi
+                else
+                    ai_warn "sha256sum not available, skipping integrity check"
+                    ai_ok "GGUF model already present: $GGUF_FILE (verification skipped)"
+                fi
+            else
+                ai_ok "GGUF model already present: $GGUF_FILE"
             fi
-            printf "\r  ${AMB}⚠${NC} %-60s\n" "Download attempt $_attempt failed"
-            sleep 3
-        done
-
-        if [[ "$_dl_success" != "true" ]]; then
-            printf "\r  ${RED}✗${NC} %-60s\n" "Download failed after 3 attempts: $GGUF_FILE"
-            ai "Manual retry: wget -c -O '$GGUF_DIR/$GGUF_FILE.part' '$GGUF_URL' && mv '$GGUF_DIR/$GGUF_FILE.part' '$GGUF_DIR/$GGUF_FILE'"
         fi
-    elif [[ -f "$GGUF_DIR/$GGUF_FILE" ]]; then
-        ai_ok "GGUF model already present: $GGUF_FILE"
+
+        # Download if not present or was removed due to corruption
+        if [[ ! -f "$GGUF_DIR/$GGUF_FILE" ]]; then
+            ai "Downloading GGUF model: $GGUF_FILE"
+            signal "This is the big one. I've got it — sit back."
+            echo ""
+
+            # Retry loop: up to 3 attempts with resume support (-c flag)
+            _dl_success=false
+            for _attempt in 1 2 3; do
+                [[ $_attempt -gt 1 ]] && ai "Retry attempt $_attempt of 3..."
+                wget -c -q --timeout=300 -O "$GGUF_DIR/$GGUF_FILE.part" "$GGUF_URL" \
+                    >> "$INSTALL_DIR/logs/model-download.log" 2>&1 &
+                dl_pid=$!
+
+                if spin_task $dl_pid "Downloading $GGUF_FILE"; then
+                    mv "$GGUF_DIR/$GGUF_FILE.part" "$GGUF_DIR/$GGUF_FILE"
+                    printf "\r  ${BGRN}✓${NC} %-60s\n" "Model downloaded: $GGUF_FILE"
+                    _dl_success=true
+                    break
+                fi
+                printf "\r  ${AMB}⚠${NC} %-60s\n" "Download attempt $_attempt failed"
+                sleep 3
+            done
+
+            if [[ "$_dl_success" != "true" ]]; then
+                printf "\r  ${RED}✗${NC} %-60s\n" "Download failed after 3 attempts: $GGUF_FILE"
+                ai "Manual retry: wget -c -O '$GGUF_DIR/$GGUF_FILE.part' '$GGUF_URL' && mv '$GGUF_DIR/$GGUF_FILE.part' '$GGUF_DIR/$GGUF_FILE'"
+            else
+                # Verify freshly downloaded file
+                if [[ -n "$GGUF_SHA256" ]]; then
+                    if command -v sha256sum &>/dev/null; then
+                        ai "Verifying download integrity (SHA256)..."
+                        ACTUAL_HASH=$(sha256sum "$GGUF_DIR/$GGUF_FILE" 2>/dev/null | awk '{print $1}')
+                        if [[ -n "$ACTUAL_HASH" && "$ACTUAL_HASH" == "$GGUF_SHA256" ]]; then
+                            ai_ok "Download verified OK"
+                        elif [[ -z "$ACTUAL_HASH" ]]; then
+                            ai_warn "Could not compute checksum for downloaded file"
+                            ai_warn "Proceeding without verification (file may be corrupt)"
+                        else
+                            printf "\r  ${RED}✗${NC} %-60s\n" "Downloaded file is corrupt (SHA256 mismatch)"
+                            ai "  Expected: $GGUF_SHA256"
+                            ai "  Got:      $ACTUAL_HASH"
+                            rm -f "$GGUF_DIR/$GGUF_FILE"
+                            ai_warn "Corrupt file removed. Re-run installer to download again."
+                            _dl_success=false
+                        fi
+                    else
+                        ai_warn "sha256sum not available, skipping integrity check"
+                        ai_warn "Proceeding without verification (file may be corrupt)"
+                    fi
+                fi
+            fi
+        fi
+
+        # Abort if model download/verification failed
+        if [[ "${DREAM_MODE:-local}" != "cloud" && -n "$GGUF_URL" && ! -f "$GGUF_DIR/$GGUF_FILE" ]]; then
+            ai_bad "Model file missing or verification failed. Cannot proceed without a valid model."
+            ai "Re-run the installer to retry the download."
+            exit 1
+        fi
     fi
 
     # ── FLUX.1-schnell model download (ComfyUI image generation) ──
@@ -109,7 +168,7 @@ else
                     # Diffusion model (~24GB)
                     if [[ ! -f "$FLUX_DIFFUSION_DIR/flux1-schnell.safetensors" ]]; then
                         echo "[FLUX] Downloading flux1-schnell.safetensors (~24GB)..."
-                        wget -c -q --show-progress -O "$FLUX_DIFFUSION_DIR/flux1-schnell.safetensors.part" \
+                        wget -c -q --show-progress --timeout=600 -O "$FLUX_DIFFUSION_DIR/flux1-schnell.safetensors.part" \
                             "https://huggingface.co/Comfy-Org/flux1-schnell/resolve/main/flux1-schnell.safetensors" 2>&1 && \
                             mv "$FLUX_DIFFUSION_DIR/flux1-schnell.safetensors.part" "$FLUX_DIFFUSION_DIR/flux1-schnell.safetensors" && \
                             echo "[FLUX] flux1-schnell.safetensors complete" || \
@@ -119,7 +178,7 @@ else
                     # CLIP-L text encoder (~246MB)
                     if [[ ! -f "$FLUX_ENCODER_DIR/clip_l.safetensors" ]]; then
                         echo "[FLUX] Downloading clip_l.safetensors (~246MB)..."
-                        wget -c -q --show-progress -O "$FLUX_ENCODER_DIR/clip_l.safetensors.part" \
+                        wget -c -q --show-progress --timeout=600 -O "$FLUX_ENCODER_DIR/clip_l.safetensors.part" \
                             "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors" 2>&1 && \
                             mv "$FLUX_ENCODER_DIR/clip_l.safetensors.part" "$FLUX_ENCODER_DIR/clip_l.safetensors" && \
                             echo "[FLUX] clip_l.safetensors complete" || \
@@ -129,7 +188,7 @@ else
                     # T5-XXL text encoder (~10GB)
                     if [[ ! -f "$FLUX_ENCODER_DIR/t5xxl_fp16.safetensors" ]]; then
                         echo "[FLUX] Downloading t5xxl_fp16.safetensors (~10GB)..."
-                        wget -c -q --show-progress -O "$FLUX_ENCODER_DIR/t5xxl_fp16.safetensors.part" \
+                        wget -c -q --show-progress --timeout=600 -O "$FLUX_ENCODER_DIR/t5xxl_fp16.safetensors.part" \
                             "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors" 2>&1 && \
                             mv "$FLUX_ENCODER_DIR/t5xxl_fp16.safetensors.part" "$FLUX_ENCODER_DIR/t5xxl_fp16.safetensors" && \
                             echo "[FLUX] t5xxl_fp16.safetensors complete" || \
@@ -139,7 +198,7 @@ else
                     # VAE (~335MB)
                     if [[ ! -f "$FLUX_VAE_DIR/ae.safetensors" ]]; then
                         echo "[FLUX] Downloading ae.safetensors (~335MB)..."
-                        wget -c -q --show-progress -O "$FLUX_VAE_DIR/ae.safetensors.part" \
+                        wget -c -q --show-progress --timeout=600 -O "$FLUX_VAE_DIR/ae.safetensors.part" \
                             "https://huggingface.co/Comfy-Org/Lumina_Image_2.0_Repackaged/resolve/main/split_files/vae/ae.safetensors" 2>&1 && \
                             mv "$FLUX_VAE_DIR/ae.safetensors.part" "$FLUX_VAE_DIR/ae.safetensors" && \
                             echo "[FLUX] ae.safetensors complete" || \

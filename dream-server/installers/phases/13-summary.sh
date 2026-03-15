@@ -101,6 +101,22 @@ else
     log "Preflight script not found — skipping validation"
 fi
 
+# Extension manifest validation (non-blocking)
+echo ""
+bootline
+echo -e "${BGRN}VALIDATING EXTENSIONS${NC}"
+bootline
+echo ""
+if [[ -f "$SCRIPT_DIR/scripts/validate-manifests.sh" ]]; then
+    if bash "$SCRIPT_DIR/scripts/validate-manifests.sh"; then
+        ai_ok "Extension manifests validated for this Dream Server version."
+    else
+        warn "Extension manifest validation reported issues. See details above."
+    fi
+else
+    log "Extension validation script not found — skipping extension checks"
+fi
+
 #=============================================================================
 # Desktop Shortcut & Sidebar Pin
 #=============================================================================

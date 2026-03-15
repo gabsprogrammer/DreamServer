@@ -36,20 +36,8 @@ if [[ -f "$_DT_DIR/lib/service-registry.sh" ]]; then
     export SCRIPT_DIR="$_DT_DIR"
     . "$_DT_DIR/lib/service-registry.sh"
     sr_load
-    if [[ -f "$_DT_DIR/.env" ]]; then
-        set -a
-        while IFS='=' read -r key value; do
-            [[ "$key" =~ ^[[:space:]]*# ]] && continue
-            [[ -z "$key" ]] && continue
-            [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
-            value="${value%\"}"
-            value="${value#\"}"
-            value="${value%\'}"
-            value="${value#\'}"
-            export "$key=$value"
-        done < "$_DT_DIR/.env"
-        set +a
-    fi
+    [[ -f "$_DT_DIR/lib/safe-env.sh" ]] && . "$_DT_DIR/lib/safe-env.sh"
+    load_env_file "$_DT_DIR/.env"
 fi
 
 # Service endpoints — resolved from registry
@@ -98,11 +86,8 @@ RESULTS_DETAILS=()
 #--------------------------------------------------------------------------
 
 load_env() {
-    if [[ -f "$ENV_FILE" ]]; then
-        set -a
-        source "$ENV_FILE" 2>/dev/null || true
-        set +a
-    fi
+    [[ -f "$_DT_DIR/lib/safe-env.sh" ]] && . "$_DT_DIR/lib/safe-env.sh"
+    load_env_file "$ENV_FILE"
 }
 
 log() {

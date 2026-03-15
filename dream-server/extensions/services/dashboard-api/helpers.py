@@ -443,6 +443,17 @@ def _get_ram_metrics_linux() -> dict:
         result["used_gb"] = round(used / (1024 * 1024), 1)
         if total > 0:
             result["percent"] = round(used / total * 100, 1)
+        # On Apple Silicon, override total_gb with the host's actual RAM
+        host_ram_gb_str = os.environ.get("HOST_RAM_GB", "")
+        gpu_backend = os.environ.get("GPU_BACKEND", "").lower()
+        if gpu_backend == "apple" and host_ram_gb_str:
+            try:
+                host_ram_gb = float(host_ram_gb_str)
+                if host_ram_gb > 0:
+                    result["total_gb"] = round(host_ram_gb, 1)
+                    result["percent"] = round(used / (host_ram_gb * 1024 * 1024) * 100, 1)
+            except ValueError:
+                pass
     except OSError as e:
         logger.debug("Failed to read /proc/meminfo: %s", e)
     return result

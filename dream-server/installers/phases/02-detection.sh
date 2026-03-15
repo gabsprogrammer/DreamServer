@@ -65,6 +65,7 @@ DISK_AVAIL=$(df -BG "$HOME" | tail -1 | awk '{print $4}' | tr -d 'G')
 log "Available disk: ${DISK_AVAIL}GB"
 
 # GPU Detection
+ai "Detecting GPU..."
 detect_gpu || true
 
 if [[ "${CAP_PROFILE_LOADED:-false}" == "true" ]]; then
@@ -195,6 +196,7 @@ if [[ "$INTERACTIVE" == "true" ]]; then
         2) SPEED_EST=45; USERS_EST="3-5" ;;
         3) SPEED_EST=55; USERS_EST="5-8" ;;
         4) SPEED_EST=40; USERS_EST="10-15" ;;
+        *)          SPEED_EST=30;  USERS_EST="varies" ;;
     esac
     show_tier_recommendation "$TIER" "$LLM_MODEL" "$SPEED_EST" "$USERS_EST"
 else

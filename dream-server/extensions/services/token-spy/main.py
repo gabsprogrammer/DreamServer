@@ -29,8 +29,8 @@ if DB_BACKEND == "postgres":
 else:
     from db import init_db, log_usage, query_session_status, query_summary, query_usage, query_recent_events
 
-from filters import apply_filters, FilterResult
-from providers import ProviderRegistry, AnthropicProvider, OpenAICompatibleProvider
+from filters import apply_filters
+from providers import ProviderRegistry
 
 # ── Configuration ────────────────────────────────────────────────────────────
 
@@ -496,7 +496,7 @@ def analyze_messages(messages: list) -> dict:
 def estimate_cost(model: str, input_tokens: int, output_tokens: int,
                   cache_read: int, cache_write: int, provider_name: str = "anthropic") -> float:
     """Estimate USD cost based on model and token counts.
-    
+
     Uses the provider plugin system for pricing data. Falls back to hardcoded
     COST_PER_MILLION if provider lookup fails for backwards compatibility.
     """
@@ -506,12 +506,12 @@ def estimate_cost(model: str, input_tokens: int, output_tokens: int,
         "cache_read_tokens": cache_read,
         "cache_write_tokens": cache_write,
     }
-    
+
     # Try provider-based cost calculation first
     provider = ProviderRegistry.get_or_none(provider_name)
     if provider:
         return provider.calculate_cost(usage, model)
-    
+
     # Fallback to hardcoded rates for backwards compatibility
     rates = None
     model_lower = (model or "").lower()
@@ -1323,7 +1323,7 @@ def _kill_session(agent: str, reason: str = "manual") -> dict:
 
 def _auto_reset_check(agent: str, history_chars: int):
     """Check if session should be auto-reset based on history size.
-    
+
     Uses dynamic settings from settings.json (editable via dashboard).
     Per-agent overrides take precedence over the global session_char_limit.
     """
@@ -2300,7 +2300,7 @@ async def token_events(request: Request):
             try:
                 # Query recent events
                 events = query_recent_events(limit=50, after_id=last_id)
-                
+
                 for event in events:
                     # Format event as SSE
                     event_data = {
@@ -2315,21 +2315,21 @@ async def token_events(request: Request):
                         "timestamp": event.get("timestamp", ""),
                         "agent_name": event.get("agent_name", AGENT_NAME)
                     }
-                    
+
                     yield f"data: {json.dumps(event_data)}\n\n"
                     last_id = event.get("id")
-                
+
                 # Heartbeat to keep connection alive
                 yield ":heartbeat\n\n"
-                
+
                 # Wait before next poll
                 await asyncio.sleep(2)
-                
+
             except Exception as e:
                 log.error(f"SSE stream error: {e}")
                 yield f"event: error\ndata: {json.dumps({'error': 'Stream error'})}\n\n"
                 await asyncio.sleep(5)
-    
+
     return StreamingResponse(
         event_stream(),
         media_type="text/event-stream",

@@ -30,9 +30,9 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: healthcheck.py <url|host:port>")
         sys.exit(1)
-    
+
     target = sys.argv[1]
-    
+
     if target.startswith('http://') or target.startswith('https://'):
         ok = check_http(target)
     elif ':' in target:
@@ -41,5 +41,5 @@ if __name__ == "__main__":
     else:
         print(f"Invalid target: {target}")
         sys.exit(1)
-    
+
     sys.exit(0 if ok else 1)
