@@ -293,8 +293,10 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
 def main(argv: Sequence[str]) -> int:
     try:
         args = parse_args(argv)
-    except SystemExit:
-        return 2
+    except SystemExit as exc:
+        if isinstance(exc.code, int):
+            return exc.code
+        return 1
 
     try:
         kind, norm = _parse_target(args.target)
