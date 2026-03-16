@@ -14,7 +14,7 @@ If AI is becoming critical infrastructure, it shouldn’t be rented. Self-hostin
 [![GitHub Stars](https://img.shields.io/github/stars/Light-Heart-Labs/DreamServer)](https://github.com/Light-Heart-Labs/DreamServer/stargazers)
 [![Release](https://img.shields.io/github/v/release/Light-Heart-Labs/DreamServer)](https://github.com/Light-Heart-Labs/DreamServer/releases)
 
-![Dream Server Dashboard](docs/images/dashboard.png)
+![Dream Server Dashboard](resources/docs/images/dashboard.png)
 
 [![Watch the demo](https://img.shields.io/badge/Demo-Watch%20on%20YouTube-red?logo=youtube)](https://youtu.be/nO8xFNHX-HA)
 
@@ -71,7 +71,7 @@ Open **http://localhost:3000** and start chatting.
 
 <div align="center">
 
-![Dream Server Installer](docs/images/installer-splash.gif)
+![Dream Server Installer](resources/docs/images/installer-splash.gif)
 
 *The DREAMGATE installer handles everything — GPU detection, model selection, service orchestration.*
 
@@ -198,7 +198,7 @@ No waiting for large downloads. Dream Server uses bootstrap mode by default:
 
 <div align="center">
 
-![Installer downloading modules](docs/images/installer-download.png)
+![Installer downloading modules](resources/docs/images/installer-download.png)
 
 *The installer pulls all services in parallel. Downloads are resume-capable — interrupted downloads pick up where they left off.*
 
