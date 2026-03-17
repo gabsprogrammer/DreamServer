@@ -119,6 +119,7 @@ except Exception:
 
 tier_key = str(tier).upper()
 tier_rank_map = {
+    "0": 0,
     "1": 1,
     "2": 2,
     "3": 3,
@@ -133,6 +134,7 @@ tier_rank_map = {
 tier_rank = tier_rank_map.get(tier_key, 1)
 
 min_ram_map = {
+    "0": 4,
     "1": 16,
     "2": 32,
     "3": 48,
@@ -141,6 +143,7 @@ min_ram_map = {
     "SH_LARGE": 96,
 }
 min_disk_map = {
+    "0": 15,
     "1": 30,
     "2": 50,
     "3": 80,
