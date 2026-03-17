@@ -44,14 +44,14 @@ If AI is becoming critical infrastructure, it shouldn’t be rented. Self-hostin
 
 ## Why Dream Server?
 
-Technology was made to empower people — not to concentrate power. Dream Server exists because we believe access to AI should come with full control over your data, your privacy, and your costs.
+Because running your own AI shouldn't require a CS degree and a weekend of debugging CUDA drivers. Right now, setting up local AI means stitching together a dozen projects, writing Docker configs from scratch, and praying everything talks to each other. Most people give up and go back to paying OpenAI.
 
-The practical problem is real too: setting up local AI usually means stitching together a dozen projects, debugging CUDA drivers, writing Docker configs, and hoping everything talks to each other. Dream Server replaces all of that.
+We built Dream Server so you don't have to.
 
-- **Run one command** — the installer detects your GPU, picks the right model for your hardware, generates secure credentials, and launches everything
-- **Chat in under 2 minutes** — bootstrap mode starts a small model instantly while your full model downloads in the background
-- **13 integrated services** — chat, agents, voice, workflows, search, RAG, image generation, and more, all pre-wired and working together
-- **Fully moddable** — drop in a folder, run `dream enable`, done. Every service is an extension
+- **One command** — detects your GPU, picks the right model, generates credentials, launches everything
+- **Chatting in under 2 minutes** — bootstrap mode gives you a working model instantly while your full model downloads in the background
+- **13 services, pre-wired** — chat, agents, voice, workflows, search, RAG, image generation, privacy tools. All talking to each other out of the box
+- **Fully moddable** — every service is an extension. Drop in a folder, run `dream enable`, done
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Light-Heart-Labs/DreamServer/main/dream-server/get-dream-server.sh | bash
@@ -124,7 +124,7 @@ See the [macOS Quickstart](dream-server/docs/MACOS-QUICKSTART.md) for details.
 
 ---
 
-## What You Get
+## What's In The Box
 
 ### Chat & Inference
 - **Open WebUI** — full-featured chat interface with conversation history, web search, document upload, and [30+ languages](https://docs.openwebui.com)
@@ -288,10 +288,12 @@ dream preset load gaming    # Restore it
 
 ## How It Compares
 
+Other tools get you part of the way. Dream Server gets you the whole way.
+
 | | Dream Server | Ollama + Open WebUI | LocalAI |
 |---|:---:|:---:|:---:|
-| **Built for** | Sovereign local AI ownership | Running a model locally | Running a model locally |
-| One-command full-stack install | LLM + agents + workflows + RAG + voice + images | LLM + chat only | LLM only |
+| **Scope** | Full AI stack — inference to agents to workflows | LLM + chat | LLM only |
+| One-command install | Everything, auto-configured | LLM + chat only | LLM only |
 | Hardware auto-detect + model selection | NVIDIA + AMD Strix Halo | No | No |
 | AMD APU unified memory support | ROCm + llama-server | Partial (Vulkan) | No |
 | Autonomous AI agents | OpenClaw | No | No |
@@ -379,6 +381,6 @@ Apache 2.0 — Use it, modify it, ship it. See [LICENSE](LICENSE).
 
 <div align="center">
 
-*Built by [Light Heart Labs](https://github.com/Light-Heart-Labs) and [The Collective](https://github.com/Light-Heart-Labs/DreamServer)*
+*Built by [Light Heart Labs](https://github.com/Light-Heart-Labs) and the growing resistance that refuses to rent what should be owned.*
 
 </div>
