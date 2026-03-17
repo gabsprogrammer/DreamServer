@@ -16,6 +16,7 @@
 #   Multi-distro: uses packaging.sh for distro-agnostic package installs.
 # ============================================================================
 
+dream_progress 30 "docker" "Setting up Docker"
 show_phase 3 6 "Docker Setup" "~2 minutes"
 ai "Preparing container runtime..."
 

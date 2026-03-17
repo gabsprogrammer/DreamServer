@@ -21,6 +21,7 @@
 . "$SCRIPT_DIR/lib/service-registry.sh"
 sr_load
 
+dream_progress 85 "health" "Checking service health"
 show_phase 6 6 "Systems Online" "~1-2 minutes"
 
 if $DRY_RUN; then

@@ -15,6 +15,7 @@
 #   Add new container images or change image tags here.
 # ============================================================================
 
+dream_progress 48 "images" "Downloading container images"
 show_phase 4 6 "Downloading Modules" "~5-10 minutes"
 
 # Build image list with cinematic labels

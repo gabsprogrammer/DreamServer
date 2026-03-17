@@ -22,6 +22,7 @@
 #   Change tier auto-detection thresholds or add new hardware classes here.
 # ============================================================================
 
+dream_progress 12 "detection" "Detecting GPU hardware"
 chapter "SYSTEM DETECTION"
 
 # Cloud mode: skip GPU detection entirely

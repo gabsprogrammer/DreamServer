@@ -23,6 +23,7 @@
 #   or change directory layout here.
 # ============================================================================
 
+dream_progress 38 "directories" "Preparing installation directory"
 chapter "SETTING UP INSTALLATION"
 
 if $DRY_RUN; then

@@ -14,6 +14,7 @@
 #   Add new developer tools or change installation methods here.
 # ============================================================================
 
+dream_progress 42 "devtools" "Installing developer tools"
 if $DRY_RUN; then
     log "[DRY RUN] Would install AI developer tools (Claude Code, Codex CLI, OpenCode)"
     log "[DRY RUN] Would configure OpenCode for local llama-server (user-level systemd service on port 3003)"

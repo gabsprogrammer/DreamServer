@@ -17,6 +17,7 @@
 #   Change model download logic or compose launch flags here.
 # ============================================================================
 
+dream_progress 75 "services" "Starting services"
 show_phase 5 6 "Starting Services" "~2-3 minutes"
 
 if $DRY_RUN; then
