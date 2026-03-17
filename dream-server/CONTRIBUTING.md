@@ -64,21 +64,45 @@ npm run lint
 npm run build
 ```
 
-## High-Value Contributions
+## Current Priorities
 
-- extension manifests and service integrations
-- dashboard plugin/registry improvements
-- installer mods: new tiers, themes, phases (see [docs/INSTALLER-ARCHITECTURE.md](docs/INSTALLER-ARCHITECTURE.md))
-- installer portability and platform support
-- workflow catalog quality and docs
-- CI coverage and deterministic tests
+These are the things we most need help with, in order of impact:
+
+1. **Model switching UI** — let users swap models from the dashboard without reinstalling or touching the CLI. The backend (`dream model swap`) exists; the frontend doesn't.
+2. **Bun website installer** — a one-click install experience from the website. This is a greenfield project — talk to us before starting.
+3. **Dashboard theming** — customizable color themes so users can make the dashboard their own. CSS variables, theme picker, preset themes.
+4. **Extensions reliability** — manifest validation, health check coverage, dependency resolution. The foundation is in; keep hardening it.
+5. **Multi-GPU utilization** — we detect multiple GPUs but don't split work across them yet.
+
+If you want to tackle any of these, open an issue first so we can align on approach.
+
+## What We'll Merge Fast
+
+- Bug fixes with reproduction steps
+- Tests for existing untested code paths
+- Focused, single-concern PRs that do one thing well
+- Platform support (new OS, new GPU vendor, new hardware tier)
+- Security fixes with clear explanation of the vulnerability
+
+## What Will Get Bounced Back
+
+We've learned these patterns the hard way. Save yourself a review cycle:
+
+- **Mega-PRs that bundle unrelated changes.** One PR = one concern. A bug fix + a feature + a refactor = three PRs.
+- **Code that wasn't run.** If your function is called but never defined, or your shell variable won't expand in that context, we'll catch it. Run your code locally before submitting.
+- **Breaking changes without migration.** Changing port defaults, tightening schemas, broadening volume mounts — these all need migration notes and maintainer discussion first. Open an issue before the PR.
+- **Tests for features that don't exist.** A test suite that skip()'s every check because the underlying feature isn't implemented gives false confidence. Write the tests alongside the feature.
+- **Formatting-only PRs.** We appreciate clean code, but a PR that only runs black/prettier across the codebase creates merge conflicts for everyone else and adds no functionality.
+- **Over-engineering.** If the problem is simple, the solution should be simple. Don't add configuration, abstraction layers, or feature flags for one-time operations.
 
 ## Style
 
-- Bash: predictable, defensive, and syntax-clean
+- Bash: `set -euo pipefail`, quote your variables, use `shellcheck`
+- Python: match the style of the file you're editing, no reformatting unrelated code
 - YAML/JSON: stable keys, minimal noise, no tabs
 - Docs: concrete commands and compatibility notes
+- Commits: short imperative subject line, explain *why* not *what* in the body
 
 ## Questions
 
-Open an issue and include enough context to reproduce the problem quickly.
+Open an issue or start a [GitHub Discussion](https://github.com/Light-Heart-Labs/DreamServer/discussions). Include enough context to reproduce the problem quickly. We're happy to help you figure out the right approach before you write code — it's much faster than reviewing a PR that needs a redesign.
