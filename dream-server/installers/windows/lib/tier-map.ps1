@@ -120,8 +120,10 @@ function ConvertTo-TierFromGpu {
     $backend = $GpuInfo.Backend
     $vramMB  = $GpuInfo.VramMB
 
-    # Cloud mode -- no GPU
+    # No GPU detected -- use Tier 0 for local inference on low-RAM machines,
+    # otherwise fall back to CLOUD (API) mode
     if ($backend -eq "none") {
+        if ($SystemRamGB -lt 12) { return "0" }
         return "CLOUD"
     }
 

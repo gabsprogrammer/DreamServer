@@ -1299,14 +1299,20 @@ cmd_model() {
             local tier="${2:-}"
             [[ -z "$tier" ]] && error "Usage: dream model swap <T0|T1|T2|T3|T4|SH|SH_LARGE|NV_ULTRA>"
             tier=$(echo "$tier" | tr '[:lower:]' '[:upper:]')
-            # Source tier-map for model lookup
+            # Source tier-map and resolve full config (model, GGUF, context)
             . "$INSTALL_DIR/installers/lib/tier-map.sh"
             local model
             model=$(tier_to_model "$tier")
             [[ -z "$model" ]] && error "Unknown tier: $tier"
+            TIER="$tier"
+            resolve_tier_config
             _env_set "LLM_MODEL" "$model"
             _env_set "TIER" "$tier"
-            success "Model set to $model (tier $tier). Run 'dream restart llama-server' to apply."
+            _env_set "GGUF_FILE" "$GGUF_FILE"
+            _env_set "GGUF_URL" "$GGUF_URL"
+            _env_set "CTX_SIZE" "$MAX_CONTEXT"
+            _env_set "MAX_CONTEXT" "$MAX_CONTEXT"
+            success "Model set to $model (tier $tier, ctx=$MAX_CONTEXT). Run 'dream restart llama-server' to apply."
             ;;
         *)
             error "Usage: dream model <current|list|swap>"
