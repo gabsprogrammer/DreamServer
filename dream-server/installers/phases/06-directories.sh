@@ -35,12 +35,14 @@ if $DRY_RUN; then
     log "[DRY RUN] Would validate .env against schema"
 else
     # Create directories
+    dream_progress 38 "directories" "Creating directory structure"
     mkdir -p "$INSTALL_DIR"/{config,data,models}
     mkdir -p "$INSTALL_DIR"/data/{open-webui,whisper,tts,n8n,qdrant,models}
     mkdir -p "$INSTALL_DIR"/data/langfuse/{postgres,clickhouse,redis,minio}
     mkdir -p "$INSTALL_DIR"/config/{n8n,litellm,openclaw,searxng}
 
     # Copy entire source tree to install dir (skip if same directory)
+    dream_progress 39 "directories" "Copying source files"
     if [[ "$SCRIPT_DIR" != "$INSTALL_DIR" ]]; then
         ai "Copying source files to $INSTALL_DIR..."
         if command -v rsync &>/dev/null; then
@@ -213,6 +215,7 @@ MODELS_EOF
     fi
 
     # ── .env merge logic: preserve user-configured values on re-install ──
+    dream_progress 40 "directories" "Generating secrets and configuration"
     # If an existing .env exists, read user-editable values so we don't
     # destroy API keys, custom ports, or manually-set secrets.
     _env_existing=""
@@ -379,6 +382,7 @@ ENV_EOF
     ai_ok "Generated secure secrets in .env (permissions: 600)"
 
     # Validate generated .env against schema (fails fast on missing/unknown keys).
+    dream_progress 41 "directories" "Validating configuration"
     if [[ -f "$SCRIPT_DIR/scripts/validate-env.sh" && -f "$SCRIPT_DIR/.env.schema.json" ]]; then
         if bash "$SCRIPT_DIR/scripts/validate-env.sh" "$INSTALL_DIR/.env" "$SCRIPT_DIR/.env.schema.json" >> "$LOG_FILE" 2>&1; then
             ai_ok "Validated .env against .env.schema.json"

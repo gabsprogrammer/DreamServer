@@ -63,6 +63,10 @@ else
         label="${entry##*|}"
         pull_count=$((pull_count + 1))
 
+        # Sub-milestone: interpolate progress 48-64% across image pulls
+        _img_pct=$(( 48 + (pull_count - 1) * 16 / pull_total ))
+        dream_progress "$_img_pct" "images" "Pulling image $pull_count/$pull_total"
+
         if ! pull_with_progress "$img" "$label" "$pull_count" "$pull_total"; then
             ai_warn "Failed to pull $img — will retry on next start"
             pull_failed=$((pull_failed + 1))
