@@ -1,7 +1,5 @@
 """Tests for workflows router endpoints."""
 
-from unittest.mock import patch, AsyncMock
-
 
 def test_workflows_requires_auth(test_client):
     """GET /api/workflows without auth → 401."""

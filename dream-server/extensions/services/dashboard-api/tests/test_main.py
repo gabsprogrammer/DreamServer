@@ -54,11 +54,12 @@ class TestGetAllowedOrigins:
 class TestPreflightDocker:
 
     def test_docker_available(self, test_client, monkeypatch):
-        monkeypatch.setattr("main.os.path.exists", lambda p: False)
+        import os.path as _ospath
+        monkeypatch.setattr(_ospath, "exists", lambda p: False)
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "Docker version 24.0.7, build afdd53b"
-        monkeypatch.setattr("subprocess.run", lambda *a, **kw: mock_result)
+        monkeypatch.setattr(subprocess, "run", lambda *a, **kw: mock_result)
 
         resp = test_client.get("/api/preflight/docker", headers=test_client.auth_headers)
         assert resp.status_code == 200
@@ -67,9 +68,10 @@ class TestPreflightDocker:
         assert "24.0.7" in data["version"]
 
     def test_docker_not_installed(self, test_client, monkeypatch):
-        monkeypatch.setattr("main.os.path.exists", lambda p: False)
+        import os.path as _ospath
+        monkeypatch.setattr(_ospath, "exists", lambda p: False)
         monkeypatch.setattr(
-            "subprocess.run",
+            subprocess, "run",
             MagicMock(side_effect=FileNotFoundError("docker not found")),
         )
 
@@ -80,9 +82,10 @@ class TestPreflightDocker:
         assert "not installed" in data["error"]
 
     def test_docker_timeout(self, test_client, monkeypatch):
-        monkeypatch.setattr("main.os.path.exists", lambda p: False)
+        import os.path as _ospath
+        monkeypatch.setattr(_ospath, "exists", lambda p: False)
         monkeypatch.setattr(
-            "subprocess.run",
+            subprocess, "run",
             MagicMock(side_effect=subprocess.TimeoutExpired(cmd=["docker"], timeout=5)),
         )
 
