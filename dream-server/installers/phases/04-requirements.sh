@@ -105,6 +105,7 @@ else
         4) MIN_RAM=64 ;;
         3) MIN_RAM=48 ;;
         2) MIN_RAM=32 ;;
+        0) MIN_RAM=4 ;;
         *) MIN_RAM=16 ;;
     esac
     if [[ $RAM_GB -lt $MIN_RAM ]]; then
@@ -113,6 +114,7 @@ else
         ai_ok "RAM: ${RAM_GB}GB (recommended: ${MIN_RAM}GB+)"
     fi
     case $TIER in
+        0) MIN_DISK=15 ;;
         1) MIN_DISK=30 ;;
         2) MIN_DISK=50 ;;
         3) MIN_DISK=80 ;;

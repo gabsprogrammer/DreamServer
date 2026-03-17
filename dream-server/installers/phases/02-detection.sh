@@ -208,6 +208,8 @@ if [[ -z "$TIER" ]]; then
         TIER=3
     elif [[ $GPU_VRAM -ge 12000 ]] || [[ $RAM_GB -ge 48 ]]; then
         TIER=2
+    elif [[ $GPU_VRAM -lt 4000 ]] && [[ $RAM_GB -lt 12 ]]; then
+        TIER=0
     else
         TIER=1
     fi
