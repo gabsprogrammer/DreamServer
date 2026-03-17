@@ -46,6 +46,7 @@ elif command -v python >/dev/null 2>&1; then
 fi
 
 "$PYTHON_CMD" - "$SCRIPT_DIR" "$TIER" "$GPU_BACKEND" "$PROFILE_OVERLAYS" "$ENV_MODE" <<'PY'
+import os
 import pathlib
 import sys
 import json
