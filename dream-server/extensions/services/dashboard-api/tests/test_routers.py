@@ -49,6 +49,24 @@ def test_workflows_requires_auth(test_client):
     assert resp.status_code == 401
 
 
+def test_agents_metrics_requires_auth(test_client):
+    """GET /api/agents/metrics without auth header → 401."""
+    resp = test_client.get("/api/agents/metrics")
+    assert resp.status_code == 401
+
+
+def test_agents_cluster_requires_auth(test_client):
+    """GET /api/agents/cluster without auth header → 401."""
+    resp = test_client.get("/api/agents/cluster")
+    assert resp.status_code == 401
+
+
+def test_agents_throughput_requires_auth(test_client):
+    """GET /api/agents/throughput without auth header → 401."""
+    resp = test_client.get("/api/agents/throughput")
+    assert resp.status_code == 401
+
+
 # ---------------------------------------------------------------------------
 # Setup router
 # ---------------------------------------------------------------------------
@@ -309,3 +327,41 @@ def test_api_service_tokens_authenticated(test_client):
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, dict)
+
+
+# ---------------------------------------------------------------------------
+# Agents router
+# ---------------------------------------------------------------------------
+
+
+def test_agents_metrics_authenticated(test_client):
+    """GET /api/agents/metrics with auth → 200, returns agent metrics."""
+    resp = test_client.get("/api/agents/metrics", headers=test_client.auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "agent" in data
+    assert "cluster" in data
+    assert "throughput" in data
+
+
+def test_agents_cluster_authenticated(test_client):
+    """GET /api/agents/cluster with auth → 200, returns cluster status."""
+    resp = test_client.get("/api/agents/cluster", headers=test_client.auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "nodes" in data
+    assert "total_gpus" in data
+    assert "active_gpus" in data
+    assert "failover_ready" in data
+
+
+def test_agents_throughput_authenticated(test_client):
+    """GET /api/agents/throughput with auth → 200, returns throughput stats."""
+    resp = test_client.get("/api/agents/throughput", headers=test_client.auth_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "current" in data
+    assert "average" in data
+    assert "peak" in data
+    assert "history" in data
+
