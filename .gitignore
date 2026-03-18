@@ -68,3 +68,4 @@ dream-server/.cache/
 # ============================================
 archive/
 .claude/
+!.claude/commands/
