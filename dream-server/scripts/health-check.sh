@@ -114,10 +114,13 @@ test_llm() {
 }
 
 # Check Docker container state for a service
-# Returns: 0 if running, 1 if not running (sets container_state result)
+# Returns: container state string (or empty if docker unavailable/container name missing)
 check_container_state() {
     local sid="$1"
     local container="${SERVICE_CONTAINERS[$sid]}"
+
+    # Guard: empty container name
+    [[ -z "$container" ]] && return 0
 
     # Skip if docker not available
     if ! command -v docker &>/dev/null; then
@@ -125,20 +128,22 @@ check_container_state() {
     fi
 
     # Get container state via docker inspect
-    local state=$(docker inspect --format '{{.State.Status}}' "$container" 2>/dev/null)
+    local state
+    state=$(docker inspect --format '{{.State.Status}}' "$container" 2>&1)
+    local inspect_exit=$?
 
-    if [[ -z "$state" ]]; then
-        result_set "${sid}_container" "not_found"
+    if [[ $inspect_exit -ne 0 ]]; then
+        echo "not_found"
         return 1
     elif [[ "$state" == "running" ]]; then
-        result_set "${sid}_container" "running"
+        echo "running"
         return 0
     elif [[ "$state" == "restarting" ]]; then
-        result_set "${sid}_container" "restarting"
+        echo "restarting"
         return 1
     else
         # exited, paused, dead, created
-        result_set "${sid}_container" "$state"
+        echo "$state"
         return 1
     fi
 }
@@ -158,7 +163,9 @@ test_service() {
     [[ -z "$health" || "$port" == "0" ]] && return 1
 
     # Check container state first (if docker available)
-    if ! check_container_state "$sid" 2>/dev/null; then
+    local container_state
+    container_state=$(check_container_state "$sid")
+    if [[ -n "$container_state" && "$container_state" != "running" ]]; then
         result_set "$sid" "fail"
         ANY_FAIL=true
         return 1
@@ -231,10 +238,15 @@ check_service() {
 check_service_async() {
     local sid="$1"
     local result_file="$2"
+
+    # Check container state first
+    local container_state
+    container_state=$(check_container_state "$sid")
+
     if test_service "$sid" 2>/dev/null; then
-        echo "ok:$sid" > "$result_file"
+        echo "ok:$sid:$container_state" > "$result_file"
     else
-        echo "fail:$sid" > "$result_file"
+        echo "fail:$sid:$container_state" > "$result_file"
     fi
 }
 
@@ -281,11 +293,14 @@ for sid in "${CORE_SIDS[@]}"; do
     if [[ -f "$result_file" ]]; then
         result=$(cat "$result_file")
         name="${SERVICE_NAMES[$sid]:-$sid}"
-        if [[ "$result" == "ok:$sid" ]]; then
+
+        # Parse result format: status:sid:container_state
+        IFS=':' read -r status sid_check container_state <<< "$result"
+
+        if [[ "$status" == "ok" ]]; then
             log "  ${GREEN}✓${NC} $name - healthy"
         else
-            # Check container state for better error message
-            container_state=$(result_get "${sid}_container")
+            # Use container state for better error message
             case "$container_state" in
                 not_found)
                     log "  ${YELLOW}!${NC} $name - container not found"
@@ -332,11 +347,14 @@ for sid in "${EXT_SIDS[@]}"; do
     if [[ -f "$result_file" ]]; then
         result=$(cat "$result_file")
         name="${SERVICE_NAMES[$sid]:-$sid}"
-        if [[ "$result" == "ok:$sid" ]]; then
+
+        # Parse result format: status:sid:container_state
+        IFS=':' read -r status sid_check container_state <<< "$result"
+
+        if [[ "$status" == "ok" ]]; then
             log "  ${GREEN}✓${NC} $name - healthy"
         else
-            # Check container state for better error message
-            container_state=$(result_get "${sid}_container")
+            # Use container state for better error message
             case "$container_state" in
                 not_found)
                     log "  ${YELLOW}!${NC} $name - container not found"
