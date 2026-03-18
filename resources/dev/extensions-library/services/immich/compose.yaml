@@ -1,5 +1,3 @@
-name: immich
-
 services:
   immich-server:
     image: ghcr.io/immich-app/immich-server:v1.131.3
@@ -88,4 +86,3 @@ services:
 networks:
   dream-network:
     external: true
-    name: dream-network

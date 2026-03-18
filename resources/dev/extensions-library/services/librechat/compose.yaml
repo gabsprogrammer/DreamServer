@@ -36,8 +36,8 @@ services:
       - DALLE3_BASEURL=${DALLE3_BASEURL:-}
       - CREDS_KEY=${CREDS_KEY:-}
       - CREDS_IV=${CREDS_IV:-}
-      - JWT_SECRET=${JWT_SECRET:-}
-      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET must be set}
       - APP_TITLE=${APP_TITLE:-LibreChat}
       - DOMAIN_CLIENT=${DOMAIN_CLIENT:-}
       - DOMAIN_SERVER=${DOMAIN_SERVER:-}
@@ -86,7 +86,7 @@ services:
       - no-new-privileges:true
     environment:
       - MONGO_INITDB_ROOT_USERNAME=librechat
-      - MONGO_INITDB_ROOT_PASSWORD=${LIBRECHAT_MONGO_PASSWORD:-librechat123}
+      - MONGO_INITDB_ROOT_PASSWORD=${LIBRECHAT_MONGO_PASSWORD:?LIBRECHAT_MONGO_PASSWORD must be set}
     volumes:
       - ./data/librechat/mongodb:/data/db:rw
     healthcheck:
@@ -114,7 +114,7 @@ services:
       - no-new-privileges:true
     environment:
       - MEILI_ENV=production
-      - MEILI_MASTER_KEY=${LIBRECHAT_MEILI_KEY:-librechat_meili_master_key}
+      - MEILI_MASTER_KEY=${LIBRECHAT_MEILI_KEY:?LIBRECHAT_MEILI_KEY must be set}
     volumes:
       - ./data/librechat/meilisearch:/meili_data:rw
     healthcheck:
