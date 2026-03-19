@@ -269,6 +269,8 @@ MODELS_INI_EOF
     ai "I'm bringing systems online. You can breathe."
     echo ""
     compose_ok=false
+    # Force-rebuild locally-built images so re-installs never serve stale code
+    $DOCKER_COMPOSE_CMD "${COMPOSE_FLAGS_ARR[@]}" build --no-cache dashboard-api dashboard >> "$LOG_FILE" 2>&1 || true
     $DOCKER_COMPOSE_CMD "${COMPOSE_FLAGS_ARR[@]}" up --build -d >> "$LOG_FILE" 2>&1 &
     compose_pid=$!
     if spin_task $compose_pid "Launching containers..."; then
