@@ -288,8 +288,10 @@ MODELS_INI_EOF
             compose_ok=true
         fi
     fi
-    # Final safety net: start any containers stuck in Created state
-    $DOCKER_COMPOSE_CMD "${COMPOSE_FLAGS_ARR[@]}" up -d --no-build >> "$LOG_FILE" 2>&1 || true
+    # Safety net: start any containers left in Created state (from missing image errors)
+    # When --no-build hits a missing image, compose aborts before starting other
+    # created-but-not-started containers. docker start catches those.
+    docker start $(docker ps -a --filter status=created -q) 2>/dev/null || true
 
     if $compose_ok; then
         printf "\r  ${BGRN}✓${NC} %-60s\n" "All containers launched"
