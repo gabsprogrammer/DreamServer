@@ -203,6 +203,59 @@ BASHRC_EOF
     fi
 fi
 
+#=============================================================================
+# Symlink dream CLI to PATH
+#=============================================================================
+if ! $DRY_RUN; then
+    if [[ -x "$INSTALL_DIR/dream-cli" ]]; then
+        if ! command -v dream &>/dev/null; then
+            if sudo -n ln -sf "$INSTALL_DIR/dream-cli" /usr/local/bin/dream 2>/dev/null; then
+                ai_ok "dream command installed (try: dream status)"
+            else
+                ai_warn "Could not create 'dream' command. Add manually:"
+                ai "  sudo ln -sf $INSTALL_DIR/dream-cli /usr/local/bin/dream"
+            fi
+        else
+            ai_ok "dream command already available"
+        fi
+    fi
+fi
+
+#=============================================================================
+# Post-Install Validation
+#=============================================================================
+if ! $DRY_RUN; then
+    # Check Perplexica config was seeded (phase 12 may have failed silently)
+    if docker inspect dream-perplexica &>/dev/null; then
+        _perplexica_status=$(curl -sf --max-time 5 "http://localhost:${SERVICE_PORTS[perplexica]:-3004}/api/config" 2>/dev/null | \
+            "$PYTHON_CMD" -c "import sys,json;d=json.load(sys.stdin);print('ok' if d['values'].get('setupComplete') else 'needed')" 2>/dev/null || echo "skip")
+        if [[ "$_perplexica_status" == "needed" ]]; then
+            ai_warn "Perplexica config incomplete — running auto-setup..."
+            if [[ -x "$INSTALL_DIR/scripts/repair/repair-perplexica.sh" ]]; then
+                bash "$INSTALL_DIR/scripts/repair/repair-perplexica.sh" \
+                    "http://localhost:${SERVICE_PORTS[perplexica]:-3004}" \
+                    "${LLM_MODEL:-qwen3-14b}" >> "$LOG_FILE" 2>&1 && \
+                    ai_ok "Perplexica configured" || \
+                    ai_warn "Perplexica may need manual config at :${SERVICE_PORTS[perplexica]:-3004}"
+            fi
+        fi
+    fi
+
+    # Check render/video groups for AMD GPU users
+    if [[ "${GPU_BACKEND:-}" == "amd" ]]; then
+        if ! groups 2>/dev/null | grep -qE "\b(render|video)\b"; then
+            echo ""
+            echo -e "${AMB}┌──────────────────────────────────────────────────────────────┐${NC}"
+            echo -e "${AMB}│  AMD GPU: user not in render/video groups                    │${NC}"
+            echo -e "${AMB}│  GPU-accelerated services (ComfyUI, ROCm) may not work.      │${NC}"
+            echo -e "${AMB}│                                                              │${NC}"
+            echo -e "${AMB}│  Fix: sudo usermod -aG render,video \$USER                    │${NC}"
+            echo -e "${AMB}│  Then log out and back in.                                   │${NC}"
+            echo -e "${AMB}└──────────────────────────────────────────────────────────────┘${NC}"
+        fi
+    fi
+fi
+
 echo ""
 signal "Broadcast stable. You're free now."
 echo ""

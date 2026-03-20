@@ -258,6 +258,12 @@ resolve_service() {
 
 # Build full compose flags: base + GPU overlay + enabled extensions
 get_compose_flags() {
+    # Fast path: use saved flags from installer if available
+    if [[ -f "$INSTALL_DIR/.compose-flags" ]]; then
+        cat "$INSTALL_DIR/.compose-flags"
+        return
+    fi
+    # Fallback: resolve dynamically
     local base_flags
     if [[ -x "$INSTALL_DIR/scripts/resolve-compose-stack.sh" ]]; then
         base_flags=$("$INSTALL_DIR/scripts/resolve-compose-stack.sh" \
@@ -557,6 +563,62 @@ cmd_start() {
         log "Starting $service..."
         docker compose "${flags[@]}" up -d "$service"
         success "$service started"
+    fi
+}
+
+cmd_repair() {
+    check_install
+    cd "$INSTALL_DIR"
+    sr_load
+
+    local service="${1:-}"
+    if [[ -z "$service" ]]; then
+        error "Usage: dream repair <service>  (e.g. dream repair perplexica)"
+    fi
+
+    service=$(resolve_service "$service")
+    local container="${SERVICE_CONTAINERS[$service]:-dream-$service}"
+
+    local flags_str
+    flags_str=$(get_compose_flags)
+    local -a flags
+    read -ra flags <<< "$flags_str"
+
+    log "Repairing $service..."
+
+    # Stop and remove container
+    log "Stopping $service..."
+    docker stop "$container" 2>/dev/null || true
+    docker rm "$container" 2>/dev/null || true
+
+    # Find and remove service volumes
+    local volumes
+    volumes=$(docker compose "${flags[@]}" config --volumes 2>/dev/null | grep -i "$service" || true)
+    local project
+    project=$(basename "$INSTALL_DIR" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-')
+    for vol in $volumes; do
+        local full_vol="${project}_${vol}"
+        if docker volume inspect "$full_vol" &>/dev/null; then
+            log "Removing volume $full_vol..."
+            docker volume rm "$full_vol" 2>/dev/null || true
+        fi
+    done
+
+    # Recreate container
+    log "Recreating $service..."
+    docker compose "${flags[@]}" up -d "$service"
+
+    # Run service-specific repair script if one exists
+    local repair_script="$INSTALL_DIR/scripts/repair/repair-${service}.sh"
+    if [[ -x "$repair_script" ]]; then
+        local port="${SERVICE_PORTS[$service]:-}"
+        local model="${LLM_MODEL:-qwen3-14b}"
+        log "Running config repair for $service..."
+        bash "$repair_script" "http://localhost:${port}" "$model" && \
+            success "$service repaired and configured" || \
+            warn "$service started but config seed failed — may need manual setup"
+    else
+        success "$service repaired"
     fi
 }
 
@@ -1869,6 +1931,7 @@ case "${1:-help}" in
     rollback)    cmd_rollback ;;
     logs|log|l)  shift; cmd_logs "$@" ;;
     restart|r)   shift; cmd_restart "$@" ;;
+    repair|fix)  shift; cmd_repair "$@" ;;
     start)       shift; cmd_start "$@" ;;
     stop)        shift; cmd_stop "$@" ;;
     update|u)    shift; cmd_update "$@" ;;

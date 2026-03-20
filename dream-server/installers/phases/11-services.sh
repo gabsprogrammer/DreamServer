@@ -28,6 +28,10 @@ else
     read -ra COMPOSE_FLAGS_ARR <<< "$COMPOSE_FLAGS"
     mkdir -p "$INSTALL_DIR/logs"
 
+    # Persist compose flags so dream-cli can reuse them without re-resolving
+    echo "$COMPOSE_FLAGS" > "$INSTALL_DIR/.compose-flags"
+    log "Saved compose flags to $INSTALL_DIR/.compose-flags"
+
     # Cloud mode: skip model downloads, auto-enable litellm
     if [[ "${DREAM_MODE:-local}" == "cloud" ]]; then
         ai "Cloud mode — skipping model download"
