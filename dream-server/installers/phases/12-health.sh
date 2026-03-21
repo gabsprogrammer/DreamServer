@@ -21,6 +21,14 @@
 . "$SCRIPT_DIR/lib/service-registry.sh"
 sr_load
 
+# Resolve port overrides from .env (SERVICE_PORTS uses manifest defaults
+# but .env may override them, e.g. OLLAMA_PORT=11434 on Strix Halo)
+if [[ -f "$INSTALL_DIR/.env" ]]; then
+    . "$SCRIPT_DIR/lib/safe-env.sh" 2>/dev/null || true
+    load_env_file "$INSTALL_DIR/.env"
+    sr_resolve_ports
+fi
+
 dream_progress 85 "health" "Checking service health"
 show_phase 6 6 "Systems Online" "~1-2 minutes"
 

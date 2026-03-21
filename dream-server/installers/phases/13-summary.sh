@@ -27,6 +27,13 @@ dream_progress 98 "summary" "Finishing up"
 . "$SCRIPT_DIR/lib/service-registry.sh"
 sr_load
 
+# Resolve port overrides from .env (same as phase 12)
+if [[ -f "$INSTALL_DIR/.env" ]]; then
+    . "$SCRIPT_DIR/lib/safe-env.sh" 2>/dev/null || true
+    load_env_file "$INSTALL_DIR/.env"
+    sr_resolve_ports
+fi
+
 # Get local IP for LAN access
 LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "")
 
