@@ -63,7 +63,7 @@ if (-not $nonInteractive -and -not $allFlag -and -not $dryRun) {
             $enableComfyui   = (Read-Host "  Enable image generation (ComfyUI + FLUX, ~34GB)? [y/N]") -match "^[yY]"
 
             # Warn on low-tier
-            if ($enableComfyui -and ($selectedTier -eq "0" -or $selectedTier -eq "1")) {
+            if ($nonInteractive -and $enableComfyui -and ($selectedTier -eq "0" -or $selectedTier -eq "1")) {
                 Write-AIWarn "ComfyUI requires 8GB+ RAM and a dedicated GPU. Your Tier $selectedTier system may not support it."
                 $enableComfyui = (Read-Host "  Continue with image generation enabled? [y/N]") -match "^[yY]"
             }
@@ -86,9 +86,9 @@ if (-not $nonInteractive -and -not $allFlag -and -not $dryRun) {
     }
 }
 
-# Tier safety net: disable ComfyUI on low-tier systems regardless of interactive mode.
-# In interactive mode, the menu already handles this — this catches -NonInteractive.
-if ($enableComfyui -and ($selectedTier -eq "0" -or $selectedTier -eq "1")) {
+# Tier safety net: disable ComfyUI on Tier 0/1 in non-interactive mode.
+# Interactive mode has its own tier checks in the menu — this catches -NonInteractive.
+if ($nonInteractive -and $enableComfyui -and ($selectedTier -eq "0" -or $selectedTier -eq "1")) {
     $enableComfyui = $false
     Write-AI "ComfyUI auto-disabled for Tier $selectedTier (insufficient RAM for shm_size 8GB)"
 }

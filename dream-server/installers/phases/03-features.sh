@@ -56,9 +56,9 @@ if $INTERACTIVE && ! $DRY_RUN; then
     fi
 fi
 
-# Tier safety net: disable ComfyUI on low-tier systems regardless of interactive mode.
-# In interactive mode, the menu already handles this — this catches --non-interactive.
-if [[ "$ENABLE_COMFYUI" == "true" ]]; then
+# Tier safety net: disable ComfyUI on Tier 0/1 in non-interactive mode.
+# Interactive mode has its own tier checks in the menu — this catches --non-interactive.
+if ! $INTERACTIVE && [[ "$ENABLE_COMFYUI" == "true" ]]; then
     case "${TIER:-}" in
         0|1)
             ENABLE_COMFYUI=false
