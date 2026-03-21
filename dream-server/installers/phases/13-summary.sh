@@ -21,9 +21,18 @@
 #   shortcut here.
 # ============================================================================
 
+dream_progress 98 "summary" "Finishing up"
+
 # Source service registry for port resolution
 . "$SCRIPT_DIR/lib/service-registry.sh"
 sr_load
+
+# Resolve port overrides from .env (same as phase 12)
+if [[ -f "$INSTALL_DIR/.env" ]]; then
+    . "$SCRIPT_DIR/lib/safe-env.sh" 2>/dev/null || true
+    load_env_file "$INSTALL_DIR/.env"
+    sr_resolve_ports
+fi
 
 # Get local IP for LAN access
 LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "")
@@ -38,6 +47,59 @@ fi
 # Show the cinematic success card
 show_success_card "http://localhost:3000" "http://localhost:3001" "$LOCAL_IP"
 
+# Check background tasks before showing additional info
+if [[ -f "$SCRIPT_DIR/installers/lib/background-tasks.sh" ]]; then
+    . "$SCRIPT_DIR/installers/lib/background-tasks.sh"
+
+    # Check if any background tasks are registered
+    if [[ -f "$BG_TASK_REGISTRY" ]]; then
+        echo ""
+        ai "Checking background tasks..."
+        bg_task_summary >> "$LOG_FILE" 2>&1
+
+        # Check FLUX download specifically
+        bg_task_status "flux-download" &>/dev/null
+        flux_status=$?
+        if [[ $flux_status -ne 3 ]]; then
+            case $flux_status in
+                0)  # Still running
+                    ai_warn "FLUX model download still in progress"
+                    ai "ComfyUI image generation will be available once download completes"
+                    ai "Check progress: tail -f $INSTALL_DIR/logs/flux-download.log"
+                    ;;
+                1)  # Completed
+                    ai_ok "FLUX model download completed"
+                    ;;
+                2)  # Failed
+                    ai_warn "FLUX model download encountered errors"
+                    ai "Check log: $INSTALL_DIR/logs/flux-download.log"
+                    ;;
+            esac
+        fi
+    fi
+fi
+
+# Check bootstrap model upgrade status
+if [[ "${_BOOTSTRAP_ACTIVE:-false}" == "true" ]]; then
+    bg_task_status "full-model-download" &>/dev/null
+    _upgrade_status=$?
+    case $_upgrade_status in
+        0)  # Still running
+            echo ""
+            ai_warn "Using bootstrap model ($BOOTSTRAP_LLM_MODEL). Full model ($FULL_LLM_MODEL) downloading..."
+            ai "The model will auto-swap when ready. Check: tail -f $INSTALL_DIR/logs/model-upgrade.log"
+            ;;
+        1)  # Completed
+            ai_ok "Full model ($FULL_LLM_MODEL) downloaded and swapped"
+            ;;
+        2)  # Failed
+            ai_warn "Full model download failed. Currently running bootstrap model ($BOOTSTRAP_LLM_MODEL)"
+            ai "Re-run installer to retry, or check: $INSTALL_DIR/logs/model-upgrade.log"
+            ;;
+    esac
+fi
+
+
 # Additional service info
 bootline
 echo -e "${BGRN}ALL SERVICES${NC}"
@@ -47,9 +109,9 @@ echo "  • Chat UI:       http://localhost:${SERVICE_PORTS[open-webui]:-3000}"
 echo "  • Dashboard:     http://localhost:${SERVICE_PORTS[dashboard]:-3001}"
 echo "  • Perplexica:    http://localhost:${SERVICE_PORTS[perplexica]:-3004}"
 echo "  • ComfyUI:       http://localhost:${SERVICE_PORTS[comfyui]:-8188}"
-echo "  • LLM API:       http://localhost:${SERVICE_PORTS[llama-server]:-8080}/v1  (llama-server)"
+echo "  • LLM API:       http://localhost:${SERVICE_PORTS[llama-server]:-11434}/v1  (llama-server)"
 [[ "$ENABLE_OPENCLAW" == "true" ]] && echo "  • OpenClaw:      http://localhost:${SERVICE_PORTS[openclaw]:-7860}"
-systemctl is-active opencode-web &>/dev/null && echo "  • OpenCode:      http://localhost:3003"
+systemctl --user is-active opencode-web &>/dev/null && echo "  • OpenCode:      http://localhost:3003"
 [[ "$ENABLE_VOICE" == "true" ]] && echo "  • Whisper STT:   http://localhost:${SERVICE_PORTS[whisper]:-9000}"
 [[ "$ENABLE_VOICE" == "true" ]] && echo "  • TTS (Kokoro):  http://localhost:${SERVICE_PORTS[tts]:-8880}"
 [[ "$ENABLE_WORKFLOWS" == "true" ]] && echo "  • n8n:           http://localhost:${SERVICE_PORTS[n8n]:-5678}"
@@ -101,6 +163,22 @@ else
     log "Preflight script not found — skipping validation"
 fi
 
+# Extension manifest validation (non-blocking)
+echo ""
+bootline
+echo -e "${BGRN}VALIDATING EXTENSIONS${NC}"
+bootline
+echo ""
+if [[ -f "$SCRIPT_DIR/scripts/validate-manifests.sh" ]]; then
+    if bash "$SCRIPT_DIR/scripts/validate-manifests.sh"; then
+        ai_ok "Extension manifests validated for this Dream Server version."
+    else
+        warn "Extension manifest validation reported issues. See details above."
+    fi
+else
+    log "Extension validation script not found — skipping extension checks"
+fi
+
 #=============================================================================
 # Desktop Shortcut & Sidebar Pin
 #=============================================================================
@@ -133,6 +211,79 @@ DESKTOP_EOF
     ai_ok "Desktop shortcut created: Dream Server"
 fi
 
+#=============================================================================
+# Bash Completion Setup
+#=============================================================================
+if ! $DRY_RUN; then
+    COMPLETION_FILE="$INSTALL_DIR/completions/dream-cli.bash"
+    if [[ -f "$COMPLETION_FILE" ]]; then
+        # Add completion sourcing to .bashrc if not already present
+        if ! grep -q "dream-cli.bash" "$HOME/.bashrc" 2>/dev/null; then
+            cat >> "$HOME/.bashrc" << 'BASHRC_EOF'
+
+# Dream Server CLI bash completion
+if [[ -f "$HOME/dream-server/completions/dream-cli.bash" ]]; then
+    . "$HOME/dream-server/completions/dream-cli.bash"
+fi
+BASHRC_EOF
+            ai_ok "Bash completion enabled for dream-cli"
+        fi
+    fi
+fi
+
+#=============================================================================
+# Symlink dream CLI to PATH
+#=============================================================================
+if ! $DRY_RUN; then
+    if [[ -x "$INSTALL_DIR/dream-cli" ]]; then
+        if ! command -v dream &>/dev/null; then
+            if sudo -n ln -sf "$INSTALL_DIR/dream-cli" /usr/local/bin/dream 2>/dev/null; then
+                ai_ok "dream command installed (try: dream status)"
+            else
+                ai_warn "Could not create 'dream' command. Add manually:"
+                ai "  sudo ln -sf $INSTALL_DIR/dream-cli /usr/local/bin/dream"
+            fi
+        else
+            ai_ok "dream command already available"
+        fi
+    fi
+fi
+
+#=============================================================================
+# Post-Install Validation
+#=============================================================================
+if ! $DRY_RUN; then
+    # Check Perplexica config was seeded (phase 12 may have failed silently)
+    if docker inspect dream-perplexica &>/dev/null; then
+        _perplexica_status=$(curl -sf --max-time 5 "http://localhost:${SERVICE_PORTS[perplexica]:-3004}/api/config" 2>>"$LOG_FILE" | \
+            "$PYTHON_CMD" -c "import sys,json;d=json.load(sys.stdin);print('ok' if d['values'].get('setupComplete') else 'needed')" 2>>"$LOG_FILE" || echo "skip")
+        if [[ "$_perplexica_status" == "needed" ]]; then
+            ai_warn "Perplexica config incomplete — running auto-setup..."
+            if [[ -x "$INSTALL_DIR/scripts/repair/repair-perplexica.sh" ]]; then
+                bash "$INSTALL_DIR/scripts/repair/repair-perplexica.sh" \
+                    "http://localhost:${SERVICE_PORTS[perplexica]:-3004}" \
+                    "${LLM_MODEL:-qwen3-14b}" >> "$LOG_FILE" 2>&1 && \
+                    ai_ok "Perplexica configured" || \
+                    ai_warn "Perplexica may need manual config at :${SERVICE_PORTS[perplexica]:-3004}"
+            fi
+        fi
+    fi
+
+    # Check render/video groups for AMD GPU users
+    if [[ "${GPU_BACKEND:-}" == "amd" ]]; then
+        if ! groups 2>/dev/null | grep -qE "\b(render|video)\b"; then
+            echo ""
+            echo -e "${AMB}┌──────────────────────────────────────────────────────────────┐${NC}"
+            echo -e "${AMB}│  AMD GPU: user not in render/video groups                    │${NC}"
+            echo -e "${AMB}│  GPU-accelerated services (ComfyUI, ROCm) may not work.      │${NC}"
+            echo -e "${AMB}│                                                              │${NC}"
+            echo -e "${AMB}│  Fix: sudo usermod -aG render,video \$USER                    │${NC}"
+            echo -e "${AMB}│  Then log out and back in.                                   │${NC}"
+            echo -e "${AMB}└──────────────────────────────────────────────────────────────┘${NC}"
+        fi
+    fi
+fi
+
 echo ""
 signal "Broadcast stable. You're free now."
 echo ""
@@ -148,7 +299,7 @@ echo -e "  ${BGRN}Dashboard${NC}    ${WHT}http://localhost:${DASHBOARD_PORT}${NC
 echo -e "  ${BGRN}Chat${NC}         ${WHT}http://localhost:${WEBUI_PORT}${NC}"
 [[ "$ENABLE_OPENCLAW" == "true" ]] && \
 echo -e "  ${BGRN}OpenClaw${NC}     ${WHT}http://localhost:${OPENCLAW_PORT}${NC}"
-systemctl is-active opencode-web &>/dev/null && \
+systemctl --user is-active opencode-web &>/dev/null && \
 echo -e "  ${BGRN}OpenCode${NC}     ${WHT}http://localhost:3003${NC}"
 echo ""
 if [[ -n "$LOCAL_IP" ]]; then
@@ -162,7 +313,15 @@ echo -e "${GRN}─────────────────────�
 echo ""
 
 if [[ -n "$SUMMARY_JSON_FILE" ]]; then
-    python3 - "$SUMMARY_JSON_FILE" "$VERSION" "$INSTALL_DIR" "$TIER" "$TIER_NAME" "$GPU_BACKEND" "${BACKEND_SERVICE_NAME:-llama-server}" "$LLM_MODEL" "$COMPOSE_FLAGS" "$DRY_RUN" "$PREFLIGHT_REPORT_FILE" "${CAP_HARDWARE_CLASS_ID:-unknown}" "${CAP_HARDWARE_CLASS_LABEL:-Unknown}" <<'PY'
+    PYTHON_CMD="python3"
+    if [[ -f "$SCRIPT_DIR/lib/python-cmd.sh" ]]; then
+        . "$SCRIPT_DIR/lib/python-cmd.sh"
+        PYTHON_CMD="$(ds_detect_python_cmd)"
+    elif command -v python >/dev/null 2>&1; then
+        PYTHON_CMD="python"
+    fi
+
+    "$PYTHON_CMD" - "$SUMMARY_JSON_FILE" "$VERSION" "$INSTALL_DIR" "$TIER" "$TIER_NAME" "$GPU_BACKEND" "${BACKEND_SERVICE_NAME:-llama-server}" "$LLM_MODEL" "$COMPOSE_FLAGS" "$DRY_RUN" "$PREFLIGHT_REPORT_FILE" "${CAP_HARDWARE_CLASS_ID:-unknown}" "${CAP_HARDWARE_CLASS_LABEL:-Unknown}" <<'PY'
 import json
 import pathlib
 import sys

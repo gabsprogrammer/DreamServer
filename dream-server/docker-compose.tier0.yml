@@ -1,0 +1,43 @@
+# Tier 0 memory overlay — reduces memory limits and reservations
+# for machines with < 8GB RAM. Layered on top of base + GPU overlay.
+#
+# Only overrides services defined in docker-compose.base.yml.
+# Optional services (n8n, qdrant, whisper, etc.) set their own
+# limits in their per-service compose files.
+#
+# NOTE: Docker Compose v5+ errors if an overlay references a service
+# not defined in any included compose file. Do NOT add optional
+# services here — they may not be in the stack.
+
+services:
+  llama-server:
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 512M
+
+  dashboard:
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+  dashboard-api:
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+  open-webui:
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M

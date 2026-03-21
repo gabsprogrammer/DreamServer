@@ -16,46 +16,138 @@
 #   Multi-distro: uses packaging.sh for distro-agnostic package installs.
 # ============================================================================
 
+dream_progress 30 "docker" "Setting up Docker"
 show_phase 3 6 "Docker Setup" "~2 minutes"
 ai "Preparing container runtime..."
 
 # Ensure package manager is detected
-[[ -z "$PKG_MANAGER" ]] && detect_pkg_manager
+[[ -z "${PKG_MANAGER:-}" ]] && detect_pkg_manager
+
+# Helper wrappers that are safe even if DOCKER_CMD contains spaces (e.g. "sudo docker")
+_docker_cmd_arr() {
+    case "${DOCKER_CMD:-docker}" in
+        "sudo docker") echo "sudo" "docker" ;;
+        *)             echo "docker" ;;
+    esac
+}
+
+docker_run() {
+    # shellcheck disable=SC2207
+    local -a cmd=($(_docker_cmd_arr))
+    "${cmd[@]}" "$@"
+}
+
+docker_compose_run() {
+    # shellcheck disable=SC2207
+    local -a cmd=($(_docker_cmd_arr))
+    "${cmd[@]}" compose "$@"
+}
+
+# Track whether docker group membership is active in this shell
+DOCKER_NEEDS_SUDO=false
 
 if [[ "$SKIP_DOCKER" == "true" ]]; then
     log "Skipping Docker installation (--skip-docker)"
 elif command -v docker &> /dev/null; then
     ai_ok "Docker already installed: $(docker --version)"
 else
+    dream_progress 31 "docker" "Installing Docker engine"
     ai "Installing Docker..."
 
     if $DRY_RUN; then
         log "[DRY RUN] Would install Docker via official script"
     else
-        tmpfile=$(mktemp /tmp/install-docker.XXXXXX.sh)
-        if ! curl -fsSL https://get.docker.com -o "$tmpfile" || ! sh "$tmpfile"; then
-            rm -f "$tmpfile"
-            error "Docker installation failed. Check network connectivity and try again."
-        fi
-        rm -f "$tmpfile"
-        sudo usermod -aG docker $USER
+        case "$PKG_MANAGER" in
+            apt|dnf|zypper)
+                # Docker CE via get.docker.com (supports Debian/Ubuntu/Fedora/RHEL/SLES)
+                tmpfile=$(mktemp /tmp/install-docker.XXXXXX.sh)
+                if ! curl -fsSL --max-time 300 https://get.docker.com -o "$tmpfile" || ! sh "$tmpfile"; then
+                    rm -f "$tmpfile"
+                    error "Docker installation failed. Check network connectivity and try again."
+                fi
+                rm -f "$tmpfile"
+                ;;
+            pacman)
+                # Arch/Manjaro/CachyOS/EndeavourOS -- Docker is in the official repos
+                pkg_install docker
+                sudo systemctl enable --now docker.service 2>>"$LOG_FILE" || true
+                ;;
+            xbps)
+                # Void Linux -- runit service management
+                pkg_install docker
+                sudo ln -s /etc/sv/docker /var/service/ 2>/dev/null || true
+                ;;
+            apk)
+                # Alpine -- OpenRC service management
+                pkg_install docker
+                sudo rc-update add docker boot 2>>"$LOG_FILE" || true
+                sudo service docker start 2>>"$LOG_FILE" || true
+                ;;
+            *)
+                # Unknown distro -- try get.docker.com as best-effort fallback
+                tmpfile=$(mktemp /tmp/install-docker.XXXXXX.sh)
+                if ! curl -fsSL --max-time 300 https://get.docker.com -o "$tmpfile" || ! sh "$tmpfile"; then
+                    rm -f "$tmpfile"
+                    error "Docker installation failed. Your distro (${DISTRO_ID:-unknown}) may not be supported. Install Docker manually and re-run with --skip-docker."
+                fi
+                rm -f "$tmpfile"
+                ;;
+        esac
 
-        # Check if we need to use newgrp or restart
-        if ! groups | grep -q docker; then
-            warn "Docker installed! Group membership requires re-login."
-            warn "Option 1: Log out and back in, then re-run this script with --skip-docker"
-            warn "Option 2: Run 'newgrp docker' in a new terminal, then re-run"
+        # Add the invoking user (not root) to the docker group
+        target_user="${SUDO_USER:-$USER}"
+        sudo usermod -aG docker "$target_user"
+
+        # In most cases group membership won't take effect until a new login shell.
+        if ! id -nG "$target_user" 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
+            DOCKER_NEEDS_SUDO=true
+        fi
+    fi
+fi
+
+# Docker 29.3.x has a bug with /dev/dri device passthrough on AMD GPUs.
+# Containers fail with: "error gathering device information while adding custom device /dev/dri"
+# Pin to 29.2.x until this is resolved upstream.
+# See: https://github.com/moby/moby/issues — device passthrough regression in 29.3.0
+if command -v docker &>/dev/null && ! $DRY_RUN; then
+    _docker_ver=$(docker version --format '{{.Server.Version}}' 2>/dev/null || echo "0.0.0")
+    if [[ "$_docker_ver" == 29.3.* ]] && [[ "${GPU_BACKEND:-}" == "amd" ]]; then
+        ai_warn "Docker $_docker_ver has a known bug with AMD GPU device passthrough."
+        ai "Downgrading to Docker 29.2.1 for AMD GPU compatibility..."
+        # Detect package format
+        if command -v apt-get &>/dev/null; then
+            _distro_codename=$(. /etc/os-release 2>/dev/null && echo "$VERSION_CODENAME" || echo "noble")
+            sudo apt-get install -y --allow-downgrades \
+                docker-ce=5:29.2.1-1~ubuntu."$(. /etc/os-release && echo "$VERSION_ID")"~"$_distro_codename" \
+                docker-ce-cli=5:29.2.1-1~ubuntu."$(. /etc/os-release && echo "$VERSION_ID")"~"$_distro_codename" \
+                >> "$LOG_FILE" 2>&1 && \
+                ai_ok "Docker downgraded to 29.2.1 (AMD GPU fix)" || \
+                ai_warn "Could not downgrade Docker. GPU containers may fail. Manual fix: sudo apt install docker-ce=5:29.2.1-1~ubuntu.24.04~noble"
+        elif command -v dnf &>/dev/null; then
+            sudo dnf downgrade -y docker-ce-29.2.1 docker-ce-cli-29.2.1 >> "$LOG_FILE" 2>&1 && \
+                ai_ok "Docker downgraded to 29.2.1 (AMD GPU fix)" || \
+                ai_warn "Could not downgrade Docker. GPU containers may fail."
+        fi
+        sudo systemctl restart docker 2>/dev/null || true
+    fi
+fi
+
+# Decide whether to use sudo for the rest of this installer session
+if [[ "${DOCKER_CMD:-}" == "" ]]; then
+    if $DOCKER_NEEDS_SUDO; then
+        warn "Docker installed, but group membership may not be active yet (re-login required)."
+        if [[ "${INTERACTIVE:-true}" == "true" ]]; then
             echo ""
-            read -p "  Try to continue with 'sudo docker' for now? [Y/n] " -r
-            if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-                # Use sudo for remaining docker commands in this session
-                DOCKER_CMD="sudo docker"
-                DOCKER_COMPOSE_CMD="sudo docker compose"
-            else
-                log "Please re-run after logging out and back in."
+            read -p "  Continue this installer using 'sudo docker' for now? [Y/n] " -r < /dev/tty
+            if [[ $REPLY =~ ^[Nn]$ ]]; then
+                log "Please re-run after logging out and back in (or after 'newgrp docker')."
                 exit 0
             fi
+        else
+            warn "Non-interactive mode: continuing with 'sudo docker'."
         fi
+        DOCKER_CMD="sudo docker"
+        DOCKER_COMPOSE_CMD="sudo docker compose"
     fi
 fi
 
@@ -64,14 +156,22 @@ DOCKER_CMD="${DOCKER_CMD:-docker}"
 DOCKER_COMPOSE_CMD="${DOCKER_COMPOSE_CMD:-docker compose}"
 
 # Docker Compose check (v2 preferred, v1 fallback)
-if $DOCKER_COMPOSE_CMD version &> /dev/null 2>&1; then
+dream_progress 33 "docker" "Checking Docker Compose"
+if docker_compose_run version &> /dev/null 2>&1; then
     ai_ok "Docker Compose v2 available"
 elif command -v docker-compose &> /dev/null; then
-    DOCKER_COMPOSE_CMD="${DOCKER_CMD%-*}-compose"
-    [[ "$DOCKER_CMD" == "sudo docker" ]] && DOCKER_COMPOSE_CMD="sudo docker-compose"
+    if [[ "$DOCKER_CMD" == "sudo docker" ]]; then
+        DOCKER_COMPOSE_CMD="sudo docker-compose"
+    else
+        DOCKER_COMPOSE_CMD="docker-compose"
+    fi
     ai_ok "Docker Compose v1 available (using docker-compose)"
 else
-    if ! $DRY_RUN; then
+    if [[ "$SKIP_DOCKER" == "true" ]]; then
+        warn "Docker Compose not found (docker compose / docker-compose). Install manually or re-run without --skip-docker."
+    elif $DRY_RUN; then
+        log "[DRY RUN] Would install Docker Compose plugin"
+    else
         ai "Installing Docker Compose plugin..."
         pkg_update
         # shellcheck disable=SC2046
@@ -79,8 +179,145 @@ else
     fi
 fi
 
+# ---------------------------------------------------------------------------
+# Runtime sanity checks
+# ---------------------------------------------------------------------------
+# Goal: make this phase resilient across:
+# - fresh installs (daemon not started yet)
+# - non-interactive runs (can't prompt)
+# - sudo-required sessions (docker group not applied yet)
+# - systems where docker exists but user permissions are wrong
+
+_docker_try_with_optional_sudo() {
+    # If DOCKER_CMD isn't already sudo docker, try docker first and fall back to sudo docker.
+    if docker_run "$@" &>/dev/null; then
+        return 0
+    fi
+
+    if [[ "$DOCKER_CMD" != "sudo docker" ]] && command -v sudo &>/dev/null; then
+        DOCKER_CMD="sudo docker"
+        DOCKER_COMPOSE_CMD="sudo docker compose"
+        if docker_run "$@" &>/dev/null; then
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+_docker_daemon_start_hint() {
+    warn "Docker daemon does not appear to be running or accessible."
+    warn "Common fixes:"
+    warn "  - Linux (systemd): sudo systemctl enable --now docker"
+    warn "  - Linux (non-systemd): start dockerd using your init system"
+    warn "  - WSL2: ensure Docker Desktop is running"
+}
+
+_docker_ensure_daemon() {
+    # Returns 0 if docker responds to 'info' (with optional sudo fallback).
+    # If not, tries to start docker on systemd systems, then retries.
+
+    if _docker_try_with_optional_sudo info; then
+        return 0
+    fi
+
+    # Try to start docker service if systemd is present
+    if command -v systemctl &>/dev/null; then
+        ai_warn "Docker not responding; attempting to start docker service..."
+        if ! $DRY_RUN; then
+            sudo systemctl start docker 2>>"$LOG_FILE" || true
+        fi
+        if _docker_try_with_optional_sudo info; then
+            return 0
+        fi
+    fi
+
+    _docker_daemon_start_hint
+    return 1
+}
+
+_docker_compose_detect_cmd() {
+    # Prefer v2 (docker compose). If docker requires sudo, wrapper will handle it.
+    if docker_compose_run version &>/dev/null 2>&1; then
+        echo "docker compose"
+        return 0
+    fi
+
+    # v1 fallback
+    if command -v docker-compose &>/dev/null; then
+        echo "docker-compose"
+        return 0
+    fi
+
+    echo ""
+    return 1
+}
+
+_docker_compose_verify() {
+    local detected
+    detected="$(_docker_compose_detect_cmd || true)"
+
+    if [[ -n "$detected" ]]; then
+        ai_ok "Compose detected: $detected"
+        return 0
+    fi
+
+    return 1
+}
+
+_docker_post_install_checks() {
+    # Best-effort checks. Should not hard-fail in dry-run.
+    if $DRY_RUN; then
+        log "[DRY RUN] Skipping docker runtime checks"
+        return 0
+    fi
+
+    # Ensure daemon is reachable (and set DOCKER_CMD to sudo docker if needed)
+    if ! _docker_ensure_daemon; then
+        error "Docker is installed but not usable (daemon not running or permissions issue)."
+    fi
+
+    # Show effective docker command (for later phases)
+    log "Using docker command: $DOCKER_CMD"
+
+    # Verify compose availability; if missing, install compose plugin when possible.
+    if ! _docker_compose_verify; then
+        if [[ "$SKIP_DOCKER" == "true" ]]; then
+            warn "Compose missing and --skip-docker set; cannot install compose automatically."
+            return 0
+        fi
+
+        ai_warn "Docker Compose not detected; attempting install of compose plugin..."
+        pkg_update
+        # shellcheck disable=SC2046
+        pkg_install $(pkg_resolve docker-compose-plugin) || true
+
+        if ! _docker_compose_verify; then
+            warn "Compose still not detected after install attempt."
+            warn "You may need to install Docker Compose manually for your distro."
+        fi
+    fi
+
+    # Basic engine health
+    if docker_run version &>/dev/null 2>&1; then
+        ai_ok "Docker engine responding"
+    else
+        warn "Docker engine did not respond to 'docker version'"
+    fi
+
+    # Optional: give the user a clear hint if they are likely missing group perms
+    if [[ "$DOCKER_CMD" == "sudo docker" ]]; then
+        warn "Docker commands are running via sudo in this installer session."
+        warn "After the install finishes, log out/in (or run 'newgrp docker') to use docker without sudo."
+    fi
+}
+
+dream_progress 35 "docker" "Running Docker post-install checks"
+_docker_post_install_checks
+
 # NVIDIA Container Toolkit (skip for AMD — uses /dev/dri + /dev/kfd passthrough)
 if [[ $GPU_COUNT -gt 0 && "$GPU_BACKEND" == "nvidia" ]]; then
+    dream_progress 36 "docker" "Checking NVIDIA Container Toolkit"
     if command -v nvidia-container-cli &> /dev/null 2>&1; then
         ai_ok "NVIDIA Container Toolkit installed"
         # Always regenerate CDI spec — driver version may have changed since last run
@@ -91,12 +328,12 @@ if [[ $GPU_COUNT -gt 0 && "$GPU_BACKEND" == "nvidia" ]]; then
         ai "Installing NVIDIA Container Toolkit..."
         if ! $DRY_RUN; then
             # Add NVIDIA GPG key (used by apt and as trust anchor)
-            curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg 2>/dev/null || true
+            curl -fsSL --max-time 60 https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg 2>/dev/null || true
 
             # Distro-aware repo setup + install
             case "$PKG_MANAGER" in
                 apt)
-                    curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+                    curl -s -L --max-time 60 https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
                         sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
                         sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list > /dev/null
                     # Verify we got a valid repo file, not an HTML 404
@@ -111,7 +348,7 @@ if [[ $GPU_COUNT -gt 0 && "$GPU_BACKEND" == "nvidia" ]]; then
                     fi
                     ;;
                 dnf)
-                    curl -s -L https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo | \
+                    curl -s -L --max-time 60 https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo | \
                         sudo tee /etc/yum.repos.d/nvidia-container-toolkit.repo > /dev/null
                     if ! sudo dnf install -y nvidia-container-toolkit 2>>"$LOG_FILE"; then
                         error "Failed to install NVIDIA Container Toolkit. Check network connectivity and NVIDIA repo configuration."

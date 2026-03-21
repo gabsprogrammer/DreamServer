@@ -12,6 +12,8 @@ param(
     [switch]$OpenClaw,
     [switch]$All,
     [switch]$Cloud,
+    [switch]$Comfyui,
+    [switch]$NoComfyui,
     [string]$SummaryJsonPath = ""
 )
 

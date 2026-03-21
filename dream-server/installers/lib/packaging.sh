@@ -18,6 +18,10 @@ PKG_MANAGER=""
 DISTRO_ID=""
 DISTRO_ID_LIKE=""
 
+# Use sudo only when not already root (e.g. Docker containers run as root)
+_SUDO=""
+if [[ ${EUID:-$(id -u)} -ne 0 ]]; then _SUDO="sudo"; fi
+
 # Detect the system's package manager from /etc/os-release
 # Sets: PKG_MANAGER, DISTRO_ID, DISTRO_ID_LIKE
 detect_pkg_manager() {
@@ -76,10 +80,12 @@ detect_pkg_manager() {
 # Update the package index
 pkg_update() {
     case "$PKG_MANAGER" in
-        apt)    sudo apt-get update -qq 2>>"$LOG_FILE" ;;
-        dnf)    sudo dnf check-update -q 2>>"$LOG_FILE" || true ;;  # returns 100 if updates available
-        pacman) sudo pacman -Syu --noconfirm 2>>"$LOG_FILE" ;;      # full sync+upgrade (partial -Sy is unsafe)
-        zypper) sudo zypper --non-interactive refresh 2>>"$LOG_FILE" ;;
+        apt)    $_SUDO apt-get update -qq 2>>"$LOG_FILE" ;;
+        dnf)    $_SUDO dnf check-update -q 2>>"$LOG_FILE" || true ;;  # returns 100 if updates available
+        pacman) $_SUDO pacman -Syu --noconfirm 2>>"$LOG_FILE" ;;      # full sync+upgrade (partial -Sy is unsafe)
+        zypper) $_SUDO zypper --non-interactive refresh 2>>"$LOG_FILE" ;;
+        xbps)   $_SUDO xbps-install -S 2>>"$LOG_FILE" ;;
+        apk)    $_SUDO apk update 2>>"$LOG_FILE" ;;
         *)      warn "Cannot update package index: unknown package manager '$PKG_MANAGER'" ;;
     esac
 }
@@ -92,10 +98,12 @@ pkg_install() {
 
     log "Installing packages (${PKG_MANAGER}): ${pkgs[*]}"
     case "$PKG_MANAGER" in
-        apt)    sudo apt-get install -y -qq "${pkgs[@]}" 2>>"$LOG_FILE" ;;
-        dnf)    sudo dnf install -y -q "${pkgs[@]}" 2>>"$LOG_FILE" ;;
-        pacman) sudo pacman -S --noconfirm --needed "${pkgs[@]}" 2>>"$LOG_FILE" ;;
-        zypper) sudo zypper --non-interactive install "${pkgs[@]}" 2>>"$LOG_FILE" ;;
+        apt)    $_SUDO apt-get install -y -qq "${pkgs[@]}" 2>>"$LOG_FILE" ;;
+        dnf)    $_SUDO dnf install -y -q "${pkgs[@]}" 2>>"$LOG_FILE" ;;
+        pacman) $_SUDO pacman -S --noconfirm --needed "${pkgs[@]}" 2>>"$LOG_FILE" ;;
+        zypper) $_SUDO zypper --non-interactive install "${pkgs[@]}" 2>>"$LOG_FILE" ;;
+        xbps)   $_SUDO xbps-install -y "${pkgs[@]}" 2>>"$LOG_FILE" ;;
+        apk)    $_SUDO apk add --no-progress "${pkgs[@]}" 2>>"$LOG_FILE" ;;
         *)      warn "Cannot install packages: unknown package manager '$PKG_MANAGER'. Install manually: ${pkgs[*]}" ; return 1 ;;
     esac
 }
@@ -109,6 +117,8 @@ pkg_available() {
         dnf)    dnf info "$pkg" &>/dev/null ;;
         pacman) pacman -Si "$pkg" &>/dev/null ;;
         zypper) zypper info "$pkg" &>/dev/null ;;
+        xbps)   xbps-query -Rs "$pkg" &>/dev/null ;;
+        apk)    apk info -e "$pkg" &>/dev/null || apk search -q "$pkg" &>/dev/null ;;
         *)      return 1 ;;
     esac
 }
@@ -121,12 +131,14 @@ pkg_resolve() {
         apt)
             case "$canonical" in
                 docker-compose-plugin) echo "docker-compose-plugin" ;;
+                python3-pyyaml)        echo "python3-yaml" ;;
                 *) echo "$canonical" ;;
             esac
             ;;
         dnf)
             case "$canonical" in
                 docker-compose-plugin) echo "docker-compose-plugin" ;;
+                python3-pyyaml)        echo "python3-pyyaml" ;;
                 build-essential)       echo "gcc gcc-c++ make" ;;
                 *) echo "$canonical" ;;
             esac
@@ -134,6 +146,7 @@ pkg_resolve() {
         pacman)
             case "$canonical" in
                 docker-compose-plugin) echo "docker-compose" ;;
+                python3-pyyaml)        echo "python-yaml" ;;
                 build-essential)       echo "base-devel" ;;
                 *) echo "$canonical" ;;
             esac
@@ -141,7 +154,24 @@ pkg_resolve() {
         zypper)
             case "$canonical" in
                 docker-compose-plugin) echo "docker-compose" ;;
+                python3-pyyaml)        echo "python3-PyYAML" ;;
                 build-essential)       echo "devel_basis" ;;
+                *) echo "$canonical" ;;
+            esac
+            ;;
+        xbps)
+            case "$canonical" in
+                docker-compose-plugin) echo "docker-compose" ;;
+                python3-pyyaml)        echo "python3-yaml" ;;
+                build-essential)       echo "base-devel" ;;
+                *) echo "$canonical" ;;
+            esac
+            ;;
+        apk)
+            case "$canonical" in
+                docker-compose-plugin) echo "docker-cli-compose" ;;
+                python3-pyyaml)        echo "py3-yaml" ;;
+                build-essential)       echo "build-base" ;;
                 *) echo "$canonical" ;;
             esac
             ;;
