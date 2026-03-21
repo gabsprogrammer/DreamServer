@@ -27,6 +27,17 @@ dream_progress 98 "summary" "Finishing up"
 . "$SCRIPT_DIR/lib/service-registry.sh"
 sr_load
 
+# Resolve port overrides from .env (same as phase 12)
+if [[ -f "$INSTALL_DIR/.env" ]]; then
+    eval "$(grep -E '^(OLLAMA_PORT|WEBUI_PORT|PERPLEXICA_PORT|COMFYUI_PORT|WHISPER_PORT|TTS_PORT|N8N_PORT|QDRANT_PORT|OPENCLAW_PORT|APE_PORT|LITELLM_PORT|SEARXNG_PORT|DASHBOARD_PORT)=' "$INSTALL_DIR/.env")"
+    for _sid in "${SERVICE_IDS[@]}"; do
+        _port_env="${SERVICE_PORT_ENVS[$_sid]:-}"
+        if [[ -n "$_port_env" && -n "${!_port_env:-}" ]]; then
+            SERVICE_PORTS[$_sid]="${!_port_env}"
+        fi
+    done
+fi
+
 # Get local IP for LAN access
 LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "")
 
