@@ -1,4 +1,4 @@
-﻿# Dream Server Root Installer (Windows)
+# Dream Server Root Installer (Windows)
 # Delegates to dream-server/installers/windows/install-windows.ps1
 
 param(
