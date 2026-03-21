@@ -1,4 +1,4 @@
-# ============================================================================
+﻿# ============================================================================
 # Dream Server Windows Installer -- Main Orchestrator
 # ============================================================================
 # Standalone Windows installer. Does not modify any Linux installer files.
@@ -46,6 +46,8 @@ param(
     [switch]$OpenClaw,
     [switch]$All,
     [switch]$Cloud,
+    [switch]$Comfyui,
+    [switch]$NoComfyui,
     [string]$SummaryJsonPath = ""
 )
 
@@ -78,6 +80,8 @@ $workflowsFlag  = $Workflows.IsPresent
 $ragFlag        = $Rag.IsPresent
 $openClawFlag   = $OpenClaw.IsPresent
 $allFlag        = $All.IsPresent
+$comfyuiFlag    = $Comfyui.IsPresent
+$noComfyuiFlag  = $NoComfyui.IsPresent
 $installDir     = $script:DS_INSTALL_DIR
 $sourceRoot     = $SourceRoot
 
@@ -340,6 +344,7 @@ if ($dryRun) {
                     "qdrant"     { if (-not $enableRag)       { $skip = $true } }
                     "embeddings" { if (-not $enableRag)       { $skip = $true } }
                     "openclaw"   { if (-not $enableOpenClaw)  { $skip = $true } }
+                    "comfyui"    { if (-not $enableComfyui)   { $skip = $true } }
                 }
                 if ($skip) { continue }
 
