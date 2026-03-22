@@ -1,9 +1,8 @@
-FROM python:3.10-slim-bookworm
+FROM python:3.10-slim-bookworm@sha256:4efa69bf17cfbd5eb44b170e40bb8091b1c0fadf3833aeb87b655512e24268e5
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     git \
-    wget \
     libsndfile1 \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
@@ -138,6 +137,15 @@ EOF
 # Create outputs directory
 RUN mkdir -p /app/outputs
 
+# Create non-root user
+RUN useradd -m -s /bin/bash appuser \
+    && chown -R appuser:appuser /app
+
+USER appuser
+
 EXPOSE 7860
+
+HEALTHCHECK --interval=30s --timeout=15s --start-period=120s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:7860/')" || exit 1
 
 CMD ["python", "/app/app.py"]
