@@ -1,13 +1,13 @@
 # Code Assistant Agent Template
 # Mission: M7 (OpenClaw Frontier Pushing)
-# Validated on: GPT-OSS-20B
+# Validated on: Qwen3.5-27B
 # Purpose: Programming help, debugging, code review
 
 agent:
   name: code-assistant
   description: "Programming assistant for code generation, debugging, and review"
   
-  model: local-llama/gpt-oss-20b
+  model: local-llama/qwen3.5-27b
   # Qwen Coder excels at programming tasks - no fallback needed
   
   system_prompt: |

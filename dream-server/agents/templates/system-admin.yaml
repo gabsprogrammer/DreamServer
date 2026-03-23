@@ -1,13 +1,13 @@
 # System Admin Assistant Agent Template
 # Mission: M7 (OpenClaw Frontier Pushing)
-# Validated on: GPT-OSS-20B
+# Validated on: Qwen3.5-27B
 # Purpose: Docker management, server administration, troubleshooting
 
 agent:
   name: system-admin
   description: "System administration assistant for Docker, Linux, and server management"
   
-  model: local-llama/gpt-oss-20b
+  model: local-llama/qwen3.5-27b
   # Coder model excels at system commands and scripting
   
   system_prompt: |

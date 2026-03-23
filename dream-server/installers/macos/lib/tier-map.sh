@@ -39,10 +39,10 @@ resolve_tier_config() {
             ;;
         3)
             TIER_NAME="Pro"
-            LLM_MODEL="gpt-oss-20b"
-            GGUF_FILE="gpt-oss-20b-Q4_K_M.gguf"
-            GGUF_URL="https://huggingface.co/unsloth/gpt-oss-20b-GGUF/resolve/main/gpt-oss-20b-Q4_K_M.gguf"
-            GGUF_SHA256="c27536640e410032865dc68781d80a08b98f8db5e93575919af8ccc0568aeb4f"
+            LLM_MODEL="qwen3.5-27b"
+            GGUF_FILE="Qwen3.5-27B-Q4_K_M.gguf"
+            GGUF_URL="https://huggingface.co/unsloth/Qwen3.5-27B-GGUF/resolve/main/Qwen3.5-27B-Q4_K_M.gguf"
+            GGUF_SHA256="84b5f7f112156d63836a01a69dc3f11a6ba63b10a23b8ca7a7efaf52d5a2d806"
             MAX_CONTEXT=32768
             ;;
         2)
