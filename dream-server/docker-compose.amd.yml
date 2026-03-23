@@ -5,9 +5,12 @@
 
 services:
   llama-server:
-    # Lemonade Docker image with ROCm support
+    # Lemonade Docker image with ROCm support + libatomic1 fix
     # Service name stays "llama-server" for compose dependency compatibility
-    image: ghcr.io/lemonade-sdk/lemonade-server:latest
+    build:
+      context: ./extensions/services/llama-server
+      dockerfile: Dockerfile.amd
+    image: dream-lemonade-server:latest
     entrypoint: ["/opt/lemonade/lemonade-server"]
     command:
       - serve

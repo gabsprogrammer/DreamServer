@@ -1,0 +1,7 @@
+FROM ghcr.io/lemonade-sdk/lemonade-server:latest
+
+# ROCm llama-server binary requires libatomic1 which is missing from the
+# upstream Lemonade image. Without it, lemonade-server starts but inference
+# requests crash the llama-server subprocess with exit code 127.
+RUN apt-get update && apt-get install -y --no-install-recommends libatomic1 \
+    && rm -rf /var/lib/apt/lists/*
