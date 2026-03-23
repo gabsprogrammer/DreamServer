@@ -208,7 +208,15 @@ function Start-NativeInferenceServer {
     $envVars = Read-DreamEnv
 
     if ($backend -eq "lemonade") {
-        $lemonadeArgs = @("serve", "--port", "$($script:LEMONADE_PORT)", "--host", "0.0.0.0")
+        $modelsDir = Join-Path (Join-Path $InstallDir "data") "models"
+        $lemonadeArgs = @(
+            "serve",
+            "--port", "$($script:LEMONADE_PORT)",
+            "--host", "0.0.0.0",
+            "--no-tray",
+            "--llamacpp", "vulkan",
+            "--extra-models-dir", $modelsDir
+        )
         $pidDir = Split-Path $script:INFERENCE_PID_FILE
         New-Item -ItemType Directory -Path $pidDir -Force | Out-Null
 

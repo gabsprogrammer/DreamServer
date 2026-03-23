@@ -161,10 +161,12 @@ Write-AISuccess "Generated SearXNG config ($_searxngPath)"
 
 # ── Generate OpenClaw configs ─────────────────────────────────────────────────
 if ($enableOpenClaw) {
-    # On Windows, AMD native llama-server is reachable from Docker containers
+    # On Windows, AMD native inference server is reachable from Docker containers
     # via host.docker.internal; NVIDIA runs in Docker as llama-server service name.
+    # Lemonade serves at /api/v1, so OpenClaw base URL needs /api prefix
+    # (OpenClaw appends /v1/chat/completions to the base URL)
     $_providerUrl = $(if ($gpuInfo.Backend -eq "amd") {
-        "http://host.docker.internal:8080"
+        "http://host.docker.internal:8080/api"
     } else {
         "http://llama-server:8080"
     })

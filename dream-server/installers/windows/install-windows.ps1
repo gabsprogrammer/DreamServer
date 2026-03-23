@@ -235,7 +235,7 @@ if ($dryRun) {
                     $dlOk = Invoke-DownloadWithRetry -Url $script:LEMONADE_MSI_URL `
                         -Destination $msiPath -Label "Downloading Lemonade Server (~3MB)"
                     if ($dlOk) {
-                        $msiArgs = "/i `"$msiPath`" /quiet /norestart"
+                        $msiArgs = "/i `"$msiPath`" /quiet /norestart ALLUSERS=1"
                         Start-Process msiexec.exe -ArgumentList $msiArgs -Wait -NoNewWindow
                         if (Test-Path $script:LEMONADE_EXE) {
                             Write-AISuccess "AMD Lemonade Server installed"
@@ -254,9 +254,20 @@ if ($dryRun) {
 
             if ($useLemonade) {
                 # ── Start Lemonade server ──
+                # --extra-models-dir: Lemonade auto-discovers GGUF files in this directory
+                # --no-tray: headless mode (no GUI system tray icon)
+                # --llamacpp vulkan: AMD Vulkan GPU acceleration
+                # Model loads automatically on first chat request — no /api/v1/load needed
                 Write-AI "Starting Lemonade server..."
-                $modelFullPath = Join-Path (Join-Path $installDir "data\models") $tierConfig.GgufFile
-                $lemonadeArgs = @("serve", "--port", "$($script:LEMONADE_PORT)", "--host", "0.0.0.0")
+                $modelsDir = Join-Path (Join-Path $installDir "data") "models"
+                $lemonadeArgs = @(
+                    "serve",
+                    "--port", "$($script:LEMONADE_PORT)",
+                    "--host", "0.0.0.0",
+                    "--no-tray",
+                    "--llamacpp", "vulkan",
+                    "--extra-models-dir", $modelsDir
+                )
 
                 $pidDir = Split-Path $script:INFERENCE_PID_FILE
                 New-Item -ItemType Directory -Path $pidDir -Force | Out-Null
@@ -265,43 +276,24 @@ if ($dryRun) {
                     -ArgumentList $lemonadeArgs -WindowStyle Hidden -PassThru
                 Set-Content -Path $script:INFERENCE_PID_FILE -Value $proc.Id
 
-                # Load the model via API after server starts
                 Write-AI "Waiting for Lemonade server to start..."
-                $maxWait = 60; $waited = 0; $serverUp = $false
+                $maxWait = 60; $waited = 0; $healthy = $false
                 while ($waited -lt $maxWait) {
                     Start-Sleep -Seconds 2; $waited += 2
                     try {
                         $req = [System.Net.HttpWebRequest]::Create($script:LEMONADE_HEALTH_URL)
                         $req.Timeout = 3000; $req.Method = "GET"
                         $resp = $req.GetResponse(); $code = [int]$resp.StatusCode; $resp.Close()
-                        if ($code -eq 200) { $serverUp = $true; break }
+                        if ($code -eq 200) { $healthy = $true; break }
                     } catch { }
                     if ($waited % 10 -eq 0) { Write-AI "  Still starting... ($waited s)" }
                 }
-
-                if ($serverUp) {
-                    # Load the GGUF model
-                    Write-AI "Loading model: $($tierConfig.GgufFile)..."
-                    try {
-                        $loadBody = @{ model = $modelFullPath } | ConvertTo-Json -Compress
-                        $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($loadBody)
-                        $loadReq = [System.Net.HttpWebRequest]::Create("http://localhost:$($script:LEMONADE_PORT)/api/v1/load")
-                        $loadReq.Method = "POST"
-                        $loadReq.ContentType = "application/json"
-                        $loadReq.Timeout = 300000  # 5 min for large models
-                        $stream = $loadReq.GetRequestStream()
-                        $stream.Write($bodyBytes, 0, $bodyBytes.Length)
-                        $stream.Close()
-                        $loadResp = $loadReq.GetResponse()
-                        $loadResp.Close()
-                        Write-AISuccess "Lemonade server healthy with model loaded (PID $($proc.Id))"
-                        if ($gpuInfo.HasNpu) {
-                            Write-AISuccess "NPU hybrid mode available (NPU prefill + GPU decode)"
-                        }
-                    } catch {
-                        Write-AIWarn "Model load API call failed: $_"
-                        Write-AI "  Lemonade may still load the model on first request."
+                if ($healthy) {
+                    Write-AISuccess "Lemonade server healthy (PID $($proc.Id))"
+                    if ($gpuInfo.HasNpu) {
+                        Write-AISuccess "NPU hybrid mode available (NPU prefill + GPU decode)"
                     }
+                    Write-AI "Model ($($tierConfig.GgufFile)) will load on first request."
                 } else {
                     Write-AIWarn "Lemonade server did not respond within ${maxWait}s. It may still be starting."
                 }
@@ -382,6 +374,16 @@ if ($dryRun) {
                     Write-AISuccess "Native llama-server healthy (PID $($proc.Id))"
                 } else {
                     Write-AIWarn "llama-server did not respond within ${maxWait}s. It may still be loading."
+                }
+
+                # Patch .env: user declined Lemonade, correct backend and API path
+                $envPath = Join-Path $installDir ".env"
+                if (Test-Path $envPath) {
+                    $envContent = Get-Content $envPath -Raw
+                    $envContent = $envContent -replace "(?m)^LLM_BACKEND=.*$", "LLM_BACKEND=llama-server"
+                    $envContent = $envContent -replace "(?m)^LLM_API_BASE_PATH=.*$", "LLM_API_BASE_PATH=/v1"
+                    [System.IO.File]::WriteAllText($envPath, $envContent, (New-Object System.Text.UTF8Encoding($false)))
+                    Write-AISuccess "Patched .env for llama-server backend"
                 }
             }
         }

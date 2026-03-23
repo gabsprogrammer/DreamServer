@@ -5,7 +5,7 @@
 
 services:
   llama-server:
-    # Lemonade Docker image with ROCm support (replaces kyuz0/amd-strix-halo-toolboxes)
+    # Lemonade Docker image with ROCm support
     # Service name stays "llama-server" for compose dependency compatibility
     image: ghcr.io/lemonade-sdk/lemonade-server:latest
     entrypoint: ["lemonade-server"]
@@ -15,6 +15,16 @@ services:
       - "8080"
       - --host
       - "0.0.0.0"
+      - --no-tray
+      - --llamacpp
+      - rocm
+      - --extra-models-dir
+      - /models
+    volumes:
+      - ./data/models:/models:ro
+      - lemonade-cache:/root/.cache/huggingface
+      - lemonade-llama:/opt/lemonade/llama
+      - lemonade-recipe:/root/.cache/lemonade
     devices:
       - /dev/dri:/dev/dri
       - /dev/kfd:/dev/kfd
@@ -25,6 +35,12 @@ services:
       - HSA_OVERRIDE_GFX_VERSION=11.5.1
       - ROCBLAS_USE_HIPBLASLT=0
       - LEMONADE_LLAMACPP_BACKEND=rocm
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/api/v1/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
     deploy:
       resources:
         limits:
@@ -41,3 +57,8 @@ services:
     volumes:
       - /sys/class/drm:/sys/class/drm:ro
       - /sys/class/hwmon:/sys/class/hwmon:ro
+
+volumes:
+  lemonade-cache:
+  lemonade-llama:
+  lemonade-recipe:
