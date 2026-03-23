@@ -17,6 +17,7 @@ services:
     environment:
       - OLLAMA_URL=http://host.docker.internal:8080
       - LLM_BACKEND=${LLM_BACKEND:-lemonade}
+      - LLM_API_BASE_PATH=${LLM_API_BASE_PATH:-/v1}
 
   open-webui:
     environment:

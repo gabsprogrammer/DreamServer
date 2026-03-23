@@ -50,10 +50,16 @@ services:
           cpus: '4.0'
           memory: 8G
 
+  open-webui:
+    environment:
+      # Lemonade serves at /api/v1, override base compose's /v1 path
+      OPENAI_API_BASE_URL: "http://llama-server:8080/api/v1"
+
   dashboard-api:
     environment:
       - GPU_BACKEND=amd
       - LLM_BACKEND=lemonade
+      - LLM_API_BASE_PATH=/api/v1
     volumes:
       - /sys/class/drm:/sys/class/drm:ro
       - /sys/class/hwmon:/sys/class/hwmon:ro
