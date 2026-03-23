@@ -297,7 +297,7 @@ DREAM_VERSION=${VERSION:-2.3.4}
 
 #=== LLM Backend Mode ===
 DREAM_MODE=$(if [[ "$GPU_BACKEND" == "amd" && "${DREAM_MODE:-local}" == "local" ]]; then echo "lemonade"; else echo "${DREAM_MODE:-local}"; fi)
-LLM_API_URL=$(if [[ "${DREAM_MODE:-local}" == "local" ]]; then echo "http://llama-server:8080"; else echo "http://litellm:4000"; fi)
+LLM_API_URL=$(if [[ "$GPU_BACKEND" == "amd" && "${DREAM_MODE:-local}" == "local" ]]; then echo "http://litellm:4000"; elif [[ "${DREAM_MODE:-local}" == "local" ]]; then echo "http://llama-server:8080"; else echo "http://litellm:4000"; fi)
 
 #=== Cloud API Keys ===
 ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
