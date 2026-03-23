@@ -162,6 +162,14 @@ for port_check in "${_conflict_ports[@]}"; do
     fi
 done
 
+# macOS AirPlay Receiver uses port 9000 (Monterey 12.0+, enabled by default).
+# It cannot be killed — it's a system service. Auto-reassign Whisper to 9100.
+if check_port_conflict 9000; then
+    export WHISPER_PORT=9100
+    ai_ok "Port 9000 in use (AirPlay Receiver) -- Whisper reassigned to port ${WHISPER_PORT}"
+    ai "  To disable AirPlay Receiver: System Settings > General > AirDrop & Handoff > AirPlay Receiver"
+fi
+
 # ============================================================================
 # PHASE 2 -- HARDWARE DETECTION
 # ============================================================================
