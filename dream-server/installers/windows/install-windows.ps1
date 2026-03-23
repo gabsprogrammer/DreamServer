@@ -413,15 +413,26 @@ if ($dryRun) {
         }
 
         Write-AI "Running: docker compose $($composeFlags -join ' ') up -d"
-        # PS 5.1 treats ANY stderr output from native commands as NativeCommandError.
-        # Silence stderr-as-error so $LASTEXITCODE reflects the real compose exit code.
+        # Capture compose output so errors are always visible, even on PS 5.1 where
+        # SilentlyContinue can swallow stderr ErrorRecord objects in pipelines.
         $prevEAP = $ErrorActionPreference
         $ErrorActionPreference = "SilentlyContinue"
-        & docker compose @composeFlags up -d 2>&1 | ForEach-Object { Write-Host "  $_" }
+        $_composeOutput = & docker compose @composeFlags up -d 2>&1
         $composeExit = $LASTEXITCODE
         $ErrorActionPreference = $prevEAP
+        # Display all output (stdout + stderr merged)
+        if ($_composeOutput) {
+            $_composeOutput | ForEach-Object { Write-Host "  $_" }
+        }
         if ($composeExit -ne 0) {
             Write-AIError "docker compose up failed (exit code: $composeExit)"
+            # Surface the last few lines of output as the likely error cause
+            $_lastLines = ($_composeOutput | Select-Object -Last 5) -join "`n"
+            if ($_lastLines) {
+                Write-AI "  Compose output (last 5 lines):"
+                $_composeOutput | Select-Object -Last 5 | ForEach-Object { Write-AI "    $_" }
+            }
+            Write-AI "  To debug: cd $installDir && docker compose $($composeFlags -join ' ') up 2>&1"
             exit 1
         }
         Write-AISuccess "Docker services started"
