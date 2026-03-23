@@ -120,11 +120,12 @@ function ConvertTo-TierFromGpu {
     $backend = $GpuInfo.Backend
     $vramMB  = $GpuInfo.VramMB
 
-    # No GPU detected -- use Tier 0 for local inference on low-RAM machines,
-    # otherwise fall back to CLOUD (API) mode
+    # No GPU detected -- use CPU-only local inference.
+    # CLOUD mode requires the explicit --Cloud flag; never auto-select it
+    # because it needs an API key the user may not have.
     if ($backend -eq "none") {
-        if ($SystemRamGB -lt 12) { return "0" }
-        return "CLOUD"
+        if ($SystemRamGB -lt 8) { return "0" }
+        return "1"
     }
 
     # AMD Strix Halo -- tier based on system RAM (unified memory)

@@ -126,6 +126,35 @@ $envResult = New-DreamEnv `
     -LlamaServerImage $llamaServerImage
 Write-AISuccess "Generated .env with secure secrets"
 
+# ── Post-generation validation: verify all required keys are present with values ──
+# Defense-in-depth: catches silent failures in env generation before docker compose
+# hits the ${VAR:?} hard-fail syntax and produces a confusing error.
+# NOTE: Only checks keys that use :? (required non-empty) in compose files.
+# Keys like ANTHROPIC_API_KEY= are intentionally empty and not checked here.
+$_envPath = Join-Path $installDir ".env"
+$_requiredKeys = @("WEBUI_SECRET", "N8N_PASS", "LITELLM_KEY", "OPENCLAW_TOKEN", "DASHBOARD_API_KEY")
+$_envLines = @{}
+if (Test-Path $_envPath) {
+    Get-Content $_envPath | ForEach-Object {
+        if ($_ -match "^([A-Za-z_][A-Za-z0-9_]*)=(.*)$") {
+            $_envLines[$Matches[1]] = $Matches[2]
+        }
+    }
+}
+$_missingKeys = @()
+foreach ($_k in $_requiredKeys) {
+    if (-not $_envLines.ContainsKey($_k) -or -not $_envLines[$_k]) {
+        $_missingKeys += $_k
+    }
+}
+if ($_missingKeys.Count -gt 0) {
+    Write-AIError ".env is missing required keys: $($_missingKeys -join ', ')"
+    Write-AI "  This will cause docker compose to fail. The .env file may be corrupted."
+    Write-AI "  Try deleting $(Join-Path $installDir '.env') and re-running the installer."
+    exit 1
+}
+Write-AISuccess "Verified .env contains all required secrets"
+
 # ── Generate SearXNG config ───────────────────────────────────────────────────
 $_searxngPath = New-SearxngConfig -InstallDir $installDir -SecretKey $envResult.SearxngSecret
 Write-AISuccess "Generated SearXNG config ($_searxngPath)"

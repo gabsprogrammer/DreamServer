@@ -124,6 +124,11 @@ if ($dryRun) {
     Write-AI "[DRY RUN] Would run: docker compose up -d"
 } else {
     Push-Location $installDir
+    # Sync .NET CWD so in-process .NET API calls using relative paths (e.g., Test-Path
+    # internals, [IO.File] methods) resolve against $installDir, not the launch directory.
+    # PowerShell's Push-Location does not update [Environment]::CurrentDirectory.
+    $_previousCwd = [Environment]::CurrentDirectory
+    [Environment]::CurrentDirectory = $installDir
 
     try {
         # ── Bootstrap fast-start ──────────────────────────────────────────────
@@ -287,7 +292,11 @@ if ($dryRun) {
         # ── Assemble Docker Compose flags ─────────────────────────────────────
         # NOTE: Blackwell GPUs (sm_120) work with the standard server-cuda image
         # via PTX JIT compilation. No special image override is needed.
-        $composeFlags = @("-f", "docker-compose.base.yml")
+        #
+        # --env-file is explicit: Docker Compose V2 on Windows may not auto-discover
+        # .env from the project directory when multiple -f flags are used. Explicitly
+        # passing --env-file removes ambiguity in .env resolution.
+        $composeFlags = @("--env-file", ".env", "-f", "docker-compose.base.yml")
 
         if ($cloudMode) {
             $composeFlags += @("-f", "installers/windows/docker-compose.windows-amd.yml")
@@ -394,6 +403,15 @@ if ($dryRun) {
 
         # ── Start Docker services ─────────────────────────────────────────────
         Write-Chapter "STARTING SERVICES"
+
+        # Pre-flight: verify .env is readable from CWD before compose up
+        $_envCheck = Join-Path $installDir ".env"
+        if (-not (Test-Path $_envCheck)) {
+            Write-AIError ".env file not found at $_envCheck -- cannot start services."
+            Write-AI "  Re-run the installer to regenerate the .env file."
+            exit 1
+        }
+
         Write-AI "Running: docker compose $($composeFlags -join ' ') up -d"
         # PS 5.1 treats ANY stderr output from native commands as NativeCommandError.
         # Silence stderr-as-error so $LASTEXITCODE reflects the real compose exit code.
@@ -452,6 +470,7 @@ exec bash "$bashScript" "$bashInstallDir" "$($fullTierConfig.GgufFile)" "$($full
 
     } finally {
         Pop-Location
+        [Environment]::CurrentDirectory = $_previousCwd
     }
 }
 

@@ -94,11 +94,16 @@ cd DreamServer/dream-server
 Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) with WSL2 backend enabled.
 **Install Docker Desktop first and make sure it is running before you start.**
 
+Open **PowerShell as Administrator** and run:
+
 ```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 git clone https://github.com/Light-Heart-Labs/DreamServer.git
 cd DreamServer
 .\install.ps1
 ```
+
+> The `Set-ExecutionPolicy` command allows the installer script to run in the current session. It does not change your system-wide policy.
 
 The installer detects your GPU, picks the right model, generates credentials, starts all services, and creates a Desktop shortcut to the Dashboard. Manage with `.\dream-server\installers\windows\dream.ps1 status`.
 

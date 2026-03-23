@@ -139,42 +139,21 @@ if (Test-Path $script:OPENCODE_EXE) {
         Write-AISuccess "OpenCode config already exists -- preserving existing configuration"
     }
 
-    # ── VBS launcher (no console window on startup) ───────────────────────────
-    # Uses VBScript rather than a .ps1 shortcut to avoid the PowerShell window
-    # flashing on Windows login. WshShell.Run 0=hidden, False=async.
+    # ── VBS launcher (available for manual startup) ──────────────────────────
+    # Creates a VBS script users can run to start OpenCode without a console
+    # window. NOT added to Windows Startup -- OpenCode is a developer tool,
+    # not a core service, so it should be opt-in.
     $_vbsContent = @"
-' Dream Server -- OpenCode Web Server (silent startup launcher)
-' Starts opencode.exe in web mode without a visible console window on login.
+' Dream Server -- OpenCode Web Server (silent launcher)
+' Run this script to start OpenCode without a visible console window.
 Set WshShell = CreateObject("WScript.Shell")
 WshShell.CurrentDirectory = WshShell.ExpandEnvironmentStrings("%USERPROFILE%\.opencode")
 WshShell.Run """%USERPROFILE%\.opencode\bin\opencode.exe"" web --port $($script:OPENCODE_PORT) --hostname 127.0.0.1", 0, False
 "@
     $_vbsPath = Join-Path $script:OPENCODE_DIR "start-opencode.vbs"
     Write-Utf8NoBom -Path $_vbsPath -Content $_vbsContent
-
-    # Copy VBS launcher to Windows Startup folder so it runs on next login
-    $_startupDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Startup"
-    $_startupVbs = Join-Path $_startupDir "DreamServer-OpenCode.vbs"
-    Copy-Item -Path $_vbsPath -Destination $_startupVbs -Force
-    Write-AISuccess "Added OpenCode to Windows Startup (launches on next login)"
-
-    # ── Start OpenCode now (for this session) ─────────────────────────────────
-    # Stop any stale OpenCode process first
-    $null = Get-Process -Name "opencode" -ErrorAction SilentlyContinue |
-        Stop-Process -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Milliseconds 500
-
-    Write-AI "Starting OpenCode web server on port $($script:OPENCODE_PORT)..."
-    $ocProc = Start-Process `
-        -FilePath    $script:OPENCODE_EXE `
-        -ArgumentList "web --port $($script:OPENCODE_PORT) --hostname 127.0.0.1" `
-        -WindowStyle Hidden `
-        -PassThru
-    if ($ocProc) {
-        Write-AISuccess "OpenCode started (PID $($ocProc.Id)) -- http://localhost:$($script:OPENCODE_PORT)"
-    } else {
-        Write-AIWarn "OpenCode may not have started. Check manually: $($script:OPENCODE_EXE) web --port $($script:OPENCODE_PORT)"
-    }
+    Write-AISuccess "OpenCode ready -- start manually: $($script:OPENCODE_EXE) web --port $($script:OPENCODE_PORT)"
+    Write-AI "  Or run: $($_vbsPath) (silent, no console window)"
 }
 
 # ── Node.js / npm tools (Claude Code + Codex CLI) ────────────────────────────

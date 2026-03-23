@@ -85,7 +85,9 @@ function Get-ComposeFlags {
     }
 
     # Fallback: detect from available files
-    $flags = @()
+    # --env-file explicit: Docker Compose V2 on Windows may not auto-discover
+    # .env from the project directory when multiple -f flags are used.
+    $flags = @("--env-file", ".env")
     $base = Join-Path $InstallDir "docker-compose.base.yml"
     $nvidia = Join-Path $InstallDir "docker-compose.nvidia.yml"
     $mono = Join-Path $InstallDir "docker-compose.yml"
