@@ -1,11 +1,20 @@
-# Dream Server — AMD GPU Overlay (Core Services Only)
+# Dream Server — AMD GPU Overlay (Lemonade inference backend)
+# Lemonade provides optimized local AI inference with Vulkan, ROCm, and NPU support.
 # ComfyUI GPU config moved to extensions/services/comfyui/compose.amd.yaml
 # Use with: docker compose -f docker-compose.base.yml -f docker-compose.amd.yml up -d
 
 services:
   llama-server:
-    image: kyuz0/amd-strix-halo-toolboxes:rocm-7.2
-    entrypoint: ["llama-server"]
+    # Lemonade Docker image with ROCm support (replaces kyuz0/amd-strix-halo-toolboxes)
+    # Service name stays "llama-server" for compose dependency compatibility
+    image: ghcr.io/lemonade-sdk/lemonade-server:latest
+    entrypoint: ["lemonade-server"]
+    command:
+      - serve
+      - --port
+      - "8080"
+      - --host
+      - "0.0.0.0"
     devices:
       - /dev/dri:/dev/dri
       - /dev/kfd:/dev/kfd
@@ -15,6 +24,7 @@ services:
     environment:
       - HSA_OVERRIDE_GFX_VERSION=11.5.1
       - ROCBLAS_USE_HIPBLASLT=0
+      - LEMONADE_LLAMACPP_BACKEND=rocm
     deploy:
       resources:
         limits:
@@ -26,10 +36,8 @@ services:
 
   dashboard-api:
     environment:
-      # Hard-code AMD backend so the dashboard uses amd sysfs GPU detection
-      # regardless of .env state (e.g. if the installer ran without sudo
-      # and couldn't write GPU_BACKEND=amd to .env).
       - GPU_BACKEND=amd
+      - LLM_BACKEND=lemonade
     volumes:
       - /sys/class/drm:/sys/class/drm:ro
       - /sys/class/hwmon:/sys/class/hwmon:ro

@@ -127,10 +127,21 @@ function New-DreamEnv {
     $langfuseInitUserEmail     = Get-EnvOrNew "LANGFUSE_INIT_USER_EMAIL"   "admin@dreamserver.local"
     $langfuseInitUserPassword  = Get-EnvOrNew "LANGFUSE_INIT_USER_PASSWORD" (New-SecureHex -Bytes 16)
 
-    # Determine LLM API URL based on backend
-    # AMD on Windows: llama-server runs natively, containers reach it via host.docker.internal
+    # Determine LLM backend engine and API URL
+    # AMD on Windows: inference server runs natively, containers reach it via host.docker.internal
     # NVIDIA: llama-server runs in Docker, containers reach it via service name
     # NOTE: $(if ...) syntax required for PS 5.1 compatibility
+    $llmBackend = $(if ($GpuBackend -eq "amd") {
+        "lemonade"
+    } elseif ($DreamMode -eq "cloud") {
+        "litellm"
+    } else {
+        "llama-server"
+    })
+
+    # Lemonade serves OpenAI-compatible API at /api/v1; llama-server at /v1
+    $llmApiBasePath = $(if ($GpuBackend -eq "amd") { "/api/v1" } else { "/v1" })
+
     $llmApiUrl = $(if ($GpuBackend -eq "amd") {
         "http://host.docker.internal:8080"
     } elseif ($DreamMode -eq "cloud") {
@@ -190,7 +201,9 @@ function New-DreamEnv {
 
 #=== LLM Backend Mode ===
 DREAM_MODE=$DreamMode
+LLM_BACKEND=$llmBackend
 LLM_API_URL=$llmApiUrl
+LLM_API_BASE_PATH=$llmApiBasePath
 
 #=== Cloud API Keys ===
 ANTHROPIC_API_KEY=$(Get-EnvOrNew "ANTHROPIC_API_KEY" "")

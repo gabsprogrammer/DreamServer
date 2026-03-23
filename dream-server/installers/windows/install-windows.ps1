@@ -118,8 +118,8 @@ if ($dryRun) {
         Write-AI "[DRY RUN] Would download: $($tierConfig.GgufFile)"
     }
     if ($gpuInfo.Backend -eq "amd") {
-        Write-AI "[DRY RUN] Would download llama-server.exe (Vulkan build)"
-        Write-AI "[DRY RUN] Would start native llama-server on port 8080"
+        Write-AI "[DRY RUN] Would install AMD Lemonade Server (or fallback to llama-server Vulkan)"
+        Write-AI "[DRY RUN] Would start native inference server on port 8080"
     }
     Write-AI "[DRY RUN] Would run: docker compose up -d"
 } else {
@@ -206,86 +206,183 @@ if ($dryRun) {
             }
         }
 
-        # ── AMD: native llama-server.exe (Vulkan) ─────────────────────────────
+        # ── AMD: native inference server (Lemonade preferred, llama-server fallback) ──
+        $useLemonade = $false
         if ($gpuInfo.Backend -eq "amd" -and -not $cloudMode) {
-            Write-Chapter "NATIVE LLAMA-SERVER (VULKAN)"
+            Write-Chapter "AMD INFERENCE BACKEND"
 
-            $llamaZip = Join-Path $env:TEMP $script:LLAMA_CPP_VULKAN_ASSET
-            if (-not (Test-Path $script:LLAMA_SERVER_EXE)) {
-                if (-not (Test-Path $llamaZip)) {
-                    $dlOk = Invoke-DownloadWithRetry -Url $script:LLAMA_CPP_VULKAN_URL `
-                        -Destination $llamaZip -Label "Downloading llama-server (Vulkan)"
-                    if (-not $dlOk) {
-                        Write-AIError "Failed to download llama-server after retries."
+            # Offer Lemonade if not already installed
+            if (Test-Path $script:LEMONADE_EXE) {
+                Write-AISuccess "AMD Lemonade Server already installed"
+                $useLemonade = $true
+            } else {
+                # Prompt user before installing third-party software
+                $npuNote = $(if ($gpuInfo.HasNpu) { " (NPU + GPU hybrid acceleration detected)" } else { " (Vulkan GPU acceleration)" })
+                Write-Host ""
+                Write-AI "AMD Lemonade Server provides optimized local AI inference$npuNote."
+                Write-AI "It replaces the default llama-server with native AMD acceleration."
+                Write-Host ""
+                $lemonadeChoice = "Y"
+                if (-not $nonInteractive) {
+                    Write-Host "  Install AMD Lemonade for optimized inference? [Y/n] " -ForegroundColor Cyan -NoNewline
+                    $lemonadeChoice = Read-Host
+                    if (-not $lemonadeChoice) { $lemonadeChoice = "Y" }
+                }
+
+                if ($lemonadeChoice -match "^[Yy]") {
+                    Write-AI "Installing AMD Lemonade Server..."
+                    $msiPath = Join-Path $env:TEMP $script:LEMONADE_MSI_FILE
+                    $dlOk = Invoke-DownloadWithRetry -Url $script:LEMONADE_MSI_URL `
+                        -Destination $msiPath -Label "Downloading Lemonade Server (~3MB)"
+                    if ($dlOk) {
+                        $msiArgs = "/i `"$msiPath`" /quiet /norestart"
+                        Start-Process msiexec.exe -ArgumentList $msiArgs -Wait -NoNewWindow
+                        if (Test-Path $script:LEMONADE_EXE) {
+                            Write-AISuccess "AMD Lemonade Server installed"
+                            $useLemonade = $true
+                        } else {
+                            Write-AIWarn "Lemonade MSI installed but executable not found at expected path."
+                            Write-AI "  Falling back to llama-server (Vulkan)."
+                        }
+                    } else {
+                        Write-AIWarn "Lemonade download failed. Falling back to llama-server (Vulkan)."
+                    }
+                } else {
+                    Write-AI "Skipped Lemonade. Using llama-server (Vulkan) instead."
+                }
+            }
+
+            if ($useLemonade) {
+                # ── Start Lemonade server ──
+                Write-AI "Starting Lemonade server..."
+                $modelFullPath = Join-Path (Join-Path $installDir "data\models") $tierConfig.GgufFile
+                $lemonadeArgs = @("serve", "--port", "$($script:LEMONADE_PORT)", "--host", "0.0.0.0")
+
+                $pidDir = Split-Path $script:INFERENCE_PID_FILE
+                New-Item -ItemType Directory -Path $pidDir -Force | Out-Null
+
+                $proc = Start-Process -FilePath $script:LEMONADE_EXE `
+                    -ArgumentList $lemonadeArgs -WindowStyle Hidden -PassThru
+                Set-Content -Path $script:INFERENCE_PID_FILE -Value $proc.Id
+
+                # Load the model via API after server starts
+                Write-AI "Waiting for Lemonade server to start..."
+                $maxWait = 60; $waited = 0; $serverUp = $false
+                while ($waited -lt $maxWait) {
+                    Start-Sleep -Seconds 2; $waited += 2
+                    try {
+                        $req = [System.Net.HttpWebRequest]::Create($script:LEMONADE_HEALTH_URL)
+                        $req.Timeout = 3000; $req.Method = "GET"
+                        $resp = $req.GetResponse(); $code = [int]$resp.StatusCode; $resp.Close()
+                        if ($code -eq 200) { $serverUp = $true; break }
+                    } catch { }
+                    if ($waited % 10 -eq 0) { Write-AI "  Still starting... ($waited s)" }
+                }
+
+                if ($serverUp) {
+                    # Load the GGUF model
+                    Write-AI "Loading model: $($tierConfig.GgufFile)..."
+                    try {
+                        $loadBody = @{ model = $modelFullPath } | ConvertTo-Json -Compress
+                        $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($loadBody)
+                        $loadReq = [System.Net.HttpWebRequest]::Create("http://localhost:$($script:LEMONADE_PORT)/api/v1/load")
+                        $loadReq.Method = "POST"
+                        $loadReq.ContentType = "application/json"
+                        $loadReq.Timeout = 300000  # 5 min for large models
+                        $stream = $loadReq.GetRequestStream()
+                        $stream.Write($bodyBytes, 0, $bodyBytes.Length)
+                        $stream.Close()
+                        $loadResp = $loadReq.GetResponse()
+                        $loadResp.Close()
+                        Write-AISuccess "Lemonade server healthy with model loaded (PID $($proc.Id))"
+                        if ($gpuInfo.HasNpu) {
+                            Write-AISuccess "NPU hybrid mode available (NPU prefill + GPU decode)"
+                        }
+                    } catch {
+                        Write-AIWarn "Model load API call failed: $_"
+                        Write-AI "  Lemonade may still load the model on first request."
+                    }
+                } else {
+                    Write-AIWarn "Lemonade server did not respond within ${maxWait}s. It may still be starting."
+                }
+            } else {
+                # ── Fallback: llama-server.exe (Vulkan) ──
+                $llamaZip = Join-Path $env:TEMP $script:LLAMA_CPP_VULKAN_ASSET
+                if (-not (Test-Path $script:LLAMA_SERVER_EXE)) {
+                    if (-not (Test-Path $llamaZip)) {
+                        $dlOk = Invoke-DownloadWithRetry -Url $script:LLAMA_CPP_VULKAN_URL `
+                            -Destination $llamaZip -Label "Downloading llama-server (Vulkan)"
+                        if (-not $dlOk) {
+                            Write-AIError "Failed to download llama-server after retries."
+                            exit 1
+                        }
+                    }
+
+                    Write-AI "Validating llama-server archive..."
+                    $zipValid = Test-ZipIntegrity -Path $llamaZip
+                    if (-not $zipValid.Valid) {
+                        Write-AIWarn "Archive is corrupt: $($zipValid.ErrorMessage)"
+                        Remove-Item $llamaZip -Force -ErrorAction SilentlyContinue
+                        Write-AIError "Corrupted download. Re-run the installer."
                         exit 1
                     }
+
+                    Write-AI "Extracting llama-server..."
+                    New-Item -ItemType Directory -Path $script:LLAMA_SERVER_DIR -Force | Out-Null
+                    if (-not (Invoke-ExtractionWithRetry -ZipPath $llamaZip -DestinationPath $script:LLAMA_SERVER_DIR)) {
+                        Write-AIError "Failed to extract llama-server after retries."
+                        exit 1
+                    }
+
+                    $exeFound = Get-ChildItem -Path $script:LLAMA_SERVER_DIR -Recurse -Filter "llama-server.exe" |
+                        Select-Object -First 1
+                    if ($exeFound -and $exeFound.DirectoryName -ne $script:LLAMA_SERVER_DIR) {
+                        Get-ChildItem -Path $exeFound.DirectoryName -Force |
+                            Move-Item -Destination $script:LLAMA_SERVER_DIR -Force
+                    }
+                    if (-not (Test-Path $script:LLAMA_SERVER_EXE)) {
+                        Write-AIError "llama-server.exe not found after extraction."
+                        exit 1
+                    }
+                    Write-AISuccess "llama-server (Vulkan) extracted"
+                } else {
+                    Write-AISuccess "llama-server.exe already present"
                 }
 
-                Write-AI "Validating llama-server archive..."
-                $zipValid = Test-ZipIntegrity -Path $llamaZip
-                if (-not $zipValid.Valid) {
-                    Write-AIWarn "Archive is corrupt: $($zipValid.ErrorMessage)"
-                    Remove-Item $llamaZip -Force -ErrorAction SilentlyContinue
-                    Write-AIError "Corrupted download. Re-run the installer."
-                    exit 1
+                # Start native llama-server
+                Write-AI "Starting native llama-server (Vulkan)..."
+                $modelFullPath = Join-Path (Join-Path $installDir "data\models") $tierConfig.GgufFile
+                $llamaArgs = @(
+                    "--model", $modelFullPath,
+                    "--host", "0.0.0.0",
+                    "--port", "8080",
+                    "--n-gpu-layers", "999",
+                    "--ctx-size", "$($tierConfig.MaxContext)"
+                )
+                $pidDir = Split-Path $script:INFERENCE_PID_FILE
+                New-Item -ItemType Directory -Path $pidDir -Force | Out-Null
+
+                $proc = Start-Process -FilePath $script:LLAMA_SERVER_EXE `
+                    -ArgumentList $llamaArgs -WindowStyle Hidden -PassThru
+                Set-Content -Path $script:INFERENCE_PID_FILE -Value $proc.Id
+
+                Write-AI "Waiting for llama-server to load model..."
+                $maxWait = 120; $waited = 0; $healthy = $false
+                while ($waited -lt $maxWait) {
+                    Start-Sleep -Seconds 2; $waited += 2
+                    try {
+                        $req = [System.Net.HttpWebRequest]::Create("http://localhost:8080/health")
+                        $req.Timeout = 3000; $req.Method = "GET"
+                        $resp = $req.GetResponse(); $code = [int]$resp.StatusCode; $resp.Close()
+                        if ($code -eq 200) { $healthy = $true; break }
+                    } catch { }
+                    if ($waited % 10 -eq 0) { Write-AI "  Still loading... ($waited s)" }
                 }
-
-                Write-AI "Extracting llama-server..."
-                New-Item -ItemType Directory -Path $script:LLAMA_SERVER_DIR -Force | Out-Null
-                if (-not (Invoke-ExtractionWithRetry -ZipPath $llamaZip -DestinationPath $script:LLAMA_SERVER_DIR)) {
-                    Write-AIError "Failed to extract llama-server after retries."
-                    exit 1
+                if ($healthy) {
+                    Write-AISuccess "Native llama-server healthy (PID $($proc.Id))"
+                } else {
+                    Write-AIWarn "llama-server did not respond within ${maxWait}s. It may still be loading."
                 }
-
-                # The zip may contain a subdirectory -- find llama-server.exe
-                $exeFound = Get-ChildItem -Path $script:LLAMA_SERVER_DIR -Recurse -Filter "llama-server.exe" |
-                    Select-Object -First 1
-                if ($exeFound -and $exeFound.DirectoryName -ne $script:LLAMA_SERVER_DIR) {
-                    Get-ChildItem -Path $exeFound.DirectoryName -Force |
-                        Move-Item -Destination $script:LLAMA_SERVER_DIR -Force
-                }
-                if (-not (Test-Path $script:LLAMA_SERVER_EXE)) {
-                    Write-AIError "llama-server.exe not found after extraction."
-                    exit 1
-                }
-                Write-AISuccess "llama-server (Vulkan) extracted"
-            } else {
-                Write-AISuccess "llama-server.exe already present"
-            }
-
-            # Start native llama-server
-            Write-AI "Starting native llama-server (Vulkan)..."
-            $modelFullPath = Join-Path (Join-Path $installDir "data\models") $tierConfig.GgufFile
-            $llamaArgs = @(
-                "--model", $modelFullPath,
-                "--host", "0.0.0.0",
-                "--port", "8080",
-                "--n-gpu-layers", "999",
-                "--ctx-size", "$($tierConfig.MaxContext)"
-            )
-            $pidDir = Split-Path $script:LLAMA_SERVER_PID_FILE
-            New-Item -ItemType Directory -Path $pidDir -Force | Out-Null
-
-            $proc = Start-Process -FilePath $script:LLAMA_SERVER_EXE `
-                -ArgumentList $llamaArgs -WindowStyle Hidden -PassThru
-            Set-Content -Path $script:LLAMA_SERVER_PID_FILE -Value $proc.Id
-
-            Write-AI "Waiting for llama-server to load model..."
-            $maxWait = 120; $waited = 0; $healthy = $false
-            while ($waited -lt $maxWait) {
-                Start-Sleep -Seconds 2; $waited += 2
-                try {
-                    $req = [System.Net.HttpWebRequest]::Create("http://localhost:8080/health")
-                    $req.Timeout = 3000; $req.Method = "GET"
-                    $resp = $req.GetResponse(); $code = [int]$resp.StatusCode; $resp.Close()
-                    if ($code -eq 200) { $healthy = $true; break }
-                } catch { }
-                if ($waited % 10 -eq 0) { Write-AI "  Still loading... ($waited s)" }
-            }
-            if ($healthy) {
-                Write-AISuccess "Native llama-server healthy (PID $($proc.Id))"
-            } else {
-                Write-AIWarn "llama-server did not respond within ${maxWait}s. It may still be loading."
             }
         }
 
@@ -504,9 +601,15 @@ if ($dryRun) {
 }
 
 # ── Service health checks ─────────────────────────────────────────────────────
-$llamaHealthPort = "8080"
-$healthChecks    = @(
-    @{ Name = "LLM (llama-server)";   Url = "http://localhost:${llamaHealthPort}/health" }
+# Use Lemonade health endpoint when AMD + Lemonade is active, llama-server otherwise
+$llmHealthUrl = $(if ($useLemonade) {
+    $script:LEMONADE_HEALTH_URL
+} else {
+    "http://localhost:8080/health"
+})
+$llmHealthName = $(if ($useLemonade) { "LLM (Lemonade)" } else { "LLM (llama-server)" })
+$healthChecks = @(
+    @{ Name = $llmHealthName; Url = $llmHealthUrl }
     @{ Name = "Chat UI (Open WebUI)"; Url = "http://localhost:3000" }
 )
 if ($enableVoice)     { $healthChecks += @{ Name = "Whisper (STT)";    Url = "http://localhost:9000/health" } }

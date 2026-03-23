@@ -1,9 +1,9 @@
 {
   "id": "amd",
-  "llm_engine": "llama-server",
+  "llm_engine": "lemonade",
   "service_name": "llama-server",
   "public_api_port": 8080,
-  "public_health_url": "http://localhost:8080/health",
-  "provider_name": "local-llama",
-  "provider_url": "http://llama-server:8080/v1"
+  "public_health_url": "http://localhost:8080/api/v1/health",
+  "provider_name": "local-lemonade",
+  "provider_url": "http://llama-server:8080/api/v1"
 }

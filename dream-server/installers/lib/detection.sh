@@ -185,6 +185,13 @@ detect_gpu() {
                     GPU_NAME="AMD APU ($GPU_DEVICE_ID)"
                 fi
                 log "GPU: $GPU_NAME (unified memory, AMD APU, device_id=$GPU_DEVICE_ID)"
+
+                # Check for NPU (Ryzen AI) for Lemonade hybrid mode
+                HAS_NPU=false
+                if [[ -d /sys/class/misc/amdnpu ]] || lspci 2>/dev/null | grep -qi 'AMD.*NPU\|AMD.*IPU'; then
+                    HAS_NPU=true
+                    log "NPU detected: Ryzen AI Neural Processing Unit"
+                fi
                 return 0
             fi
         fi

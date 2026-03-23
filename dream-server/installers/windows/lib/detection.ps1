@@ -106,6 +106,14 @@ function Get-GpuInfo {
             $driverVer = $primary.DriverVersion
             if (-not $driverVer) { $driverVer = "unknown" }
 
+            # Detect AMD NPU (Ryzen AI) for Lemonade hybrid NPU+GPU mode
+            $hasNpu = $false
+            try {
+                $npuDevices = Get-CimInstance Win32_PnPEntity -ErrorAction SilentlyContinue |
+                    Where-Object { $_.Name -match "AMD IPU|Ryzen AI|NPU|Neural Processing" }
+                if ($npuDevices) { $hasNpu = $true }
+            } catch { }
+
             return @{
                 Backend       = "amd"
                 Name          = $gpuName
@@ -118,6 +126,7 @@ function Get-GpuInfo {
                 ComputeCap    = ""
                 IsBlackwell   = $false
                 SystemRamGB   = $systemRamGB
+                HasNpu        = $hasNpu
             }
         }
     } catch {
