@@ -1,0 +1,7 @@
+# LiteLLM AMD overlay — disable auth for local-only Lemonade installs.
+# All LiteLLM ports bind to 127.0.0.1 — no external exposure.
+# Loads after compose.yaml via GPU overlay discovery, so this wins.
+services:
+  litellm:
+    environment:
+      - LITELLM_MASTER_KEY=

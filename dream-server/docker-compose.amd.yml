@@ -56,11 +56,7 @@ services:
 
   # Services route through LiteLLM (DREAM_MODE=lemonade sets LLM_API_URL=http://litellm:4000).
   # LiteLLM handles the /api/v1 translation to Lemonade internally.
-  # Auth disabled — all ports bind to 127.0.0.1, no external exposure.
-
-  litellm:
-    environment:
-      - LITELLM_MASTER_KEY=
+  # Auth disabled via extensions/services/litellm/compose.amd.yaml (loads after compose.yaml).
 
   open-webui:
     environment:

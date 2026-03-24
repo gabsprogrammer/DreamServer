@@ -23,6 +23,9 @@ test: ## Run unit and contract tests
 	@echo "=== Installer contracts ==="
 	@bash tests/contracts/test-installer-contracts.sh
 	@bash tests/contracts/test-preflight-fixtures.sh
+	@echo ""
+	@echo "=== AMD/Lemonade contracts ==="
+	@bash tests/contracts/test-amd-lemonade-contracts.sh
 
 bats: ## Run BATS unit tests for shell libraries
 	@echo "=== BATS unit tests ==="
