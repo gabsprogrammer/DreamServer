@@ -343,13 +343,13 @@ export default function Dashboard({ status, loading }) {
 const FeatureCard = memo(function FeatureCard({ icon: Icon, title, description, href, status, hint }) {
   const isExternal = href?.startsWith('http')
   const statusColors = {
-    ready: 'border-theme-border hover:border-theme-accent/30',
-    disabled: 'border-theme-border/60 opacity-60',
-    coming: 'border-transparent opacity-40'
+    ready: 'border-theme-border bg-theme-card hover:border-theme-accent/30',
+    disabled: 'border-theme-border/60 bg-theme-card opacity-60',
+    coming: 'border-transparent bg-theme-bg/50 opacity-30'
   }
 
   const content = (
-    <div className={`p-7 rounded-xl border ${statusColors[status]} bg-theme-card transition-all cursor-pointer hover:bg-theme-surface-hover hover:shadow-md`}>
+    <div className={`p-7 rounded-xl border ${statusColors[status]} transition-all cursor-pointer hover:bg-theme-surface-hover hover:shadow-md`}>
       <div className="flex items-start justify-between mb-4">
         <div className="p-3 bg-theme-bg rounded-xl">
           <Icon size={22} className="text-theme-text-secondary" />
