@@ -1,14 +1,11 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 
 const STORAGE_KEY = 'dream-theme'
-const THEMES = ['dream', 'lemonade', 'light', 'midnight', 'forest', 'sunset', 'arctic']
+const THEMES = ['dream', 'lemonade', 'light', 'arctic']
 const THEME_LABELS = {
   dream: 'Dream',
   lemonade: 'Lemonade',
   light: 'Light',
-  midnight: 'Midnight',
-  forest: 'Forest',
-  sunset: 'Sunset',
   arctic: 'Arctic'
 }
 const DEFAULT_THEME = 'dream'
