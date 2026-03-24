@@ -106,21 +106,22 @@ else
     if [[ -x "$HOME/.opencode/bin/opencode" ]]; then
         OPENCODE_CONFIG_DIR="$HOME/.config/opencode"
         mkdir -p "$OPENCODE_CONFIG_DIR"
+        # Read OLLAMA_PORT and DREAM_MODE from .env generated in phase 06
+        if [[ -f "$INSTALL_DIR/.env" ]]; then
+            [[ -z "${OLLAMA_PORT:-}" ]] && OLLAMA_PORT=$(grep -m1 '^OLLAMA_PORT=' "$INSTALL_DIR/.env" | cut -d= -f2-)
+            [[ -z "${DREAM_MODE:-}" ]] && DREAM_MODE=$(grep -m1 '^DREAM_MODE=' "$INSTALL_DIR/.env" | cut -d= -f2-)
+            [[ -z "${LITELLM_KEY:-}" ]] && LITELLM_KEY=$(grep -m1 '^LITELLM_KEY=' "$INSTALL_DIR/.env" | cut -d= -f2-)
+        fi
+        # Route through LiteLLM on AMD/Lemonade, direct to llama-server otherwise
+        if [[ "${DREAM_MODE:-local}" == "lemonade" ]]; then
+            _opencode_url="http://127.0.0.1:4000/v1"
+            _opencode_key="${LITELLM_KEY:-no-key}"
+        else
+            _opencode_url="http://127.0.0.1:${OLLAMA_PORT:-8080}/v1"
+            _opencode_key="no-key"
+        fi
+
         if [[ ! -f "$OPENCODE_CONFIG_DIR/opencode.json" ]]; then
-            # Read OLLAMA_PORT and DREAM_MODE from .env generated in phase 06
-            if [[ -f "$INSTALL_DIR/.env" ]]; then
-                [[ -z "${OLLAMA_PORT:-}" ]] && OLLAMA_PORT=$(grep -m1 '^OLLAMA_PORT=' "$INSTALL_DIR/.env" | cut -d= -f2-)
-                [[ -z "${DREAM_MODE:-}" ]] && DREAM_MODE=$(grep -m1 '^DREAM_MODE=' "$INSTALL_DIR/.env" | cut -d= -f2-)
-                [[ -z "${LITELLM_KEY:-}" ]] && LITELLM_KEY=$(grep -m1 '^LITELLM_KEY=' "$INSTALL_DIR/.env" | cut -d= -f2-)
-            fi
-            # Route through LiteLLM on AMD/Lemonade, direct to llama-server otherwise
-            if [[ "${DREAM_MODE:-local}" == "lemonade" ]]; then
-                _opencode_url="http://127.0.0.1:4000/v1"
-                _opencode_key="${LITELLM_KEY:-no-key}"
-            else
-                _opencode_url="http://127.0.0.1:${OLLAMA_PORT:-8080}/v1"
-                _opencode_key="no-key"
-            fi
             cat > "$OPENCODE_CONFIG_DIR/opencode.json" <<OPENCODE_EOF
 {
   "\$schema": "https://opencode.ai/config.json",
@@ -147,12 +148,15 @@ else
   }
 }
 OPENCODE_EOF
-            # OpenCode reads config.json, not opencode.json
-            cp "$OPENCODE_CONFIG_DIR/opencode.json" "$OPENCODE_CONFIG_DIR/config.json"
             ai_ok "OpenCode configured for local llama-server (model: ${LLM_MODEL})"
         else
-            ai_ok "OpenCode config already exists — skipping"
+            # Reinstall: update API key and URL in existing config (key may have changed)
+            _sed_i "s|\"apiKey\":.*|\"apiKey\": \"${_opencode_key}\"|" "$OPENCODE_CONFIG_DIR/opencode.json"
+            _sed_i "s|\"baseURL\":.*|\"baseURL\": \"${_opencode_url}\"|" "$OPENCODE_CONFIG_DIR/opencode.json"
+            ai_ok "OpenCode config updated (API key and URL refreshed)"
         fi
+        # OpenCode reads config.json, not opencode.json — always sync
+        cp "$OPENCODE_CONFIG_DIR/opencode.json" "$OPENCODE_CONFIG_DIR/config.json"
 
         # Install OpenCode Web UI as user-level systemd service (no sudo required)
         if [[ -f "$INSTALL_DIR/opencode/opencode-web.service" ]]; then

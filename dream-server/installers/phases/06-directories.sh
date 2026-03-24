@@ -416,7 +416,15 @@ ENV_EOF
         mkdir -p "$INSTALL_DIR/config/litellm"
         cat > "$INSTALL_DIR/config/litellm/lemonade.yaml" << LITELLM_EOF
 model_list:
+  # Tier model alias → bootstrap GGUF (upgraded later by background download)
   - model_name: "${LLM_MODEL}"
+    litellm_params:
+      model: "openai/extra.${_lemonade_gguf}"
+      api_base: http://llama-server:8080/api/v1
+      api_key: sk-lemonade
+
+  # Bootstrap model alias → same GGUF (services use this after Phase 10 overwrites LLM_MODEL)
+  - model_name: "${BOOTSTRAP_LLM_MODEL}"
     litellm_params:
       model: "openai/extra.${_lemonade_gguf}"
       api_base: http://llama-server:8080/api/v1

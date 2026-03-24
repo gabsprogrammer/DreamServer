@@ -65,6 +65,22 @@ try {
 
     if (providerName && config.models.providers[providerName]) {
       const provider = config.models.providers[providerName];
+
+      // Route through LiteLLM when OLLAMA_URL points to it, and pass credentials
+      const ollamaUrl = process.env.OLLAMA_URL || '';
+      const litellmKey = process.env.LITELLM_KEY || '';
+      if (ollamaUrl) {
+        const newBase = ollamaUrl.replace(/\/$/, '') + '/v1';
+        if (provider.baseUrl !== newBase) {
+          console.log(`[inject-token] updated provider baseUrl: ${provider.baseUrl} -> ${newBase}`);
+          provider.baseUrl = newBase;
+        }
+        if (litellmKey && provider.apiKey !== litellmKey) {
+          provider.apiKey = litellmKey;
+          console.log(`[inject-token] updated provider apiKey from env`);
+        }
+      }
+
       // Update model list — replace the first model's id
       if (Array.isArray(provider.models) && provider.models.length > 0) {
         const oldId = provider.models[0].id;
