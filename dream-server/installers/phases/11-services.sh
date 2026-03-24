@@ -3,7 +3,7 @@
 # Dream Server Installer — Phase 11: Start Services
 # ============================================================================
 # Part of: installers/phases/
-# Purpose: Download GGUF model, FLUX models, generate models.ini, launch
+# Purpose: Download GGUF model, SDXL Lightning model, generate models.ini, launch
 #          Docker Compose stack
 #
 # Expects: DRY_RUN, INSTALL_DIR, LOG_FILE, GPU_BACKEND,
@@ -166,35 +166,30 @@ else
         fi
     fi
 
-    # ── FLUX.1-schnell model download (ComfyUI image generation) ──
+    # ── SDXL Lightning model download (ComfyUI image generation) ──
     dream_progress 79 "services" "Checking image generation models"
     if [[ "$ENABLE_COMFYUI" != "true" ]]; then
-        ai "Image generation disabled — skipping FLUX model download"
+        ai "Image generation disabled — skipping model download"
     elif [[ "${DREAM_MODE:-local}" == "cloud" ]]; then
-        ai "Cloud mode — skipping FLUX model download"
+        ai "Cloud mode — skipping image model download"
     elif [[ "$GPU_BACKEND" == "amd" ]]; then
         COMFYUI_BASE="$INSTALL_DIR/data/comfyui/ComfyUI/models"
     elif [[ "$GPU_BACKEND" == "nvidia" ]]; then
         COMFYUI_BASE="$INSTALL_DIR/data/comfyui/models"
     fi
     if [[ "$GPU_BACKEND" == "amd" || "$GPU_BACKEND" == "nvidia" ]]; then
-        FLUX_DIFFUSION_DIR="$COMFYUI_BASE/diffusion_models"
-        FLUX_ENCODER_DIR="$COMFYUI_BASE/text_encoders"
-        FLUX_VAE_DIR="$COMFYUI_BASE/vae"
-        mkdir -p "$FLUX_DIFFUSION_DIR" "$FLUX_ENCODER_DIR" "$FLUX_VAE_DIR"
+        SDXL_CHECKPOINT_DIR="$COMFYUI_BASE/checkpoints"
+        mkdir -p "$SDXL_CHECKPOINT_DIR"
         # NVIDIA ComfyUI also needs output/input/workflows bind-mount dirs
         if [[ "$GPU_BACKEND" == "nvidia" ]]; then
             mkdir -p "$INSTALL_DIR/data/comfyui"/{output,input,workflows}
         fi
 
-        FLUX_NEEDED=false
-        [[ ! -f "$FLUX_DIFFUSION_DIR/flux1-schnell.safetensors" ]] && FLUX_NEEDED=true
-        [[ ! -f "$FLUX_ENCODER_DIR/clip_l.safetensors" ]] && FLUX_NEEDED=true
-        [[ ! -f "$FLUX_ENCODER_DIR/t5xxl_fp16.safetensors" ]] && FLUX_NEEDED=true
-        [[ ! -f "$FLUX_VAE_DIR/ae.safetensors" ]] && FLUX_NEEDED=true
+        SDXL_MODEL="sdxl_lightning_4step.safetensors"
+        SDXL_URL="https://huggingface.co/ByteDance/SDXL-Lightning/resolve/main/sdxl_lightning_4step.safetensors"
 
-        if [[ "$FLUX_NEEDED" == "true" ]]; then
-            ai "Downloading FLUX.1-schnell models (~34GB) for image generation..."
+        if [[ ! -f "$SDXL_CHECKPOINT_DIR/$SDXL_MODEL" ]]; then
+            ai "Downloading SDXL Lightning 4-step (~6.5GB) for image generation..."
 
             # Source background task tracking
             if [[ -f "$SCRIPT_DIR/installers/lib/background-tasks.sh" ]]; then
@@ -202,66 +197,33 @@ else
             fi
 
             nohup env \
-                FLUX_DIFFUSION_DIR="$FLUX_DIFFUSION_DIR" \
-                FLUX_ENCODER_DIR="$FLUX_ENCODER_DIR" \
-                FLUX_VAE_DIR="$FLUX_VAE_DIR" \
+                SDXL_CHECKPOINT_DIR="$SDXL_CHECKPOINT_DIR" \
+                SDXL_MODEL="$SDXL_MODEL" \
+                SDXL_URL="$SDXL_URL" \
                 bash -c '
-                    echo "[FLUX] Starting FLUX.1-schnell model downloads..."
-
-                    # Diffusion model (~24GB)
-                    if [[ ! -f "$FLUX_DIFFUSION_DIR/flux1-schnell.safetensors" ]]; then
-                        echo "[FLUX] Downloading flux1-schnell.safetensors (~24GB)..."
-                        curl -fSL -C - --connect-timeout 30 --max-time 3600 -o "$FLUX_DIFFUSION_DIR/flux1-schnell.safetensors.part" \
-                            "https://huggingface.co/Comfy-Org/flux1-schnell/resolve/main/flux1-schnell.safetensors" 2>&1 && \
-                            mv "$FLUX_DIFFUSION_DIR/flux1-schnell.safetensors.part" "$FLUX_DIFFUSION_DIR/flux1-schnell.safetensors" && \
-                            echo "[FLUX] flux1-schnell.safetensors complete" || \
-                            echo "[FLUX] ERROR: Failed to download flux1-schnell.safetensors"
+                    echo "[SDXL] Starting SDXL Lightning model download..."
+                    if [[ ! -f "$SDXL_CHECKPOINT_DIR/$SDXL_MODEL" ]]; then
+                        echo "[SDXL] Downloading $SDXL_MODEL (~6.5GB)..."
+                        curl -fSL -C - --connect-timeout 30 --max-time 3600 -o "$SDXL_CHECKPOINT_DIR/$SDXL_MODEL.part" \
+                            "$SDXL_URL" 2>&1 && \
+                            mv "$SDXL_CHECKPOINT_DIR/$SDXL_MODEL.part" "$SDXL_CHECKPOINT_DIR/$SDXL_MODEL" && \
+                            echo "[SDXL] $SDXL_MODEL complete" || \
+                            echo "[SDXL] ERROR: Failed to download $SDXL_MODEL"
                     fi
+                    echo "[SDXL] SDXL Lightning model download finished."
+                ' > "$INSTALL_DIR/logs/sdxl-download.log" 2>&1 &
 
-                    # CLIP-L text encoder (~246MB)
-                    if [[ ! -f "$FLUX_ENCODER_DIR/clip_l.safetensors" ]]; then
-                        echo "[FLUX] Downloading clip_l.safetensors (~246MB)..."
-                        curl -fSL -C - --connect-timeout 30 --max-time 3600 -o "$FLUX_ENCODER_DIR/clip_l.safetensors.part" \
-                            "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors" 2>&1 && \
-                            mv "$FLUX_ENCODER_DIR/clip_l.safetensors.part" "$FLUX_ENCODER_DIR/clip_l.safetensors" && \
-                            echo "[FLUX] clip_l.safetensors complete" || \
-                            echo "[FLUX] ERROR: Failed to download clip_l.safetensors"
-                    fi
-
-                    # T5-XXL text encoder (~10GB)
-                    if [[ ! -f "$FLUX_ENCODER_DIR/t5xxl_fp16.safetensors" ]]; then
-                        echo "[FLUX] Downloading t5xxl_fp16.safetensors (~10GB)..."
-                        curl -fSL -C - --connect-timeout 30 --max-time 3600 -o "$FLUX_ENCODER_DIR/t5xxl_fp16.safetensors.part" \
-                            "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors" 2>&1 && \
-                            mv "$FLUX_ENCODER_DIR/t5xxl_fp16.safetensors.part" "$FLUX_ENCODER_DIR/t5xxl_fp16.safetensors" && \
-                            echo "[FLUX] t5xxl_fp16.safetensors complete" || \
-                            echo "[FLUX] ERROR: Failed to download t5xxl_fp16.safetensors"
-                    fi
-
-                    # VAE (~335MB)
-                    if [[ ! -f "$FLUX_VAE_DIR/ae.safetensors" ]]; then
-                        echo "[FLUX] Downloading ae.safetensors (~335MB)..."
-                        curl -fSL -C - --connect-timeout 30 --max-time 3600 -o "$FLUX_VAE_DIR/ae.safetensors.part" \
-                            "https://huggingface.co/Comfy-Org/Lumina_Image_2.0_Repackaged/resolve/main/split_files/vae/ae.safetensors" 2>&1 && \
-                            mv "$FLUX_VAE_DIR/ae.safetensors.part" "$FLUX_VAE_DIR/ae.safetensors" && \
-                            echo "[FLUX] ae.safetensors complete" || \
-                            echo "[FLUX] ERROR: Failed to download ae.safetensors"
-                    fi
-
-                    echo "[FLUX] All FLUX.1-schnell model downloads finished."
-                ' > "$INSTALL_DIR/logs/flux-download.log" 2>&1 &
-
-            flux_pid=$!
+            sdxl_pid=$!
 
             # Register background task
             if command -v bg_task_start &>/dev/null; then
-                bg_task_start "flux-download" "$flux_pid" "FLUX.1-schnell model downloads" "$INSTALL_DIR/logs/flux-download.log"
+                bg_task_start "sdxl-download" "$sdxl_pid" "SDXL Lightning model download" "$INSTALL_DIR/logs/sdxl-download.log"
             fi
 
-            log "Background FLUX download started (PID: $flux_pid). Check: tail -f $INSTALL_DIR/logs/flux-download.log"
-            ai "FLUX.1-schnell models downloading in background (~34GB). ComfyUI will be ready once complete."
+            log "Background SDXL download started (PID: $sdxl_pid). Check: tail -f $INSTALL_DIR/logs/sdxl-download.log"
+            ai "SDXL Lightning downloading in background (~6.5GB). ComfyUI will be ready once complete."
         else
-            ai_ok "FLUX.1-schnell models already present"
+            ai_ok "SDXL Lightning model already present"
         fi
     fi
 

@@ -143,27 +143,9 @@ test_file_has_timeout \
 
 test_file_has_timeout \
     "$ROOT_DIR/installers/phases/11-services.sh" \
-    "curl.*flux1-schnell" \
+    "curl.*SDXL_URL" \
     "--max-time" \
-    "FLUX diffusion model download"
-
-test_file_has_timeout \
-    "$ROOT_DIR/installers/phases/11-services.sh" \
-    "curl.*clip_l.safetensors" \
-    "--max-time" \
-    "FLUX CLIP encoder download"
-
-test_file_has_timeout \
-    "$ROOT_DIR/installers/phases/11-services.sh" \
-    "curl.*t5xxl_fp16" \
-    "--max-time" \
-    "FLUX T5 encoder download"
-
-test_file_has_timeout \
-    "$ROOT_DIR/installers/phases/11-services.sh" \
-    "curl.*ae.safetensors" \
-    "--max-time" \
-    "FLUX VAE download"
+    "SDXL Lightning model download"
 
 # Phase 12 - Health checks
 test_file_has_timeout \

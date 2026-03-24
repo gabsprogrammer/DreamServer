@@ -81,35 +81,29 @@ services:
       SEARXNG_QUERY_URL: "http://searxng:8080/search?q=<query>&format=json"
       ENABLE_SEARCH_QUERY_GENERATION: "true"
       WEB_SEARCH_RESULT_COUNT: "5"
-      # ── ComfyUI Image Generation (FLUX.1-schnell — 4-step distilled) ──
+      # ── ComfyUI Image Generation (SDXL Lightning 4-step) ──
       ENABLE_IMAGE_GENERATION: "${ENABLE_IMAGE_GENERATION:-true}"
       IMAGE_GENERATION_ENGINE: "comfyui"
       COMFYUI_BASE_URL: "http://comfyui:8188"
       IMAGE_SIZE: "1024x1024"
       IMAGE_STEPS: "4"
-      IMAGE_GENERATION_MODEL: "flux1-schnell.safetensors"
+      IMAGE_GENERATION_MODEL: "sdxl_lightning_4step.safetensors"
       COMFYUI_WORKFLOW: >-
-        {"6":{"inputs":{"text":"placeholder","clip":["11",0]},"class_type":"CLIPTextEncode"},
-        "8":{"inputs":{"samples":["13",0],"vae":["10",0]},"class_type":"VAEDecode"},
-        "9":{"inputs":{"filename_prefix":"openwebui","images":["8",0]},"class_type":"SaveImage"},
-        "10":{"inputs":{"vae_name":"ae.safetensors"},"class_type":"VAELoader"},
-        "11":{"inputs":{"clip_name1":"t5xxl_fp16.safetensors","clip_name2":"clip_l.safetensors","type":"flux"},"class_type":"DualCLIPLoader"},
-        "12":{"inputs":{"unet_name":"flux1-schnell.safetensors","weight_dtype":"default"},"class_type":"UNETLoader"},
-        "13":{"inputs":{"noise":["25",0],"guider":["22",0],"sampler":["16",0],"sigmas":["17",0],"latent_image":["27",0]},"class_type":"SamplerCustomAdvanced"},
-        "16":{"inputs":{"sampler_name":"euler"},"class_type":"KSamplerSelect"},
-        "17":{"inputs":{"scheduler":"simple","steps":4,"denoise":1,"model":["12",0]},"class_type":"BasicScheduler"},
-        "22":{"inputs":{"model":["12",0],"conditioning":["26",0]},"class_type":"BasicGuider"},
-        "25":{"inputs":{"noise_seed":42},"class_type":"RandomNoise"},
-        "26":{"inputs":{"guidance":1.0,"conditioning":["6",0]},"class_type":"FluxGuidance"},
-        "27":{"inputs":{"width":1024,"height":1024,"batch_size":1},"class_type":"EmptySD3LatentImage"}}
+        {"3":{"inputs":{"seed":42,"steps":4,"cfg":1.5,"sampler_name":"euler","scheduler":"sgm_uniform","denoise":1.0,"model":["4",0],"positive":["6",0],"negative":["7",0],"latent_image":["5",0]},"class_type":"KSampler"},
+        "4":{"inputs":{"ckpt_name":"sdxl_lightning_4step.safetensors"},"class_type":"CheckpointLoaderSimple"},
+        "5":{"inputs":{"width":1024,"height":1024,"batch_size":1},"class_type":"EmptyLatentImage"},
+        "6":{"inputs":{"text":"placeholder","clip":["4",1]},"class_type":"CLIPTextEncode"},
+        "7":{"inputs":{"text":"","clip":["4",1]},"class_type":"CLIPTextEncode"},
+        "8":{"inputs":{"samples":["3",0],"vae":["4",2]},"class_type":"VAEDecode"},
+        "9":{"inputs":{"filename_prefix":"openwebui","images":["8",0]},"class_type":"SaveImage"}}
       COMFYUI_WORKFLOW_NODES: >-
         [{"type":"prompt","key":"text","node_ids":["6"]},
-        {"type":"model","key":"unet_name","node_ids":["12"]},
-        {"type":"width","key":"width","node_ids":["27"]},
-        {"type":"height","key":"height","node_ids":["27"]},
-        {"type":"steps","key":"steps","node_ids":["17"]},
-        {"type":"seed","key":"noise_seed","node_ids":["25"]},
-        {"type":"n","key":"batch_size","node_ids":["27"]}]
+        {"type":"model","key":"ckpt_name","node_ids":["4"]},
+        {"type":"width","key":"width","node_ids":["5"]},
+        {"type":"height","key":"height","node_ids":["5"]},
+        {"type":"steps","key":"steps","node_ids":["3"]},
+        {"type":"seed","key":"seed","node_ids":["3"]},
+        {"type":"n","key":"batch_size","node_ids":["5"]}]
       # ── Speech-to-Text (Whisper) ──
       AUDIO_STT_ENGINE: "openai"
       AUDIO_STT_OPENAI_API_BASE_URL: "http://whisper:8000/v1"
