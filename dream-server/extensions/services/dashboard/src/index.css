@@ -30,9 +30,9 @@
 
 /* Lemonade — warm parchment theme matching lemonade-server.ai branding */
 :root[data-theme="lemonade"] {
-  --theme-bg: #F6EFD9;
-  --theme-card: #FDFBF2;
-  --theme-border: #E8DFC8;
+  --theme-bg: #F0E8CF;
+  --theme-card: #FDFBF3;
+  --theme-border: #E4DABB;
   --theme-text: #262626;
   --theme-text-secondary: #6B665C;
   --theme-text-muted: #8A8478;

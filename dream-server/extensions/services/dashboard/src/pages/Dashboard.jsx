@@ -349,9 +349,9 @@ const FeatureCard = memo(function FeatureCard({ icon: Icon, title, description, 
   }
 
   const content = (
-    <div className={`p-6 rounded-xl border ${statusColors[status]} bg-theme-card transition-all cursor-pointer hover:bg-theme-surface-hover`}>
-      <div className="flex items-start justify-between mb-3">
-        <div className="p-2.5 bg-theme-bg rounded-xl">
+    <div className={`p-7 rounded-xl border ${statusColors[status]} bg-theme-card transition-all cursor-pointer hover:bg-theme-surface-hover hover:shadow-md`}>
+      <div className="flex items-start justify-between mb-4">
+        <div className="p-3 bg-theme-bg rounded-xl">
           <Icon size={22} className="text-theme-text-secondary" />
         </div>
         {status === 'ready' && (
@@ -365,8 +365,8 @@ const FeatureCard = memo(function FeatureCard({ icon: Icon, title, description, 
           </span>
         )}
       </div>
-      <h3 className="text-base font-bold text-theme-text mb-0.5">{title}</h3>
-      <p className="text-sm text-theme-text-muted leading-relaxed">{description}</p>
+      <h3 className="text-[15px] font-extrabold text-theme-text mb-1">{title}</h3>
+      <p className="text-[13px] text-theme-text-muted/80 leading-relaxed">{description}</p>
       {status === 'disabled' && hint && (
         <p className="text-xs text-theme-text-muted mt-3 font-mono">{hint}</p>
       )}
@@ -391,14 +391,14 @@ const FeatureCard = memo(function FeatureCard({ icon: Icon, title, description, 
 const MetricCard = memo(function MetricCard({ icon: Icon, label, value, subvalue, percent, alert }) {
   return (
     <div className="p-4 bg-theme-card border border-theme-border rounded-xl overflow-hidden min-w-0">
-      <div className="flex items-center gap-2 mb-3">
-        <Icon size={16} className={alert ? 'text-red-400' : 'text-theme-text-muted'} />
-        <span className="text-xs font-medium uppercase tracking-wide text-theme-text-muted">{label}</span>
+      <div className="flex items-center gap-2 mb-2">
+        <Icon size={14} className={alert ? 'text-red-400' : 'text-theme-text-muted/70'} />
+        <span className="text-[10px] font-semibold uppercase tracking-widest text-theme-text-muted/70">{label}</span>
       </div>
-      <div className="text-2xl font-bold text-theme-text font-mono truncate" title={value}>{value}</div>
-      <div className="text-[11px] text-theme-text-muted mt-1">{subvalue}</div>
+      <div className="text-[26px] font-bold text-theme-text font-mono leading-tight truncate" title={value}>{value}</div>
+      <div className="text-[11px] text-theme-text-muted mt-0.5">{subvalue}</div>
       {percent !== undefined && (
-        <div className="h-1.5 bg-theme-border/60 rounded-full mt-3 overflow-hidden">
+        <div className="h-1 bg-theme-border/40 rounded-full mt-3 overflow-hidden">
           <div
             className={`h-full rounded-full transition-all ${percent > 90 ? 'bg-red-500' : percent > 70 ? 'bg-yellow-500' : 'bg-theme-accent'}`}
             style={{ width: `${Math.min(percent, 100)}%` }}
@@ -427,11 +427,11 @@ const ServiceCard = memo(function ServiceCard({ service }) {
 
   return (
     <div className="px-4 py-5 bg-theme-card border border-theme-border rounded-xl">
-      <div className="flex items-center gap-2.5 mb-2.5">
-        <div className={`w-1.5 h-1.5 rounded-full ${statusColors[service.status] || 'bg-zinc-500'}`} />
-        <span className="text-sm font-medium text-theme-text">{service.name}</span>
+      <div className="flex items-center gap-2.5 mb-3">
+        <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusColors[service.status] || 'bg-zinc-500'}`} />
+        <span className="text-[13px] font-medium text-theme-text leading-tight">{service.name}</span>
       </div>
-      <div className="text-[11px] text-theme-text-muted font-mono pl-4">
+      <div className="text-[10px] text-theme-text-muted/70 font-mono pl-4">
         {service.port ? `:${service.port} · ` : ''}{formatUptime(service.uptime)}
       </div>
     </div>

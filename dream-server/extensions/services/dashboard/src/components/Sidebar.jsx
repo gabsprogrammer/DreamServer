@@ -78,10 +78,10 @@ export default function Sidebar({ status, collapsed, onToggle }) {
   return (
     <aside className={`fixed left-0 top-0 h-screen ${collapsed ? 'w-20' : 'w-64'} bg-theme-sidebar border-r border-theme-border flex flex-col transition-all duration-200`}>
       {/* Logo */}
-      <div className="px-4 pt-5 pb-4 border-b border-theme-border overflow-hidden">
+      <div className="px-4 pt-6 pb-5 border-b border-theme-border overflow-hidden">
         {collapsed ? (
           <div className="flex flex-col items-center">
-            <span className="text-lg font-extrabold text-theme-text font-mono tracking-tight">DS</span>
+            <span className="text-xl font-black text-theme-text font-mono tracking-tight">DS</span>
             <p className="text-[8px] text-theme-text-muted font-mono mt-0.5">
               v{status?.version || '...'}
             </p>
@@ -98,10 +98,10 @@ export default function Sidebar({ status, collapsed, onToggle }) {
    \\__ \\ / _ \\ / ___/| | / // _ \\ / ___/
   ___/ //  __// /    | |/ //  __// /
  /____/ \\___//_/     |___/ \\___//_/`}</pre>
-            <p className="text-[8px] text-theme-text-secondary font-mono tracking-wider mt-1.5">
+            <p className="text-[8px] text-theme-text-secondary font-mono tracking-widest mt-2">
               LOCAL AI // SOVEREIGN INTELLIGENCE
             </p>
-            <p className="text-[10px] text-theme-text-secondary mt-1">
+            <p className="text-[10px] text-theme-text-secondary mt-0.5">
               {status?.tier || 'Loading...'} • v{status?.version || '...'}
             </p>
           </>
