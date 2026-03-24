@@ -316,6 +316,7 @@ MODELS_INI_EOF
     _build_count=0
     _build_services=(dashboard dashboard-api ape token-spy privacy-shield)
     [[ "$ENABLE_COMFYUI" == "true" ]] && _build_services+=(comfyui)
+    [[ "$GPU_BACKEND" == "amd" ]] && _build_services+=(llama-server)
     _build_total=${#_build_services[@]}
     for _svc in "${_build_services[@]}"; do
         _build_count=$((_build_count + 1))

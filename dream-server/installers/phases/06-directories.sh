@@ -301,8 +301,11 @@ LLM_API_URL=$(if [[ "$GPU_BACKEND" == "amd" && "${DREAM_MODE:-local}" == "local"
 
 #=== Cloud API Keys ===
 ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-OPENAI_API_KEY=${OPENAI_API_KEY:-}
+OPENAI_API_KEY=$(if [[ "$GPU_BACKEND" == "amd" && "${DREAM_MODE:-local}" == "local" ]]; then echo "$LITELLM_KEY"; else echo "${OPENAI_API_KEY:-}"; fi)
 TOGETHER_API_KEY=${TOGETHER_API_KEY:-}
+
+#=== Service Auth (LiteLLM proxy) ===
+TARGET_API_KEY=$(if [[ "$GPU_BACKEND" == "amd" && "${DREAM_MODE:-local}" == "local" ]]; then echo "$LITELLM_KEY"; else echo "not-needed"; fi)
 
 #=== LLM Settings (llama-server) ===
 LLM_MODEL=${LLM_MODEL}

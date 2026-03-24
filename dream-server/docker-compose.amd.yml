@@ -38,6 +38,7 @@ services:
       - HSA_OVERRIDE_GFX_VERSION=11.5.1
       - ROCBLAS_USE_HIPBLASLT=0
       - LEMONADE_LLAMACPP_BACKEND=rocm
+      - LEMONADE_CTX_SIZE=${CTX_SIZE:-131072}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8080/api/v1/health"]
       interval: 15s
@@ -53,9 +54,12 @@ services:
           cpus: '4.0'
           memory: 8G
 
-  # Services no longer need /api/v1 overrides here — they route through
-  # LiteLLM (DREAM_MODE=lemonade sets LLM_API_URL=http://litellm:4000).
+  # Services route through LiteLLM (DREAM_MODE=lemonade sets LLM_API_URL=http://litellm:4000).
   # LiteLLM handles the /api/v1 translation to Lemonade internally.
+
+  open-webui:
+    environment:
+      - OPENAI_API_KEY=${LITELLM_KEY}
 
   dashboard-api:
     environment:
