@@ -21,8 +21,12 @@ services:
       - --no-tray
       - --llamacpp
       - rocm
+      - --llamacpp-args
+      - "--metrics --host 0.0.0.0"
       - --extra-models-dir
       - /models
+    expose:
+      - "8001"
     volumes:
       - ./data/models:/models:ro
       - lemonade-cache:/root/.cache/huggingface
@@ -66,6 +70,7 @@ services:
     environment:
       - GPU_BACKEND=amd
       - LLM_BACKEND=lemonade
+      - LLAMA_METRICS_PORT=8001
     volumes:
       - /sys/class/drm:/sys/class/drm:ro
       - /sys/class/hwmon:/sys/class/hwmon:ro
