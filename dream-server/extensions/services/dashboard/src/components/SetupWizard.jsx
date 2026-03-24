@@ -61,7 +61,7 @@ export default function SetupWizard({ onComplete }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-[#0f0f13] z-50 overflow-y-auto">
+    <div className="fixed inset-0 bg-theme-bg z-50 overflow-y-auto">
       <div className="min-h-screen flex flex-col">
         <div className="flex-1 flex flex-col justify-center p-8">
           {/* Step Indicator */}
@@ -71,7 +71,7 @@ export default function SetupWizard({ onComplete }) {
                 {i < step ? (
                   <CheckCircle className="w-6 h-6 text-green-500" />
                 ) : i === step ? (
-                  <Circle className="w-6 h-6 text-indigo-500 fill-indigo-500/20" />
+                  <Circle className="w-6 h-6 text-theme-accent fill-indigo-500/20" />
                 ) : (
                   <Circle className="w-6 h-6 text-zinc-600" />
                 )}
@@ -100,15 +100,15 @@ export default function SetupWizard({ onComplete }) {
           {/* Step 2: Welcome */}
           {step === 2 && (
             <div className="text-center max-w-lg mx-auto">
-              <div className="w-20 h-20 bg-indigo-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Settings className="w-10 h-10 text-indigo-400" />
+              <div className="w-20 h-20 bg-theme-accent/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <Settings className="w-10 h-10 text-theme-accent" />
               </div>
               <h2 className="text-3xl font-bold text-white mb-4">Welcome to Dream Server</h2>
               <p className="text-zinc-400 mb-8">
                 Let's get your local AI set up in just a few steps.
                 Everything runs on your hardware — no cloud, no subscriptions.
               </p>
-              <div className="space-y-3 text-left bg-zinc-900/50 rounded-xl p-6 mb-8">
+              <div className="space-y-3 text-left bg-theme-card rounded-xl p-6 mb-8">
                 <div className="flex items-center gap-3 text-zinc-300">
                   <CheckCircle className="w-5 h-5 text-green-500" />
                   <span>Personalize your assistant</span>
@@ -140,7 +140,7 @@ export default function SetupWizard({ onComplete }) {
                 value={config.userName}
                 onChange={(e) => setConfig(c => ({ ...c, userName: e.target.value }))}
                 placeholder="Enter your name"
-                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
+                className="w-full px-4 py-3 bg-theme-card border border-theme-border rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-theme-accent"
                 autoFocus
               />
             </div>
@@ -163,14 +163,14 @@ export default function SetupWizard({ onComplete }) {
                     onClick={() => setConfig(c => ({ ...c, voice: voice.id }))}
                     className={`flex items-center gap-4 p-4 rounded-xl border transition-all text-left ${
                       config.voice === voice.id
-                        ? 'border-indigo-500 bg-indigo-500/10'
-                        : 'border-zinc-700 bg-zinc-800/50 hover:border-zinc-600'
+                        ? 'border-theme-accent bg-theme-accent/10'
+                        : 'border-theme-border bg-theme-card/50 hover:border-zinc-600'
                     }`}
                   >
                     <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                      config.voice === voice.id ? 'border-indigo-500' : 'border-zinc-600'
+                      config.voice === voice.id ? 'border-theme-accent' : 'border-zinc-600'
                     }`}>
-                      {config.voice === voice.id && <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />}
+                      {config.voice === voice.id && <div className="w-2.5 h-2.5 rounded-full bg-theme-accent" />}
                     </div>
                     <div className="flex-1">
                       <div className="font-medium text-white">{voice.name}</div>
@@ -196,18 +196,18 @@ export default function SetupWizard({ onComplete }) {
               {!testStatus.running && !testStatus.done && (
                 <button
                   onClick={runDiagnostics}
-                  className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors"
+                  className="px-6 py-3 bg-theme-accent hover:bg-theme-accent-hover text-white rounded-lg font-medium transition-colors"
                 >
                   Start Diagnostics
                 </button>
               )}
 
               {(testStatus.running || testStatus.done) && (
-                <div className="bg-zinc-900 rounded-xl p-4 text-left font-mono text-sm max-h-64 overflow-y-auto">
+                <div className="bg-theme-card rounded-xl p-4 text-left font-mono text-sm max-h-64 overflow-y-auto">
                   {testStatus.output.map((line, i) => (
                     <div key={i} className="text-zinc-400">{line}</div>
                   ))}
-                  {testStatus.running && <div className="text-indigo-400 animate-pulse">...</div>}
+                  {testStatus.running && <div className="text-theme-accent animate-pulse">...</div>}
                 </div>
               )}
 
@@ -220,7 +220,7 @@ export default function SetupWizard({ onComplete }) {
           )}
         </div>
 
-        <div className="p-6 border-t border-zinc-800">
+        <div className="p-6 border-t border-theme-border">
           <div className="max-w-4xl mx-auto flex items-center justify-between">
             <button
               onClick={() => setStep(s => Math.max(1, s - 1))}
@@ -239,7 +239,7 @@ export default function SetupWizard({ onComplete }) {
               <button
                 onClick={() => setStep(s => s + 1)}
                 disabled={step === 3 && !config.userName.trim()}
-                className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                className="flex items-center gap-2 px-6 py-2 bg-theme-accent hover:bg-theme-accent-hover disabled:bg-zinc-700 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
               >
                 Next
                 <ChevronRight className="w-5 h-5" />

@@ -104,7 +104,7 @@ export function SuccessValidation({ status, onAllPassed }) {
 
   const getStatusIcon = (test) => {
     if (test.status === 'running') {
-      return <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
+      return <Loader2 className="w-5 h-5 text-theme-accent animate-spin" />
     }
     if (test.status === 'passed') {
       return <CheckCircle className="w-5 h-5 text-emerald-400" />
@@ -112,14 +112,14 @@ export function SuccessValidation({ status, onAllPassed }) {
     if (test.status === 'failed') {
       return <XCircle className="w-5 h-5 text-red-400" />
     }
-    return <div className="w-5 h-5 rounded-full border-2 border-zinc-600" />
+    return <div className="w-5 h-5 rounded-full border-2 border-theme-border" />
   }
 
   const getStatusClass = (status) => {
     if (status === 'passed') return 'border-emerald-500/30 bg-emerald-500/5'
     if (status === 'failed') return 'border-red-500/30 bg-red-500/5'
-    if (status === 'running') return 'border-indigo-500/30 bg-indigo-500/5'
-    return 'border-zinc-700 bg-zinc-800/30'
+    if (status === 'running') return 'border-theme-accent/30 bg-theme-accent/5'
+    return 'border-theme-border bg-theme-card/30'
   }
 
   const passedCount = tests.filter(t => t.status === 'passed').length
@@ -140,7 +140,7 @@ export function SuccessValidation({ status, onAllPassed }) {
         <button
           onClick={runLiveTests}
           disabled={running}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-theme-card hover:bg-theme-surface-hover text-zinc-300 rounded-lg transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${running ? 'animate-spin' : ''}`} />
           {running ? 'Testing...' : 'Run Tests'}
@@ -148,7 +148,7 @@ export function SuccessValidation({ status, onAllPassed }) {
       </div>
 
       {/* Progress Bar */}
-      <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+      <div className="h-2 bg-theme-border rounded-full overflow-hidden">
         <div 
           className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-500"
           style={{ width: `${(passedCount / totalCount) * 100}%` }}
@@ -190,7 +190,7 @@ export function SuccessValidation({ status, onAllPassed }) {
                 {test.status !== 'passed' && test.action && (
                   <div className="mt-2 flex items-center gap-2">
                     <span className="text-xs text-zinc-500">Try:</span>
-                    <span className="text-xs text-indigo-300">{test.action}</span>
+                    <span className="text-xs text-theme-accent-light">{test.action}</span>
                   </div>
                 )}
               </div>

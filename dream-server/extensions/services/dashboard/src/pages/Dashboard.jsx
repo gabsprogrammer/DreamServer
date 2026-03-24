@@ -142,11 +142,11 @@ export default function Dashboard({ status, loading }) {
   if (loading) {
     return (
       <div className="p-8 animate-pulse">
-        <div className="h-8 bg-zinc-800 rounded w-1/3 mb-4" />
+        <div className="h-8 bg-theme-card rounded w-1/3 mb-4" />
         <p className="text-sm text-zinc-500 mb-8">Linking modules... reading telemetry...</p>
         <div className="grid grid-cols-3 gap-6">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-40 bg-zinc-800 rounded-xl" />
+            <div key={i} className="h-40 bg-theme-card rounded-xl" />
           ))}
         </div>
       </div>
@@ -166,8 +166,8 @@ export default function Dashboard({ status, loading }) {
             {health.text}
           </p>
         </div>
-        <div className="flex items-center gap-4 text-xs text-zinc-500 font-mono bg-zinc-900/50 border border-zinc-800 rounded-lg px-3 py-2">
-          {status?.tier && <span className="text-indigo-300">{status.tier}</span>}
+        <div className="flex items-center gap-4 text-xs text-zinc-500 font-mono bg-theme-card border border-theme-border rounded-lg px-3 py-2">
+          {status?.tier && <span className="text-theme-accent-light">{status.tier}</span>}
           {status?.model?.name && <span>{status.model.name}</span>}
           {status?.version && <span>v{status.version}</span>}
         </div>
@@ -343,16 +343,16 @@ export default function Dashboard({ status, loading }) {
 const FeatureCard = memo(function FeatureCard({ icon: Icon, title, description, href, status, hint }) {
   const isExternal = href?.startsWith('http')
   const statusColors = {
-    ready: 'border-indigo-500/20 hover:border-indigo-500/35',
-    disabled: 'border-zinc-700 opacity-60',
-    coming: 'border-zinc-700 opacity-40'
+    ready: 'border-theme-accent/20 hover:border-theme-accent/35',
+    disabled: 'border-theme-border opacity-60',
+    coming: 'border-theme-border opacity-40'
   }
 
   const content = (
-    <div className={`p-6 rounded-xl border-2 ${statusColors[status]} bg-zinc-900/50 transition-all cursor-pointer hover:bg-zinc-800/50`}>
+    <div className={`p-6 rounded-xl border-2 ${statusColors[status]} bg-theme-card transition-all cursor-pointer hover:bg-theme-surface-hover`}>
       <div className="flex items-start justify-between mb-4">
-        <div className="p-3 bg-zinc-800 rounded-lg">
-          <Icon size={24} className="text-indigo-400" />
+        <div className="p-3 bg-theme-card rounded-lg">
+          <Icon size={24} className="text-theme-accent" />
         </div>
         {status === 'ready' && (
           <span className="px-2 py-1 text-xs bg-green-500/20 text-green-400 rounded-full">
@@ -366,7 +366,7 @@ const FeatureCard = memo(function FeatureCard({ icon: Icon, title, description, 
         )}
       </div>
       <h3 className="text-lg font-semibold text-white mb-1">{title}</h3>
-      <p className="text-sm text-zinc-400">{description}</p>
+      <p className="text-sm text-theme-text-muted">{description}</p>
       {status === 'disabled' && hint && (
         <p className="text-xs text-zinc-500 mt-3 font-mono">{hint}</p>
       )}
@@ -390,17 +390,17 @@ const FeatureCard = memo(function FeatureCard({ icon: Icon, title, description, 
 
 const MetricCard = memo(function MetricCard({ icon: Icon, label, value, subvalue, percent, alert }) {
   return (
-    <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden min-w-0">
+    <div className="p-4 bg-theme-card border border-theme-border rounded-xl overflow-hidden min-w-0">
       <div className="flex items-center gap-3 mb-2">
-        <Icon size={18} className={alert ? 'text-red-400' : 'text-zinc-400'} />
-        <span className="text-sm text-zinc-400">{label}</span>
+        <Icon size={18} className={alert ? 'text-red-400' : 'text-theme-text-muted'} />
+        <span className="text-sm text-theme-text-muted">{label}</span>
       </div>
       <div className="text-xl font-semibold text-white font-mono truncate" title={value}>{value}</div>
       <div className="text-xs text-zinc-500 mt-1">{subvalue}</div>
       {percent !== undefined && (
         <div className="h-1 bg-zinc-700 rounded-full mt-3 overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all ${percent > 90 ? 'bg-red-500' : percent > 70 ? 'bg-yellow-500' : 'bg-indigo-500'}`}
+            className={`h-full rounded-full transition-all ${percent > 90 ? 'bg-red-500' : percent > 70 ? 'bg-yellow-500' : 'bg-theme-accent'}`}
             style={{ width: `${Math.min(percent, 100)}%` }}
           />
         </div>
@@ -426,7 +426,7 @@ const ServiceCard = memo(function ServiceCard({ service }) {
   }
 
   return (
-    <div className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl">
+    <div className="p-4 bg-theme-card border border-theme-border rounded-xl">
       <div className="flex items-center gap-2 mb-2">
         <div className={`w-2 h-2 rounded-full ${statusColors[service.status] || 'bg-zinc-500'}`} />
         <span className="text-sm font-medium text-white">{service.name}</span>

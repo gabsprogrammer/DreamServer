@@ -21,11 +21,11 @@ export default function Models() {
     return (
       <div className="p-8">
         <div className="animate-pulse">
-          <div className="h-8 bg-zinc-800 rounded w-1/3 mb-8" />
-          <div className="h-24 bg-zinc-800 rounded-xl mb-8" />
+          <div className="h-8 bg-theme-card rounded w-1/3 mb-8" />
+          <div className="h-24 bg-theme-card rounded-xl mb-8" />
           <div className="space-y-4">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-32 bg-zinc-800 rounded-xl" />
+              <div key={i} className="h-32 bg-theme-card rounded-xl" />
             ))}
           </div>
         </div>
@@ -38,13 +38,13 @@ export default function Models() {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Models</h1>
-          <p className="text-zinc-400 mt-1">
+          <p className="text-theme-text-muted mt-1">
             Download, switch, and manage your AI models.
           </p>
         </div>
         <button 
           onClick={refresh}
-          className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
+          className="p-2 text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover rounded-lg transition-colors"
           title="Refresh"
         >
           <RefreshCw size={20} />
@@ -59,9 +59,9 @@ export default function Models() {
 
       {/* VRAM Indicator */}
       {gpu && (
-        <div className="mb-8 p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl">
+        <div className="mb-8 p-4 bg-theme-card border border-theme-border rounded-xl">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-zinc-400">GPU VRAM</span>
+            <span className="text-sm text-theme-text-muted">GPU VRAM</span>
             <span className="text-sm text-white">
               {gpu.vramUsed?.toFixed(1)} / {gpu.vramTotal?.toFixed(0)} GB used
             </span>
@@ -69,8 +69,8 @@ export default function Models() {
           <div className="h-2 bg-zinc-700 rounded-full overflow-hidden">
             <div 
               className={`h-full rounded-full transition-all ${
-                (gpu.vramUsed / gpu.vramTotal) > 0.9 ? 'bg-red-500' : 
-                (gpu.vramUsed / gpu.vramTotal) > 0.7 ? 'bg-yellow-500' : 'bg-indigo-500'
+                (gpu.vramUsed / gpu.vramTotal) > 0.9 ? 'bg-red-500' :
+                (gpu.vramUsed / gpu.vramTotal) > 0.7 ? 'bg-yellow-500' : 'bg-theme-accent'
               }`}
               style={{ width: `${(gpu.vramUsed / gpu.vramTotal) * 100}%` }} 
             />
@@ -125,7 +125,7 @@ function ModelCard({ model, isLoading, onDownload, onLoad, onDelete }) {
   const isAvailable = model.status === 'available'
 
   const specialtyColors = {
-    'General': 'bg-indigo-500/20 text-indigo-400',
+    'General': 'bg-theme-accent/20 text-theme-accent',
     'Fast': 'bg-green-500/20 text-green-400',
     'Code': 'bg-purple-500/20 text-purple-400',
     'Balanced': 'bg-blue-500/20 text-blue-400',
@@ -135,16 +135,16 @@ function ModelCard({ model, isLoading, onDownload, onLoad, onDelete }) {
   }
 
   return (
-    <div className={`p-6 bg-zinc-900/50 border rounded-xl transition-all ${
-      isLoaded ? 'border-green-500/30 bg-green-500/5' : 
-      isDownloaded ? 'border-indigo-500/30' : 'border-zinc-800'
+    <div className={`p-6 bg-theme-card border rounded-xl transition-all ${
+      isLoaded ? 'border-green-500/30 bg-green-500/5' :
+      isDownloaded ? 'border-theme-accent/30' : 'border-theme-border'
     }`}>
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-4">
           <div className={`p-3 rounded-lg ${
-            isLoaded ? 'bg-green-500/20' : 'bg-zinc-800'
+            isLoaded ? 'bg-green-500/20' : 'bg-theme-card'
           }`}>
-            <Box size={24} className={isLoaded ? 'text-green-400' : 'text-indigo-400'} />
+            <Box size={24} className={isLoaded ? 'text-green-400' : 'text-theme-accent'} />
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-2">
@@ -158,7 +158,7 @@ function ModelCard({ model, isLoading, onDownload, onLoad, onDelete }) {
             
             <p className="text-sm text-zinc-500 mt-1">{model.description}</p>
             
-            <div className="flex items-center gap-3 mt-3 text-sm text-zinc-400">
+            <div className="flex items-center gap-3 mt-3 text-sm text-theme-text-muted">
               <span>{model.size}</span>
               <span>•</span>
               <span>{model.vramRequired} GB VRAM</span>
@@ -189,7 +189,7 @@ function ModelCard({ model, isLoading, onDownload, onLoad, onDelete }) {
                 </span>
               )}
               {isDownloaded && !isLoaded && (
-                <span className="px-2 py-0.5 text-xs bg-indigo-500/20 text-indigo-400 rounded">
+                <span className="px-2 py-0.5 text-xs bg-theme-accent/20 text-theme-accent rounded">
                   Downloaded
                 </span>
               )}
@@ -213,8 +213,8 @@ function ModelCard({ model, isLoading, onDownload, onLoad, onDelete }) {
                 onClick={onLoad}
                 disabled={!model.fitsVram}
                 className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors ${
-                  model.fitsVram 
-                    ? 'bg-indigo-600 hover:bg-indigo-700 text-white' 
+                  model.fitsVram
+                    ? 'bg-theme-accent hover:bg-theme-accent-hover text-white'
                     : 'bg-zinc-700 text-zinc-500 cursor-not-allowed'
                 }`}
                 title={model.fitsVram ? 'Load this model' : 'Not enough VRAM'}
@@ -224,7 +224,7 @@ function ModelCard({ model, isLoading, onDownload, onLoad, onDelete }) {
               </button>
               <button 
                 onClick={onDelete}
-                className="p-2 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                className="p-2 text-theme-text-muted hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                 title="Delete model"
               >
                 <Trash2 size={16} />
@@ -233,7 +233,7 @@ function ModelCard({ model, isLoading, onDownload, onLoad, onDelete }) {
           ) : (
             <button 
               onClick={onDownload}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+              className="px-4 py-2 bg-theme-accent hover:bg-theme-accent-hover text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
             >
               <Download size={16} />
               Download
@@ -263,23 +263,23 @@ function DownloadProgressBar({ progress, helpers }) {
   }
 
   return (
-    <div className="mb-6 p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-xl">
+    <div className="mb-6 p-4 bg-theme-accent/10 border border-theme-accent/30 rounded-xl">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <HardDrive size={20} className="text-indigo-400" />
-            <span className="absolute -top-1 -right-1 w-2 h-2 bg-indigo-400 rounded-full animate-pulse" />
+            <HardDrive size={20} className="text-theme-accent" />
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-theme-accent rounded-full animate-pulse" />
           </div>
           <div>
             <p className="text-white font-medium">Downloading {progress.model}</p>
-            <p className="text-sm text-zinc-400">
+            <p className="text-sm text-theme-text-muted">
               {formatBytes(progress.bytesDownloaded)} / {formatBytes(progress.bytesTotal)}
               {progress.speedMbps > 0 && ` • ${progress.speedMbps.toFixed(1)} MB/s`}
               {progress.eta && ` • ETA: ${formatEta(progress.eta)}`}
             </p>
           </div>
         </div>
-        <span className="text-lg font-bold text-indigo-400">
+        <span className="text-lg font-bold text-theme-accent">
           {progress.percent?.toFixed(0) || 0}%
         </span>
       </div>

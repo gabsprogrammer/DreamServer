@@ -64,9 +64,9 @@ function useVoiceServices() {
 function VoiceServicesBanner({ services, loading, onRefresh }) {
   if (loading) {
     return (
-      <div className="mb-6 p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl flex items-center gap-3">
-        <Loader2 size={18} className="text-zinc-400 animate-spin" />
-        <span className="text-sm text-zinc-400">Checking voice services...</span>
+      <div className="mb-6 p-4 bg-theme-card border border-theme-border rounded-xl flex items-center gap-3">
+        <Loader2 size={18} className="text-theme-text-muted animate-spin" />
+        <span className="text-sm text-theme-text-muted">Checking voice services...</span>
       </div>
     )
   }
@@ -164,9 +164,9 @@ function MessageBubble({ role, content, timestamp }) {
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
       <div 
         className={`max-w-[80%] px-4 py-3 rounded-2xl ${
-          isUser 
-            ? 'bg-indigo-600 text-white rounded-br-none' 
-            : 'bg-zinc-800 text-zinc-100 rounded-bl-none'
+          isUser
+            ? 'bg-theme-accent text-white rounded-br-none'
+            : 'bg-theme-card text-zinc-100 rounded-bl-none'
         }`}
       >
         <p className="text-sm">{content}</p>
@@ -184,7 +184,7 @@ function VolumeSlider({ volume, onChange, muted, onToggleMute }) {
     <div className="flex items-center gap-3">
       <button 
         onClick={onToggleMute}
-        className="text-zinc-400 hover:text-white transition-colors"
+        className="text-theme-text-muted hover:text-theme-text transition-colors"
       >
         {muted ? <VolumeX size={20} /> : <Volume2 size={20} />}
       </button>
@@ -227,17 +227,17 @@ function VoiceSettings({ isOpen, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 w-full max-w-md">
+      <div className="bg-theme-card border border-theme-border rounded-xl p-6 w-full max-w-md">
         <h3 className="text-lg font-semibold text-white mb-4">Voice Settings</h3>
         
         <div className="space-y-4">
           {/* Voice Selection */}
           <div>
-            <label className="text-sm text-zinc-400 block mb-2">Voice</label>
-            <select 
+            <label className="text-sm text-theme-text-muted block mb-2">Voice</label>
+            <select
               value={voice}
               onChange={(e) => setVoice(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white"
+              className="w-full bg-theme-card border border-theme-border rounded-lg px-3 py-2 text-white"
             >
               <option value="default">Default (LJSpeech)</option>
               <option value="jenny">Jenny (Female)</option>
@@ -248,7 +248,7 @@ function VoiceSettings({ isOpen, onClose }) {
 
           {/* Speech Speed */}
           <div>
-            <label className="text-sm text-zinc-400 block mb-2">
+            <label className="text-sm text-theme-text-muted block mb-2">
               Speech Speed: {speed.toFixed(1)}x
             </label>
             <input
@@ -271,7 +271,7 @@ function VoiceSettings({ isOpen, onClose }) {
             <button
               onClick={() => setWakeWord(!wakeWord)}
               className={`w-12 h-6 rounded-full transition-colors ${
-                wakeWord ? 'bg-indigo-600' : 'bg-zinc-700'
+                wakeWord ? 'bg-theme-accent' : 'bg-zinc-700'
               }`}
             >
               <div 
@@ -286,13 +286,13 @@ function VoiceSettings({ isOpen, onClose }) {
         <div className="flex justify-end gap-3 mt-6">
           <button
             onClick={handleCancel}
-            className="px-4 py-2 text-zinc-400 hover:text-white transition-colors"
+            className="px-4 py-2 text-theme-text-muted hover:text-theme-text transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+            className="px-4 py-2 bg-theme-accent hover:bg-theme-accent-hover text-white rounded-lg transition-colors"
           >
             Save
           </button>
@@ -384,11 +384,11 @@ export default function Voice() {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="p-6 border-b border-zinc-800">
+      <div className="p-6 border-b border-theme-border">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-white">Voice</h1>
-            <p className="text-zinc-400 mt-1">
+            <p className="text-theme-text-muted mt-1">
               Talk to your AI. Like having your own Jarvis.
             </p>
           </div>
@@ -408,7 +408,7 @@ export default function Voice() {
             {/* Settings */}
             <button 
               onClick={() => setShowSettings(true)}
-              className="text-zinc-400 hover:text-white transition-colors"
+              className="text-theme-text-muted hover:text-theme-text transition-colors"
             >
               <Settings size={20} />
             </button>
@@ -429,7 +429,7 @@ export default function Voice() {
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
         {messages.length === 0 && !currentTranscript && (
           <div className="h-full flex flex-col items-center justify-center text-center">
-            <div className="w-24 h-24 rounded-full bg-zinc-800/50 flex items-center justify-center mb-4">
+            <div className="w-24 h-24 rounded-full bg-theme-card/50 flex items-center justify-center mb-4">
               <Mic size={40} className="text-zinc-600" />
             </div>
             <h3 className="text-lg text-zinc-300 mb-2">Start a conversation</h3>
@@ -447,7 +447,7 @@ export default function Voice() {
         {/* Current (interim) transcript */}
         {currentTranscript && (
           <div className="flex justify-end mb-4">
-            <div className="max-w-[80%] px-4 py-3 rounded-2xl bg-indigo-600/50 text-white rounded-br-none border border-indigo-500/30">
+            <div className="max-w-[80%] px-4 py-3 rounded-2xl bg-theme-accent/50 text-white rounded-br-none border border-theme-accent/30">
               <p className="text-sm italic">{currentTranscript}</p>
             </div>
           </div>
@@ -456,9 +456,9 @@ export default function Voice() {
         {/* AI Speaking indicator */}
         {isSpeaking && (
           <div className="flex justify-start mb-4">
-            <div className="px-4 py-3 rounded-2xl bg-zinc-800 rounded-bl-none flex items-center gap-3">
+            <div className="px-4 py-3 rounded-2xl bg-theme-card rounded-bl-none flex items-center gap-3">
               <AudioWaveform active={true} />
-              <span className="text-sm text-zinc-400">AI is speaking...</span>
+              <span className="text-sm text-theme-text-muted">AI is speaking...</span>
             </div>
           </div>
         )}
@@ -481,13 +481,13 @@ export default function Voice() {
       )}
 
       {/* Control Bar */}
-      <div className="p-6 border-t border-zinc-800 bg-zinc-900/50">
+      <div className="p-6 border-t border-theme-border bg-theme-card">
         <div className="flex items-center justify-center gap-4">
           {/* Clear button */}
           {messages.length > 0 && (
             <button
               onClick={clearMessages}
-              className="p-3 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-full transition-colors"
+              className="p-3 text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover rounded-full transition-colors"
               title="Clear conversation"
             >
               <Trash2 size={20} />
@@ -502,8 +502,8 @@ export default function Voice() {
               status === 'connecting'
                 ? 'bg-zinc-700 cursor-not-allowed'
                 : isListening 
-                  ? 'bg-red-500 hover:bg-red-600 scale-110' 
-                  : 'bg-indigo-600 hover:bg-indigo-700 hover:scale-105'
+                  ? 'bg-red-500 hover:bg-red-600 scale-110'
+                  : 'bg-theme-accent hover:bg-theme-accent-hover hover:scale-105'
             }`}
           >
             {status === 'connecting' ? (
@@ -519,7 +519,7 @@ export default function Voice() {
           {isSpeaking && (
             <button
               onClick={interrupt}
-              className="p-3 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-full transition-colors"
+              className="p-3 text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover rounded-full transition-colors"
               title="Interrupt AI"
             >
               <StopCircle size={20} />
@@ -538,7 +538,7 @@ export default function Voice() {
 
         {/* Keyboard hint */}
         <p className="text-center text-xs text-zinc-600 mt-2">
-          Tip: Hold <kbd className="px-1.5 py-0.5 bg-zinc-800 rounded text-zinc-400">Space</kbd> to talk
+          Tip: Hold <kbd className="px-1.5 py-0.5 bg-theme-card rounded text-theme-text-muted">Space</kbd> to talk
         </p>
       </div>
 

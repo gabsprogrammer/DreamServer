@@ -184,7 +184,7 @@ export function PreFlightChecks({ onComplete, onIssuesFound }) {
 
   const getStatusIcon = (check) => {
     if (check.status === 'checking') {
-      return <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
+      return <Loader2 className="w-5 h-5 text-theme-accent animate-spin" />
     }
     if (check.status === 'success') {
       return <CheckCircle className="w-5 h-5 text-emerald-400" />
@@ -199,7 +199,7 @@ export function PreFlightChecks({ onComplete, onIssuesFound }) {
     if (status === 'success') return 'border-emerald-500/30 bg-emerald-500/5'
     if (status === 'error') return 'border-red-500/30 bg-red-500/5'
     if (status === 'warning') return 'border-amber-500/30 bg-amber-500/5'
-    return 'border-zinc-700 bg-zinc-800/50'
+    return 'border-theme-border bg-theme-card/50'
   }
 
   return (
@@ -235,8 +235,8 @@ export function PreFlightChecks({ onComplete, onIssuesFound }) {
                 <p className="text-xs text-zinc-500 mt-1">{check.details}</p>
               )}
               {check.fix && (
-                <div className="mt-2 p-2 bg-zinc-900/50 rounded text-xs text-zinc-400">
-                  <span className="text-indigo-400 font-medium">Fix:</span> {check.fix}
+                <div className="mt-2 p-2 bg-theme-card rounded text-xs text-theme-text-muted">
+                  <span className="text-theme-accent font-medium">Fix:</span> {check.fix}
                 </div>
               )}
             </div>

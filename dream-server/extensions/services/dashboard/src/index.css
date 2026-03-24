@@ -2,32 +2,77 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom scrollbar */
+/* ── Theme Variables ────────────────────────────────────── */
+
+:root, :root[data-theme="dream"] {
+  --theme-bg: #0f0f13;
+  --theme-card: #18181b;
+  --theme-border: #27272a;
+  --theme-text: #e4e4e7;
+  --theme-text-secondary: #a1a1aa;
+  --theme-text-muted: #71717a;
+  --theme-accent: #6366f1;
+  --theme-accent-hover: #4f46e5;
+  --theme-accent-light: #a78bfa;
+  --theme-surface-hover: #27272a;
+  --theme-scrollbar-track: #18181b;
+  --theme-scrollbar-thumb: #3f3f46;
+  --theme-scrollbar-hover: #52525b;
+  --theme-focus: #6366f1;
+  --theme-loading-logo: #a78bfa;
+  --theme-gradient-from: rgba(99,102,241,0.4);
+  --theme-gradient-to: rgba(147,51,234,0.4);
+}
+
+:root[data-theme="lemonade"] {
+  --theme-bg: #FFF8E7;
+  --theme-card: #FFFFFF;
+  --theme-border: #E5DDD0;
+  --theme-text: #2D2A26;
+  --theme-text-secondary: #6B6560;
+  --theme-text-muted: #9C9590;
+  --theme-accent: #D4A017;
+  --theme-accent-hover: #B8860B;
+  --theme-accent-light: #F5C518;
+  --theme-surface-hover: #FFF0CC;
+  --theme-scrollbar-track: #FFF8E7;
+  --theme-scrollbar-thumb: #E5DDD0;
+  --theme-scrollbar-hover: #D4CCC0;
+  --theme-focus: #D4A017;
+  --theme-loading-logo: #D4A017;
+  --theme-gradient-from: rgba(245,197,24,0.4);
+  --theme-gradient-to: rgba(212,160,23,0.4);
+}
+
+/* ── Scrollbar ──────────────────────────────────────────── */
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #18181b;
+  background: var(--theme-scrollbar-track);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #3f3f46;
+  background: var(--theme-scrollbar-thumb);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
+  background: var(--theme-scrollbar-hover);
 }
 
-/* Focus styles */
+/* ── Focus ──────────────────────────────────────────────── */
+
 :focus-visible {
-  outline: 2px solid #6366f1;
+  outline: 2px solid var(--theme-focus);
   outline-offset: 2px;
 }
 
-/* Smooth transitions — scoped to interactive elements only */
+/* ── Transitions (scoped to interactive elements) ───────── */
+
 a, button, input, select, textarea,
 [class*="rounded-xl"], [class*="rounded-lg"],
 [class*="border-"] {
@@ -36,7 +81,8 @@ a, button, input, select, textarea,
   transition-duration: 150ms;
 }
 
-/* Animation classes */
+/* ── Animations ─────────────────────────────────────────── */
+
 .animate-fade-in {
   animation: fadeIn 0.3s ease-in-out;
 }

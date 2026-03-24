@@ -144,7 +144,7 @@ export function TroubleshootingAssistant({ serviceStatus }) {
         placeholder="Search issues..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
+        className="w-full px-3 py-2 bg-theme-card border border-theme-border rounded-lg text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-theme-accent"
       />
 
       {/* Relevant issues first */}
@@ -173,8 +173,8 @@ export function TroubleshootingAssistant({ serviceStatus }) {
             key={issue.id}
             className={`border rounded-lg overflow-hidden transition-all ${
               expanded === issue.id 
-                ? 'border-zinc-600 bg-zinc-800/50' 
-                : 'border-zinc-800 hover:border-zinc-700'
+                ? 'border-zinc-600 bg-theme-card/50'
+                : 'border-theme-border hover:border-theme-border'
             }`}
           >
             <button
@@ -218,7 +218,7 @@ export function TroubleshootingAssistant({ serviceStatus }) {
                 <div className="space-y-2">
                   <p className="text-xs text-zinc-500">Solutions:</p>
                   {issue.solutions.map((solution, i) => (
-                    <div key={i} className="bg-zinc-900/50 rounded p-2">
+                    <div key={i} className="bg-theme-card rounded p-2">
                       <p className="text-xs font-medium text-zinc-300 mb-1">{solution.title}</p>
                       <p className="text-xs text-zinc-500 mb-2">{solution.description}</p>
                       
@@ -229,7 +229,7 @@ export function TroubleshootingAssistant({ serviceStatus }) {
                           </pre>
                           <button
                             onClick={() => copyToClipboard(solution.command, `${issue.id}-${i}`)}
-                            className="absolute top-1 right-1 p-1 bg-zinc-800 hover:bg-zinc-700 rounded text-zinc-500 hover:text-zinc-300 transition-colors"
+                            className="absolute top-1 right-1 p-1 bg-theme-card hover:bg-theme-surface-hover rounded text-zinc-500 hover:text-zinc-300 transition-colors"
                           >
                             {copied === `${issue.id}-${i}` ? (
                               <Check className="w-3 h-3 text-emerald-400" />
@@ -255,19 +255,19 @@ export function TroubleshootingAssistant({ serviceStatus }) {
       )}
 
       {/* Help footer */}
-      <div className="pt-3 border-t border-zinc-800">
+      <div className="pt-3 border-t border-theme-border">
         <p className="text-xs text-zinc-500">
           Still stuck? Check the{' '}
           <a 
             href="https://github.com/Light-Heart-Labs/DreamServer/tree/main/dream-server#troubleshooting" 
             target="_blank"
             rel="noopener noreferrer"
-            className="text-indigo-400 hover:text-indigo-300"
+            className="text-theme-accent hover:text-theme-accent-light"
           >
             full troubleshooting guide
           </a>
           {' '}or run{' '}
-          <code className="bg-zinc-800 px-1 py-0.5 rounded text-zinc-400">./scripts/dream-test.sh</code>
+          <code className="bg-theme-card px-1 py-0.5 rounded text-theme-text-muted">./scripts/dream-test.sh</code>
         </p>
       </div>
     </div>

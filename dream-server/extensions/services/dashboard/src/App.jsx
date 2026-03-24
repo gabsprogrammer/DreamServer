@@ -34,7 +34,7 @@ function App() {
   const handleToggle = useCallback(() => setSidebarCollapsed(c => !c), [])
 
   return (
-    <div className="flex min-h-screen bg-[#0f0f13]">
+    <div className="flex min-h-screen bg-theme-bg text-theme-text">
       <Sidebar
         status={status}
         collapsed={sidebarCollapsed}
@@ -52,9 +52,9 @@ function App() {
 
         <Suspense fallback={
           <div className="p-8 animate-pulse">
-            <div className="h-8 bg-zinc-800 rounded w-1/3 mb-4" />
+            <div className="h-8 bg-theme-card rounded w-1/3 mb-4" />
             <div className="grid grid-cols-3 gap-6">
-              {[...Array(6)].map((_, i) => <div key={i} className="h-40 bg-zinc-800 rounded-xl" />)}
+              {[...Array(6)].map((_, i) => <div key={i} className="h-40 bg-theme-card rounded-xl" />)}
             </div>
           </div>
         }>
@@ -93,28 +93,28 @@ function BootstrapBanner({ bootstrap }) {
   }
 
   return (
-    <div className="bg-gradient-to-r from-indigo-900/40 to-purple-900/40 border-b border-indigo-500/30 p-4">
+    <div className="border-b border-theme-border p-4" style={{ background: `linear-gradient(to right, var(--theme-gradient-from), var(--theme-gradient-to))` }}>
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <div className="w-3 h-3 bg-indigo-400 rounded-full animate-pulse" />
+            <div className="w-3 h-3 bg-theme-accent rounded-full animate-pulse" />
             <div>
               <h3 className="text-sm font-semibold text-white">Downloading Full Model</h3>
               <p className="text-xs text-zinc-400">
-                Chat now with lightweight model • <span className="text-indigo-300">{bootstrap.model}</span> downloading
+                Chat now with lightweight model • <span className="text-theme-accent-light">{bootstrap.model}</span> downloading
               </p>
             </div>
           </div>
           <div className="text-right">
-            <span className="text-xl font-bold text-indigo-400">{bootstrap.percent?.toFixed(1) || 0}%</span>
+            <span className="text-xl font-bold text-theme-accent">{bootstrap.percent?.toFixed(1) || 0}%</span>
             {bootstrap.speedMbps && (
               <p className="text-xs text-zinc-500">{bootstrap.speedMbps.toFixed(1)} MB/s</p>
             )}
           </div>
         </div>
-        <div className="h-2 bg-zinc-700 rounded-full overflow-hidden">
+        <div className="h-2 bg-theme-border rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
+            className="h-full bg-theme-accent rounded-full transition-all duration-500"
             style={{ width: `${bootstrap.percent || 0}%` }}
           />
         </div>
