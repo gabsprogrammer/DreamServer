@@ -96,8 +96,9 @@ async def get_llama_metrics(model_hint: Optional[str] = None) -> dict:
     try:
         host = SERVICES["llama-server"]["host"]
         port = SERVICES["llama-server"]["port"]
+        metrics_port = int(os.environ.get("LLAMA_METRICS_PORT", port))
         model_name = model_hint if model_hint is not None else (await get_loaded_model() or "")
-        url = f"http://{host}:{port}/metrics"
+        url = f"http://{host}:{metrics_port}/metrics"
         params = {"model": model_name} if model_name else {}
         client = await _get_httpx_client()
         resp = await client.get(url, params=params)
