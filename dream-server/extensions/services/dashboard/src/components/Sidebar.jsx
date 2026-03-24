@@ -133,11 +133,11 @@ export default function Sidebar({ status, collapsed, onToggle }) {
 
         {/* External Links — hidden when collapsed */}
         {!collapsed && (
-          <div className="mt-6 pt-6 border-t border-theme-border">
-            <p className="px-3 text-xs font-medium text-theme-text-muted uppercase mb-2">
+          <div className="mt-4 pt-4 border-t border-theme-border/60">
+            <p className="px-3 text-[10px] font-semibold text-theme-text-muted/60 uppercase tracking-widest mb-1.5">
               Quick Links
             </p>
-            <ul className="space-y-1">
+            <ul className="space-y-0">
               {externalLinks.map(({ key, url, icon: Icon, label, healthy }) => (
                 <li key={key}>
                   <a
@@ -145,16 +145,16 @@ export default function Sidebar({ status, collapsed, onToggle }) {
                     onClick={(e) => { if (!healthy) e.preventDefault() }}
                     target={healthy ? '_blank' : undefined}
                     rel={healthy ? 'noopener noreferrer' : undefined}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                    className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition-colors ${
                       healthy
-                        ? 'text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover'
-                        : 'text-theme-text-muted opacity-40 cursor-not-allowed'
+                        ? 'text-theme-text-muted/80 hover:text-theme-text hover:bg-theme-surface-hover'
+                        : 'text-theme-text-muted/40 cursor-not-allowed'
                     }`}
                   >
-                    <Icon size={20} />
-                    <span>{label}</span>
-                    <span className={`ml-auto text-[10px] font-mono ${healthy ? 'text-theme-text-muted' : 'text-theme-text-muted'}`}>
-                      {healthy ? 'OPEN' : 'OFFLINE'}
+                    <Icon size={16} />
+                    <span className="text-[12px]">{label}</span>
+                    <span className={`ml-auto text-[9px] font-mono ${healthy ? 'text-theme-text-muted/50' : 'text-theme-text-muted/30'}`}>
+                      {healthy ? 'OPEN' : '—'}
                     </span>
                   </a>
                 </li>

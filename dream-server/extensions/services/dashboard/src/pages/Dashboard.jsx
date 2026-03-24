@@ -177,7 +177,7 @@ export default function Dashboard({ status, loading }) {
       <FeatureDiscoveryBanner />
 
       {/* Feature Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
         {features.length > 0 ? (
           features.map(feature => (
             <FeatureCard
@@ -209,8 +209,8 @@ export default function Dashboard({ status, loading }) {
       </div>
 
       {/* System Status */}
-      <h2 className="text-lg font-semibold text-theme-text mb-4">System Status</h2>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+      <h2 className="text-lg font-semibold text-theme-text mb-5">System Status</h2>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-12">
         {status?.gpu && (
           <>
             <MetricCard
@@ -327,8 +327,8 @@ export default function Dashboard({ status, loading }) {
       </div>
 
       {/* Services Grid — sorted by severity */}
-      <h2 className="text-lg font-semibold text-theme-text mb-4">Services</h2>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+      <h2 className="text-lg font-semibold text-theme-text mb-5">Services</h2>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-12">
         {servicesSorted.map(service => (
           <ServiceCard key={service.name} service={service} />
         ))}
@@ -391,14 +391,14 @@ const FeatureCard = memo(function FeatureCard({ icon: Icon, title, description, 
 const MetricCard = memo(function MetricCard({ icon: Icon, label, value, subvalue, percent, alert }) {
   return (
     <div className="p-4 bg-theme-card border border-theme-border rounded-xl overflow-hidden min-w-0">
-      <div className="flex items-center gap-2 mb-2">
-        <Icon size={14} className={alert ? 'text-red-400' : 'text-theme-text-muted/70'} />
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-theme-text-muted/70">{label}</span>
+      <div className="flex items-center gap-1.5 mb-2">
+        <Icon size={13} className={alert ? 'text-red-400' : 'text-theme-text-muted/50'} />
+        <span className="text-[9px] font-semibold uppercase tracking-[0.15em] text-theme-text-muted/50">{label}</span>
       </div>
-      <div className="text-[26px] font-bold text-theme-text font-mono leading-tight truncate" title={value}>{value}</div>
-      <div className="text-[11px] text-theme-text-muted mt-0.5">{subvalue}</div>
+      <div className="text-[28px] font-bold text-theme-text font-mono leading-none truncate" title={value}>{value}</div>
+      <div className="text-[10px] text-theme-text-muted/70 mt-1">{subvalue}</div>
       {percent !== undefined && (
-        <div className="h-1 bg-theme-border/40 rounded-full mt-3 overflow-hidden">
+        <div className="h-[3px] bg-theme-border/30 rounded-full mt-3 overflow-hidden">
           <div
             className={`h-full rounded-full transition-all ${percent > 90 ? 'bg-red-500' : percent > 70 ? 'bg-yellow-500' : 'bg-theme-accent'}`}
             style={{ width: `${Math.min(percent, 100)}%` }}
