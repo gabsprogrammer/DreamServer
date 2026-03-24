@@ -3,8 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
-  Sun,
-  Moon
+  Palette
 } from 'lucide-react'
 import { getSidebarExternalLinks, getSidebarNavItems } from '../plugins/registry'
 import { useTheme } from '../contexts/ThemeContext'
@@ -16,7 +15,7 @@ const getExternalUrl = (port) =>
     : `http://localhost:${port}`
 
 export default function Sidebar({ status, collapsed, onToggle }) {
-  const { theme, toggleTheme } = useTheme()
+  const { theme, cycleTheme, labels } = useTheme()
   const [serviceTokens, setServiceTokens] = useState({})
   const [apiLinks, setApiLinks] = useState([])
 
@@ -168,14 +167,14 @@ export default function Sidebar({ status, collapsed, onToggle }) {
       {/* Theme + Toggle buttons */}
       <div className="mx-4 mb-2 flex items-center gap-1">
         <button
-          onClick={toggleTheme}
+          onClick={cycleTheme}
           className="flex items-center justify-center p-2 rounded-lg text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
-          title={theme === 'dream' ? 'Switch to Lemonade theme' : 'Switch to Dream theme'}
+          title={`Theme: ${labels[theme]} (click to cycle)`}
         >
-          {theme === 'dream' ? <Sun size={18} /> : <Moon size={18} />}
+          <Palette size={18} />
         </button>
         {!collapsed && (
-          <span className="text-xs text-theme-text-muted capitalize">{theme}</span>
+          <span className="text-xs text-theme-text-muted">{labels[theme]}</span>
         )}
         <button
           onClick={onToggle}

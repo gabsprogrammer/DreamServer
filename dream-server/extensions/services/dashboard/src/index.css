@@ -4,6 +4,7 @@
 
 /* ── Theme Variables ────────────────────────────────────── */
 
+/* Dream — default dark theme with indigo accents */
 :root, :root[data-theme="dream"] {
   --theme-bg: #0f0f13;
   --theme-card: #18181b;
@@ -24,6 +25,7 @@
   --theme-gradient-to: rgba(147,51,234,0.4);
 }
 
+/* Lemonade — warm gold theme matching AMD Lemonade branding */
 :root[data-theme="lemonade"] {
   --theme-bg: #FFF8E7;
   --theme-card: #FFFFFF;
@@ -42,6 +44,111 @@
   --theme-loading-logo: #D4A017;
   --theme-gradient-from: rgba(245,197,24,0.4);
   --theme-gradient-to: rgba(212,160,23,0.4);
+}
+
+/* Light — clean modern futuristic light theme */
+:root[data-theme="light"] {
+  --theme-bg: #F4F4F5;
+  --theme-card: #FFFFFF;
+  --theme-border: #E4E4E7;
+  --theme-text: #18181B;
+  --theme-text-secondary: #52525B;
+  --theme-text-muted: #A1A1AA;
+  --theme-accent: #2563EB;
+  --theme-accent-hover: #1D4ED8;
+  --theme-accent-light: #60A5FA;
+  --theme-surface-hover: #F0F0F3;
+  --theme-scrollbar-track: #F4F4F5;
+  --theme-scrollbar-thumb: #D4D4D8;
+  --theme-scrollbar-hover: #A1A1AA;
+  --theme-focus: #2563EB;
+  --theme-loading-logo: #2563EB;
+  --theme-gradient-from: rgba(37,99,235,0.15);
+  --theme-gradient-to: rgba(99,102,241,0.15);
+}
+
+/* Midnight — deep navy with electric blue accents */
+:root[data-theme="midnight"] {
+  --theme-bg: #0B0E1A;
+  --theme-card: #111627;
+  --theme-border: #1E2640;
+  --theme-text: #E2E8F0;
+  --theme-text-secondary: #94A3B8;
+  --theme-text-muted: #64748B;
+  --theme-accent: #3B82F6;
+  --theme-accent-hover: #2563EB;
+  --theme-accent-light: #60A5FA;
+  --theme-surface-hover: #1A2035;
+  --theme-scrollbar-track: #111627;
+  --theme-scrollbar-thumb: #1E2640;
+  --theme-scrollbar-hover: #2D3A5C;
+  --theme-focus: #3B82F6;
+  --theme-loading-logo: #60A5FA;
+  --theme-gradient-from: rgba(59,130,246,0.4);
+  --theme-gradient-to: rgba(99,102,241,0.4);
+}
+
+/* Forest — dark green tones with emerald accents */
+:root[data-theme="forest"] {
+  --theme-bg: #0C1410;
+  --theme-card: #121F18;
+  --theme-border: #1C3328;
+  --theme-text: #E2F0E8;
+  --theme-text-secondary: #8FB8A0;
+  --theme-text-muted: #5C8A6E;
+  --theme-accent: #10B981;
+  --theme-accent-hover: #059669;
+  --theme-accent-light: #34D399;
+  --theme-surface-hover: #1A2E22;
+  --theme-scrollbar-track: #121F18;
+  --theme-scrollbar-thumb: #1C3328;
+  --theme-scrollbar-hover: #2D5040;
+  --theme-focus: #10B981;
+  --theme-loading-logo: #34D399;
+  --theme-gradient-from: rgba(16,185,129,0.4);
+  --theme-gradient-to: rgba(5,150,105,0.4);
+}
+
+/* Sunset — warm dark with orange/coral accents */
+:root[data-theme="sunset"] {
+  --theme-bg: #1A0F0F;
+  --theme-card: #241616;
+  --theme-border: #3D2222;
+  --theme-text: #F0E4E4;
+  --theme-text-secondary: #C4A0A0;
+  --theme-text-muted: #8B6B6B;
+  --theme-accent: #F97316;
+  --theme-accent-hover: #EA580C;
+  --theme-accent-light: #FB923C;
+  --theme-surface-hover: #2E1A1A;
+  --theme-scrollbar-track: #241616;
+  --theme-scrollbar-thumb: #3D2222;
+  --theme-scrollbar-hover: #5C3333;
+  --theme-focus: #F97316;
+  --theme-loading-logo: #FB923C;
+  --theme-gradient-from: rgba(249,115,22,0.4);
+  --theme-gradient-to: rgba(239,68,68,0.4);
+}
+
+/* Arctic — cool light theme with ice blue accents */
+:root[data-theme="arctic"] {
+  --theme-bg: #F0F7FF;
+  --theme-card: #FFFFFF;
+  --theme-border: #D0E3F7;
+  --theme-text: #1A2332;
+  --theme-text-secondary: #4A6178;
+  --theme-text-muted: #8AA0B8;
+  --theme-accent: #0EA5E9;
+  --theme-accent-hover: #0284C7;
+  --theme-accent-light: #38BDF8;
+  --theme-surface-hover: #E6F0FC;
+  --theme-scrollbar-track: #F0F7FF;
+  --theme-scrollbar-thumb: #D0E3F7;
+  --theme-scrollbar-hover: #A8C8E8;
+  --theme-focus: #0EA5E9;
+  --theme-loading-logo: #0EA5E9;
+  --theme-gradient-from: rgba(14,165,233,0.15);
+  --theme-gradient-to: rgba(56,189,248,0.15);
 }
 
 /* ── Scrollbar ──────────────────────────────────────────── */

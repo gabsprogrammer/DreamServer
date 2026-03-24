@@ -1,7 +1,16 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 
 const STORAGE_KEY = 'dream-theme'
-const THEMES = ['dream', 'lemonade']
+const THEMES = ['dream', 'lemonade', 'light', 'midnight', 'forest', 'sunset', 'arctic']
+const THEME_LABELS = {
+  dream: 'Dream',
+  lemonade: 'Lemonade',
+  light: 'Light',
+  midnight: 'Midnight',
+  forest: 'Forest',
+  sunset: 'Sunset',
+  arctic: 'Arctic'
+}
 const DEFAULT_THEME = 'dream'
 
 const ThemeContext = createContext(null)
@@ -21,12 +30,15 @@ export function ThemeProvider({ children }) {
     if (THEMES.includes(t)) setThemeState(t)
   }, [])
 
-  const toggleTheme = useCallback(() => {
-    setThemeState(prev => prev === 'dream' ? 'lemonade' : 'dream')
+  const cycleTheme = useCallback(() => {
+    setThemeState(prev => {
+      const idx = THEMES.indexOf(prev)
+      return THEMES[(idx + 1) % THEMES.length]
+    })
   }, [])
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme, themes: THEMES }}>
+    <ThemeContext.Provider value={{ theme, setTheme, cycleTheme, themes: THEMES, labels: THEME_LABELS }}>
       {children}
     </ThemeContext.Provider>
   )

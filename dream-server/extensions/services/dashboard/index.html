@@ -10,7 +10,7 @@
       // Prevent flash of wrong theme — runs before React
       (function() {
         var t = localStorage.getItem('dream-theme');
-        if (t === 'lemonade') document.documentElement.setAttribute('data-theme', 'lemonade');
+        if (t && t !== 'dream') document.documentElement.setAttribute('data-theme', t);
       })();
     </script>
     <style>
