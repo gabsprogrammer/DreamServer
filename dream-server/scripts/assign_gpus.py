@@ -19,14 +19,14 @@ from itertools import combinations
 from typing import Optional
 
 
-#  Constants 
+#  Constants
 
 HIGH_BW_THRESHOLD = 80   # min rank for NVLink / XGMI
 DEFAULT_SERVICES  = ["llama_server", "whisper", "comfyui", "embeddings"]
 NON_LLAMA         = ["whisper", "comfyui", "embeddings"]
 
 
-#  Data Models 
+#  Data Models
 
 @dataclass
 class GPU:
@@ -69,7 +69,7 @@ class AssignmentResult:
     services: dict
 
 
-#  Phase 1: Topology Analysis 
+#  Phase 1: Topology Analysis
 
 def parse_gpus(topology: dict) -> list:
     gpus = []
@@ -156,7 +156,7 @@ def enumerate_subsets(gpus: list, rank_matrix: dict) -> list:
     )
 
 
-#  Phase 2: GPU Assignment 
+#  Phase 2: GPU Assignment
 
 def find_llama_subset(ordered_subsets: list, model_size_mb: float) -> Subset:
     """
@@ -257,7 +257,7 @@ def assign_services(all_gpus: list, llama_gpus: list, rank_matrix: dict, enabled
     return assignments, final_llama_gpus, strategy
 
 
-#  Phase 3: Llama Parallelism 
+#  Phase 3: Llama Parallelism
 
 def largest_pow2_divisor(n: int) -> int:
     """
@@ -369,7 +369,7 @@ def select_parallelism(subset: Subset) -> LlamaParallelism:
             )
 
 
-#  Phase 4: Build Output JSON 
+#  Phase 4: Build Output JSON
 
 def build_output(result: AssignmentResult) -> dict:
     services = {}
@@ -400,7 +400,7 @@ def build_output(result: AssignmentResult) -> dict:
     }
 
 
-#  Entry Point 
+#  Entry Point
 
 def main():
     parser = argparse.ArgumentParser(description="GPU assignment algorithm for DreamServer")
@@ -429,7 +429,7 @@ def main():
         print("ERROR: no GPUs found in topology", file=sys.stderr)
         sys.exit(1)
 
-    #  Early exit: single GPU 
+    #  Early exit: single GPU
     if gpu_count == 1:
         gpu = parse_gpus(topology)[0]
         if model_size_mb > gpu.memory_mb:
@@ -453,13 +453,13 @@ def main():
         print(json.dumps(build_output(result), indent=2))
         return
 
-    #  Phase 1: Topology analysis 
+    #  Phase 1: Topology analysis
     gpus        = parse_gpus(topology)
     links       = parse_links(topology)
     rank_matrix = build_rank_matrix(links)
     ordered     = enumerate_subsets(gpus, rank_matrix)
 
-    #  Phase 2: GPU assignment 
+    #  Phase 2: GPU assignment
     try:
         llama_subset = find_llama_subset(ordered, model_size_mb)
         if llama_subset is None:
@@ -472,12 +472,12 @@ def main():
         gpus, llama_subset.gpus, rank_matrix, enabled_services
     )
 
-    #  Phase 3: Llama parallelism 
+    #  Phase 3: Llama parallelism
     final_subset = compute_subset(final_llama_gpus, rank_matrix)
     parallelism  = select_parallelism(final_subset)
     service_assignments["llama_server"].parallelism = parallelism
 
-    #  Phase 4: Emit JSON 
+    #  Phase 4: Emit JSON
     result = AssignmentResult(strategy=strategy, services=service_assignments)
     print(json.dumps(build_output(result), indent=2))
 

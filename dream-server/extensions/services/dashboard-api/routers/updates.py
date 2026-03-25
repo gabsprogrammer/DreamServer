@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["updates"])
 
+_VALID_ACTIONS = {"check", "backup", "update"}
+
 _GITHUB_HEADERS = {"Accept": "application/vnd.github.v3+json"}
 
 
