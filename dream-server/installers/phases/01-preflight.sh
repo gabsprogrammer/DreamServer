@@ -42,11 +42,21 @@ if ! command -v curl &> /dev/null; then
 fi
 log "curl: $(curl --version 2>/dev/null | sed -n '1p')"
 
+if ! command -v jq &> /dev/null; then
+    log "jq not found - attempting auto-install..."
+    case "$PKG_MANAGER" in
+        dnf)    sudo dnf install -y jq ;;
+        pacman) sudo pacman -S --noconfirm jq ;;
+        zypper) sudo zypper install -y jq ;;
+        apk)    sudo apk add jq ;;
+        *)      sudo apt-get install -y jq ;;
+    esac
+    command -v jq &> /dev/null || error "Failed to install jq automatically. Install it manually and re-run."
+fi
+log "jq: $(jq --version 2>/dev/null)"
+
 # Check optional tools (warn but don't fail)
 OPTIONAL_TOOLS_MISSING=""
-if ! command -v jq &> /dev/null; then
-    OPTIONAL_TOOLS_MISSING="$OPTIONAL_TOOLS_MISSING jq"
-fi
 if ! command -v rsync &> /dev/null; then
     OPTIONAL_TOOLS_MISSING="$OPTIONAL_TOOLS_MISSING rsync"
 fi
