@@ -14,7 +14,7 @@ import argparse
 import json
 import math
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from itertools import combinations
 from typing import Optional
 
@@ -233,15 +233,21 @@ def assign_services(all_gpus: list, llama_gpus: list, rank_matrix: dict, enabled
         strategy = "colocated"
 
     elif len(remaining) == 2:
-        if "whisper"    in enabled_services: assignments["whisper"]    = ServiceAssignment(gpus=[remaining[0]])
-        if "comfyui"    in enabled_services: assignments["comfyui"]    = ServiceAssignment(gpus=[remaining[1]])
-        if "embeddings" in enabled_services: assignments["embeddings"] = ServiceAssignment(gpus=[remaining[1]])
+        if "whisper" in enabled_services:
+            assignments["whisper"] = ServiceAssignment(gpus=[remaining[0]])
+        if "comfyui" in enabled_services:
+            assignments["comfyui"] = ServiceAssignment(gpus=[remaining[1]])
+        if "embeddings" in enabled_services:
+            assignments["embeddings"] = ServiceAssignment(gpus=[remaining[1]])
         strategy = "colocated"
 
     else:
-        if "whisper"    in enabled_services: assignments["whisper"]    = ServiceAssignment(gpus=[remaining[0]])
-        if "comfyui"    in enabled_services: assignments["comfyui"]    = ServiceAssignment(gpus=[remaining[1]])
-        if "embeddings" in enabled_services: assignments["embeddings"] = ServiceAssignment(gpus=[remaining[2]])
+        if "whisper" in enabled_services:
+            assignments["whisper"] = ServiceAssignment(gpus=[remaining[0]])
+        if "comfyui" in enabled_services:
+            assignments["comfyui"] = ServiceAssignment(gpus=[remaining[1]])
+        if "embeddings" in enabled_services:
+            assignments["embeddings"] = ServiceAssignment(gpus=[remaining[2]])
         # Push extras back to llama so no GPU sits idle
         if len(remaining) > 3:
             final_llama_gpus = final_llama_gpus + remaining[3:]
