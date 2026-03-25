@@ -301,7 +301,7 @@ MODELS_EOF
     OPENAI_API_KEY=$(_env_get OPENAI_API_KEY "${OPENAI_API_KEY:-}")
     TOGETHER_API_KEY=$(_env_get TOGETHER_API_KEY "${TOGETHER_API_KEY:-}")
     # Base64-encode GPU assignment JSON for safe .env storage
-    if [[ -n "$GPU_ASSIGNMENT_JSON" && "$GPU_ASSIGNMENT_JSON" != "{}" ]]; then
+    if [[ -n "${GPU_ASSIGNMENT_JSON:-}" && "${GPU_ASSIGNMENT_JSON:-}" != "{}" ]]; then
         GPU_ASSIGNMENT_JSON_B64=$(echo "$GPU_ASSIGNMENT_JSON" | jq -c '.' | base64 -w0)
     else
         GPU_ASSIGNMENT_JSON_B64=""
