@@ -18,7 +18,7 @@ RVC (Retrieval-Based Voice Conversion) is an open-source voice conversion framew
 ### Environment Variables
 
 - `RVC_PORT` - Port for web interface (default: 7860)
-- `LLM_API_URL` - URL for your LLM API (from .env)
+- `RVC_API_KEY` - API key for RVC service authentication (optional; leave empty to disable auth)
 
 ### Volumes
 

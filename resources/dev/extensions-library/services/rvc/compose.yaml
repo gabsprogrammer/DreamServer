@@ -10,7 +10,7 @@ services:
       - ./data/rvc/dataset:/app/dataset
       - ./data/rvc/logs:/app/logs
     environment:
-      - LLM_API_URL=${LLM_API_URL:-http://localhost:8000}
+      - RVC_API_KEY=${RVC_API_KEY:-}
     shm_size: "1gb"
     restart: unless-stopped
     security_opt:

@@ -14,6 +14,7 @@ services:
       - SUNO_USE_SMALL_MODELS=${BARK_USE_SMALL_MODELS:-false}
       # Offload to CPU between calls — reduces VRAM at the cost of speed
       - SUNO_OFFLOAD_CPU=${BARK_OFFLOAD_CPU:-false}
+      - BARK_API_KEY=${BARK_API_KEY:-}
     volumes:
       # Bark model cache — persists ~5GB of downloaded models
       - ./data/bark/models:/root/.cache/suno

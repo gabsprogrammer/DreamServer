@@ -70,6 +70,7 @@ Bark understands non-verbal cues in brackets:
 | `BARK_USE_SMALL_MODELS` | `false` | Use smaller/faster models |
 | `BARK_OFFLOAD_CPU` | `false` | Offload to CPU between requests |
 | `BARK_PORT` | `9200` | External port |
+| `BARK_API_KEY` | `` | API key for authentication (optional) |
 
 ## Data Persistence
 
