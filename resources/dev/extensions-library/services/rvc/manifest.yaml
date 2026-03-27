@@ -17,7 +17,7 @@ service:
   category: optional
   depends_on: []
   env_vars:
-    - name: RVC_API_KEY
+    - key: RVC_API_KEY
       description: API key for RVC service authentication (optional; leave empty to disable auth)
       default: ""
 

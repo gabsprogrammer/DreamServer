@@ -17,13 +17,13 @@ service:
   category: optional
   depends_on: []
   env_vars:
-    - name: BARK_USE_SMALL_MODELS
+    - key: BARK_USE_SMALL_MODELS
       description: Use smaller/faster Bark models (less VRAM, slightly lower quality)
       default: "false"
-    - name: BARK_OFFLOAD_CPU
+    - key: BARK_OFFLOAD_CPU
       description: Offload Bark models to CPU between requests (reduces VRAM usage)
       default: "false"
-    - name: BARK_API_KEY
+    - key: BARK_API_KEY
       description: API key for Bark TTS service authentication (optional; leave empty to disable auth)
       default: ""
   description: |
