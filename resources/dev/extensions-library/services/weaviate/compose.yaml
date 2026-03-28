@@ -12,6 +12,9 @@ services:
       - AUTHENTICATION_APIKEY_ALLOWED_KEYS=${WEAVIATE_API_KEY:?WEAVIATE_API_KEY must be set}
       - AUTHENTICATION_APIKEY_USERS=admin@dreamserver.local
       - PERSISTENCE_DATA_PATH=/var/lib/weaviate
+      - CLUSTER_HOSTNAME=dream-weaviate
+      - RAFT_JOIN=dream-weaviate
+      - RAFT_BOOTSTRAP_EXPECT=1
     volumes:
       - ./data/weaviate:/var/lib/weaviate
     ports:
