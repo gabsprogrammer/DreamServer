@@ -160,13 +160,13 @@ if [[ -f "$SCRIPT_DIR/dream-preflight.sh" ]]; then
     # Retry up to 3 times with 10s backoff before reporting failures.
     _preflight_passed=false
     for _pf_attempt in 1 2 3; do
-        sleep 10
         if bash "$SCRIPT_DIR/dream-preflight.sh" 2>>"$LOG_FILE"; then
             _preflight_passed=true
             break
         fi
         if [[ $_pf_attempt -lt 3 ]]; then
             ai_warn "Some services still starting (attempt $_pf_attempt/3). Retrying in 10s..."
+            sleep 10
         fi
     done
     if [[ "$_preflight_passed" != "true" ]]; then
