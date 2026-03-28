@@ -156,9 +156,23 @@ bootline
 echo ""
 
 if [[ -f "$SCRIPT_DIR/dream-preflight.sh" ]]; then
-    # Wait a moment for services to stabilize
-    sleep 2
-    bash "$SCRIPT_DIR/dream-preflight.sh" || true
+    # Services like APE and Embeddings may still be starting on fresh installs.
+    # Retry up to 3 times with 10s backoff before reporting failures.
+    _preflight_passed=false
+    for _pf_attempt in 1 2 3; do
+        sleep 10
+        if bash "$SCRIPT_DIR/dream-preflight.sh" 2>>"$LOG_FILE"; then
+            _preflight_passed=true
+            break
+        fi
+        if [[ $_pf_attempt -lt 3 ]]; then
+            ai_warn "Some services still starting (attempt $_pf_attempt/3). Retrying in 10s..."
+        fi
+    done
+    if [[ "$_preflight_passed" != "true" ]]; then
+        ai_warn "Preflight did not fully pass. Services may still be starting."
+        ai "  Check with: dream status"
+    fi
 else
     log "Preflight script not found — skipping validation"
 fi
