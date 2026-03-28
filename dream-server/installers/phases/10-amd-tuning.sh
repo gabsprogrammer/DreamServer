@@ -26,10 +26,16 @@ elif [[ "$GPU_BACKEND" == "amd" ]] && ! $DRY_RUN; then
 
     # Ensure user is in render and video groups for ROCm GPU access
     # Without these, containers can't access /dev/kfd and /dev/dri
-    if ! groups "$USER" 2>/dev/null | grep -qw render; then
-        sudo -n usermod -aG render,video "$USER" 2>/dev/null && \
-            ai_ok "Added $USER to render and video groups (needed for GPU access)" || \
-            ai_warn "Could not add $USER to render/video groups. Run: sudo usermod -aG render,video $USER"
+    if ! groups "$USER" 2>/dev/null | grep -qw render || ! groups "$USER" 2>/dev/null | grep -qw video; then
+        if [[ "${INTERACTIVE:-true}" == "true" ]]; then
+            sudo usermod -aG render,video "$USER" && \
+                ai_ok "Added $USER to render and video groups (needed for GPU access)" || \
+                ai_warn "Could not add $USER to render/video groups. Run: sudo usermod -aG render,video $USER"
+        else
+            sudo -n usermod -aG render,video "$USER" 2>/dev/null && \
+                ai_ok "Added $USER to render and video groups (needed for GPU access)" || \
+                ai_warn "Could not add $USER to render/video groups. Run: sudo usermod -aG render,video $USER"
+        fi
     fi
 
     # Verify GPU compute devices exist — containers need /dev/kfd and /dev/dri
