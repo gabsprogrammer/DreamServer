@@ -80,7 +80,6 @@ See [`agent-systems/README.md`](agent-systems/README.md) for the full reading or
 |----------|---------------|
 | [M10-SECURITY-AUDIT-2026-02-11.md](security/M10-SECURITY-AUDIT-2026-02-11.md) | Ship-readiness audit (217 findings, 42 critical) |
 | [M3-PII-DETECTION-LIBS.md](security/M3-PII-DETECTION-LIBS.md) | PII detection library comparison |
-| [M3-PRIVACY-SHIELD-STRATEGIES.md](security/M3-PRIVACY-SHIELD-STRATEGIES.md) | Privacy strategies analysis |
 
 ---
 

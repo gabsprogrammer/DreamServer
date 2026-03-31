@@ -1120,7 +1120,6 @@ Add ignore comments:
 
 - [Code Review Agent](./agent-template-code-review.md) - Quality and security review
 - [Testing Agent](./agent-template-testing.md) - Generate missing tests
-- [Documentation Agent](./agent-template-documentation.md) - Keep docs current
 
 ---
 

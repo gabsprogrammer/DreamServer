@@ -107,7 +107,6 @@ Technical analysis from real deployments, not theory. *(The 32 agent architectur
 | `06-swarm-patterns.md` | Multi-agent swarm coordination |
 | `07-grace-voice-agent.md` | Production HVAC voice agent |
 | `08-n8n-local-llm.md` | n8n workflows with local LLM |
-| `09-local-vllm-setup.md` | Local vLLM + Qwen inference from scratch |
 | `agent-template-*.md` | 11 task templates (code review, testing, research, migration, debugging, etc.) |
 
 ### [`tools/`](tools/) — 20 Operational Scripts

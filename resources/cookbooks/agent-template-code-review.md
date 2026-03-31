@@ -570,7 +570,6 @@ metrics:
 ## See Also
 
 - [Testing Agent](./agent-template-testing.md) - Generate tests for reviewed code
-- [Documentation Agent](./agent-template-documentation.md) - Keep docs in sync with changes
 - [Security Agent](./agent-template-security.md) - Deep security analysis (specialized)
 
 ---
