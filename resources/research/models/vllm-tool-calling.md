@@ -55,6 +55,53 @@ vllm serve meta-llama/Llama-3.1-8B-Instruct \
 - **Llama 3.2 small models**: Often fail to emit tool calls correctly
 - **JSON format issues**: Models may serialize arrays as strings instead of proper JSON
 
+## 5. Silent Compatibility Issues (Agent Frameworks)
+
+When using vLLM as a backend for agent frameworks (OpenClaw, LangChain, custom loops), several parameters and response fields cause silent failures. No error, no warning — the agent just gets nothing back or the framework chokes on unexpected fields. These were discovered through production debugging and are handled by the [vllm-tool-proxy](../../tools/vllm-tool-proxy.py).
+
+### Problem: Streaming + Tool Calls Don't Mix
+
+If the client sends `"stream": true` with tools present, vLLM streams tokens incrementally. But tool calls embedded in content (common with models that output tool JSON as text rather than structured `tool_calls`) can't be extracted from a stream mid-flight. The framework receives partial JSON fragments and fails silently.
+
+**Fix:** Force `"stream": false` when `tools` are present. Extract tool calls from the complete response, then optionally re-wrap as SSE if the client expects streaming.
+
+### Problem: `stream_options` on Non-Streaming Requests
+
+vLLM 0.14+ rejects requests that include `"stream_options"` when `"stream"` is `false`. The rejection is silent — the request either hangs or returns an empty response. Many frameworks send `stream_options` by default regardless of streaming mode.
+
+**Fix:** Strip `"stream_options"` from the request body whenever `"stream"` is `false` or absent.
+
+### Problem: Extra Response Fields Break Framework Parsers
+
+vLLM returns fields that don't exist in the OpenAI spec. Frameworks that strictly validate response schemas fail silently when they encounter these. The problematic fields:
+
+**Top-level:** `prompt_logprobs`, `prompt_token_ids`, `kv_transfer_params`, `service_tier`, `system_fingerprint`
+
+**Per-choice:** `stop_reason`, `token_ids`
+
+**Per-message:** `reasoning`, `reasoning_content`, `refusal`, `annotations`, `audio`, `function_call`
+
+**Usage:** `prompt_tokens_details`
+
+**Fix:** Strip all non-standard fields from the response before forwarding to the framework. Also ensure `tool_calls` is absent (not an empty list `[]`) when no tools were called — some frameworks treat `[]` as "tools were attempted and failed."
+
+### Problem: Tool Calls Returned as Text Content
+
+Some models (notably GPT-OSS-120B, some Qwen configurations) output tool calls as plain text in the `content` field rather than as structured `tool_calls`. The response looks normal to vLLM but the framework sees no tool calls and falls back to treating it as a text response.
+
+Three formats observed:
+1. `<tools>{"name": "func", "arguments": {...}}</tools>` — XML-wrapped JSON
+2. `{"name": "func", "arguments": {...}}` — bare JSON as content
+3. Multi-line JSON — multiple tool calls on separate lines
+
+**Fix:** Post-process the response: if `tool_calls` is empty but `content` contains parseable tool JSON in any of these formats, extract it, build proper `tool_calls` structures, and set `finish_reason` to `"tool_calls"`.
+
+### Implementation
+
+All of these fixes are implemented in [`tools/vllm-tool-proxy.py`](../../tools/vllm-tool-proxy.py) — a Flask proxy that sits between the agent framework and vLLM. It also includes a loop breaker (`MAX_TOOL_CALLS = 20`) to abort runaway tool-calling loops.
+
+---
+
 ## Quick Reference
 
 ```python

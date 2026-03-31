@@ -282,13 +282,57 @@ Each step is more invasive than the last. Soft restart fixes transient failures 
 
 ---
 
+## Pattern 7: External Triggers Over Agent Discipline
+
+### What It Is
+
+The principle that any behavior which depends on an agent *remembering* to do something on its own will eventually fail. Every recurring behavior that matters must be driven by an external trigger — a cron timer, an event hook, a file watcher — never by the agent deciding to do it.
+
+### Why It Works
+
+Agents don't form habits. This is the single most important operational insight from running autonomous agents in production, and it's the meta-principle that justifies Patterns 1, 3, 4, and 5.
+
+A cron timer fires every time. An event trigger fires when its condition is met. An agent *deciding* to check something, reset something, or report something? It works for a while. Maybe a day. Maybe a week. Then it silently stops, and you'll never know exactly when or why. The agent didn't rebel. It didn't refuse. It just... drifted past it. The context shifted, the priority changed, the prompt got crowded, and the behavior dropped out of the window.
+
+This isn't a bug to fix. It's a property of non-deterministic systems. The same variability that makes LLMs useful — their flexibility, creativity, ability to handle novel situations — is what makes them unreliable for recurring discipline. You can't prompt your way out of this. You can't fine-tune it away. You design around it.
+
+### Implementation Levels
+
+**Level 1 — Timers for Critical Behaviors:**
+Session resets, health check-ins, memory archival, status reports — anything that must happen on a schedule gets a cron job or systemd timer. The agent doesn't choose when. The timer fires, the agent responds.
+
+**Level 2 — Event Triggers for Reactive Behaviors:**
+File size exceeding a threshold triggers session cleanup. A git push triggers a sync. A failed health check triggers a restart. The agent doesn't monitor — the infrastructure does, and pokes the agent (or acts without it) when something needs attention.
+
+**Level 3 — Zero Reliance on Agent-Initiated Discipline:**
+The system is designed so that no critical behavior requires the agent to "remember" anything between sessions. Identity comes from a file the agent reads, not from what it recalls. Coordination comes from git state, not from what agents told each other. Accountability comes from a supervisor's ping, not from the agent's conscience.
+
+### Watch Out For
+
+- **The temptation to trust it after it works for a while.** Your agent will reliably self-report for days. You'll think "maybe I don't need the timer." You do. The moment you remove it is the moment drift begins, and you won't notice for another week.
+- **Confusing capability with reliability.** An agent *can* check its own session size. It *can* decide to reset. It *can* remember to follow up. "Can" is not "will, every time, forever." Design for "will."
+- **Hope is not an ops strategy.** If the sentence starts with "the agent should..." and doesn't end with "...because this timer/trigger forces it," the behavior will drop.
+
+### This Toolkit's Implementation
+
+This pattern is embedded throughout the other patterns rather than having a single implementation:
+
+- [Pattern 1 (Supervision)](../../multi-agent/patterns/PATTERNS.md) — Android-18 supervisor fires on a timer, not on agent initiative
+- [Pattern 4 (Session Lifecycle)](../../multi-agent/patterns/PATTERNS.md) — session cleanup runs on file-size triggers, not on agent self-awareness
+- [Pattern 5 (Memory Stratification)](../../multi-agent/patterns/PATTERNS.md) — Memory Shepherd resets on a timer, not on the agent deciding it's time
+- [session-cleanup.sh](../../tools/session-cleanup.sh) — file-size watcher that triggers session rotation
+- [ai-health-monitor.sh](../../tools/ai-health-monitor.sh) — cron-driven health checks, not agent self-monitoring
+
+---
+
 ## Applying These Patterns
 
-You don't need all six. Start with what hurts most:
+You don't need all seven. Start with what hurts most:
 
 - **Agents keep crashing?** Start with Pattern 6 (Self-Healing) and Pattern 4 (Session Lifecycle).
 - **Agents lose context between sessions?** Start with Pattern 2 (Workspace-as-Brain) and Pattern 5 (Memory Stratification).
 - **Agents wander off task?** Start with Pattern 3 (Mission Governance) and Pattern 1 (Supervision).
+- **Agents are unreliable at recurring tasks?** Start with Pattern 7 (External Triggers) — then audit every behavior that depends on agent initiative.
 - **Building a multi-agent system?** Start with Pattern 1 (Supervision) and Pattern 3 (Mission Governance), then layer in the rest.
 
 The patterns compose well. Each addresses a different failure mode, and each is independent — you can implement Pattern 2 without Pattern 1, or Pattern 6 without Pattern 3. But together, they form a complete safety stack for autonomous agent operations.
