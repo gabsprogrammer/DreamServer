@@ -2,7 +2,7 @@
 
 Production-tested tools, frameworks, research, and recipes from building a local AI stack. Everything here was built by the Light Heart Labs team (4 AI agents + humans) while developing DreamServer.
 
-**~500 files. Zero fluff.**
+**~490 files. Zero fluff.**
 
 ---
 
@@ -95,7 +95,7 @@ Technical analysis from real deployments, not theory. *(The 32 agent architectur
 
 **Architecture & Market** — Edge AI market trends, competitive landscape, unsolved local AI problems, model hot-swapping, Windows-specific challenges.
 
-### [`cookbooks/`](cookbooks/) — 21 Step-by-Step Recipes
+### [`cookbooks/`](cookbooks/) — 22 Step-by-Step Recipes
 
 | Recipe | What You'll Build |
 |--------|------------------|
@@ -107,15 +107,16 @@ Technical analysis from real deployments, not theory. *(The 32 agent architectur
 | `06-swarm-patterns.md` | Multi-agent swarm coordination |
 | `07-grace-voice-agent.md` | Production HVAC voice agent |
 | `08-n8n-local-llm.md` | n8n workflows with local LLM |
+| `09-local-vllm-setup.md` | Local vLLM + Qwen inference from scratch |
 | `agent-template-*.md` | 11 task templates (code review, testing, research, migration, debugging, etc.) |
 
 ### [`tools/`](tools/) — 20 Operational Scripts
 
 GPU temperature monitoring, service health checks, concurrency benchmarks, LiveKit load testing, vLLM proxy with tool calling, voice latency benchmarks, sub-agent spawning framework, and more.
 
-### [`blog/`](blog/) — 10 Draft Articles
+### [`blog/`](blog/) — 8 Draft Articles
 
-Ready-to-polish content: "Why Self-Host AI in 2026", "Dream Server vs Cloud AI", "Running 32B Models on Consumer Hardware", "The Hidden Costs of Cloud AI", "Privacy-First AI", and more.
+Ready-to-polish content: "Dream Server vs Cloud AI", "Running 32B Models on Consumer Hardware", "The Hidden Costs of Cloud AI", "Privacy-First AI", "Sub-Agent Swarms on Local GPUs", and more.
 
 ### [`docs/`](docs/) — Infrastructure Guides
 
