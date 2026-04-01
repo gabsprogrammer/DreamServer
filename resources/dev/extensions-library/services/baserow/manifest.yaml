@@ -12,6 +12,7 @@ service:
   external_port_default: 3007
   health: /api/_health/
   type: docker
+  gpu_backends: [all]
   category: optional
   compose_file: compose.yaml
   depends_on: []

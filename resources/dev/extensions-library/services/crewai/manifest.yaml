@@ -12,6 +12,7 @@ service:
   external_port_default: 8501
   health: /
   type: docker
+  gpu_backends: [all]
   category: optional
   depends_on: []
   env_vars: []
