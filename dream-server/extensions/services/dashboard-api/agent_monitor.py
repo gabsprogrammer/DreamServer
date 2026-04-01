@@ -52,7 +52,7 @@ class ClusterStatus:
         logger.debug("Refreshing cluster status from proxy")
         try:
             proc = await asyncio.create_subprocess_exec(
-                "curl", "-s", f"http://localhost:{os.environ.get('CLUSTER_PROXY_PORT', '9199')}/status",
+                "curl", "-s", "--max-time", "4", f"http://localhost:{os.environ.get('CLUSTER_PROXY_PORT', '9199')}/status",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
@@ -69,6 +69,8 @@ class ClusterStatus:
         except FileNotFoundError:
             logger.debug("Cluster proxy not available: curl command not found")
         except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
             logger.debug("Cluster proxy health check timed out after 5s")
         except OSError as e:
             logger.debug("Cluster proxy connection failed: %s", e)
