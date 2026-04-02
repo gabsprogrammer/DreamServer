@@ -130,9 +130,9 @@ export default function Extensions() {
 
   const requestAction = (ext, action) => {
     const messages = {
-      install: `Install ${ext.name}? This copies extension files to your server.`,
-      enable: `Enable ${ext.name}?`,
-      disable: `Disable ${ext.name}?`,
+      install: `Install ${ext.name}? This will download and start the service.`,
+      enable: `Enable ${ext.name}? The service will be started.`,
+      disable: `Disable ${ext.name}? The service will be stopped.`,
       uninstall: `Remove ${ext.name}? You can reinstall it from the library.`,
     }
     setConfirm({ action, ext, message: messages[action] })
@@ -358,6 +358,8 @@ function ExtensionCard({ ext, gpuBackend, agentAvailable, onDetails, onConsole, 
   const isMutating = mutating === ext.id
   const anyMutating = !!mutating
   const agentOffline = agentAvailable === false
+  const actionDisabled = anyMutating || agentOffline
+  const disabledTitle = agentOffline ? 'Host agent is offline' : anyMutating ? 'Another operation is in progress' : undefined
 
   const isCore = ext.source === 'core'
   const isUserExt = ext.source === 'user'
@@ -409,7 +411,8 @@ function ExtensionCard({ ext, gpuBackend, agentAvailable, onDetails, onConsole, 
             )}
             {isToggleable && (
               <button
-                disabled={anyMutating || agentOffline}
+                disabled={actionDisabled}
+                title={disabledTitle}
                 onClick={() => onAction(ext, status === 'enabled' ? 'disable' : 'enable')}
                 className={`relative inline-flex h-[18px] w-[32px] shrink-0 rounded-full transition-colors disabled:opacity-50 ${
                   status === 'enabled' ? 'bg-green-500' : 'bg-zinc-600'
@@ -434,7 +437,8 @@ function ExtensionCard({ ext, gpuBackend, agentAvailable, onDetails, onConsole, 
         <div className="flex gap-1.5">
           {showInstall && (
             <button
-              disabled={anyMutating || agentOffline}
+              disabled={actionDisabled}
+              title={disabledTitle}
               onClick={() => onAction(ext, 'install')}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-500 text-white hover:bg-indigo-400 transition-colors disabled:opacity-50 shadow-sm shadow-indigo-500/20"
             >
@@ -443,12 +447,16 @@ function ExtensionCard({ ext, gpuBackend, agentAvailable, onDetails, onConsole, 
           )}
           {showRemove && (
             <button
-              disabled={anyMutating || agentOffline}
+              disabled={actionDisabled}
+              title={disabledTitle}
               onClick={() => onAction(ext, 'uninstall')}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-zinc-800 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors disabled:opacity-50"
             >
               {isMutating ? <Loader2 size={12} className="animate-spin" /> : <><Trash2 size={12} /> Remove</>}
             </button>
+          )}
+          {isUserExt && status === 'enabled' && (
+            <span className="text-[10px] text-zinc-600">Disable to remove</span>
           )}
           {!showInstall && !showRemove && !isToggleable && (
             <div className="flex items-center gap-1" title={status === 'incompatible' && gpuBackend ? `Your system: ${gpuBackend}` : undefined}>
