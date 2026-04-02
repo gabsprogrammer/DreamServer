@@ -36,7 +36,7 @@ services:
       searxng:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "if [ \"$$OPENCLAW_HTTP_API\" = 'true' ]; then wget -qO- http://localhost:18790/v1/models || exit 1; else wget -qO- http://localhost:18789/ || exit 1; fi"]
+      test: ["CMD-SHELL", "if [ \"$$OPENCLAW_HTTP_API\" = 'true' ]; then wget -qO- http://127.0.0.1:18790/v1/models || exit 1; else wget -qO- http://127.0.0.1:18789/ || exit 1; fi"]
       interval: 30s
       timeout: 10s
       retries: 3
