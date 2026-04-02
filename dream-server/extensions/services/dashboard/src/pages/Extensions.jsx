@@ -25,6 +25,23 @@ const ICON_MAP = {
   FileText, Shield, Globe, Music, Video, Search, Puzzle, Box,
 }
 
+const friendlyError = (detail) => {
+  if (!detail || typeof detail !== 'string') return detail
+  if (detail.includes('build context') || detail.includes('local build'))
+    return 'This extension requires a local build and cannot be installed through the portal yet.'
+  if (detail.includes('already installed'))
+    return 'This extension is already installed.'
+  if (detail.includes('already enabled'))
+    return 'This extension is already enabled.'
+  if (detail.includes('already disabled'))
+    return 'This extension is already disabled.'
+  if (detail.includes('Disable extension before'))
+    return 'Please disable this extension before removing it.'
+  if (detail.includes('Missing dependencies'))
+    return detail
+  return detail
+}
+
 const STATUS_STYLES = {
   enabled:       'bg-green-500/20 text-green-400',
   disabled:      'bg-zinc-700 text-zinc-400',
@@ -95,7 +112,7 @@ export default function Extensions() {
       }
       await fetchCatalog()
     } catch (err) {
-      setToast({ type: 'error', text: err.message || `Failed to ${action} extension` })
+      setToast({ type: 'error', text: friendlyError(err.message) || `Failed to ${action} extension` })
     } finally {
       setMutating(null)
     }
