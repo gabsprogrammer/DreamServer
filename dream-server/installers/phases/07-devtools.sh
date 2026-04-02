@@ -175,3 +175,38 @@ OPENCODE_EOF
         fi
     fi
 fi
+
+# ── Dream Host Agent (extension lifecycle management) ──
+if [[ -f "$INSTALL_DIR/bin/dream-host-agent.py" ]]; then
+    AGENT_PYTHON="$(command -v python3)"
+    if [[ -n "$AGENT_PYTHON" ]]; then
+        if systemctl --user status >/dev/null 2>&1; then
+            # systemd path
+            SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
+            mkdir -p "$SYSTEMD_USER_DIR"
+            if [[ -f "$INSTALL_DIR/scripts/systemd/dream-host-agent.service" ]]; then
+                svc_tmp="/tmp/dream-host-agent.service.$$"
+                cp "$INSTALL_DIR/scripts/systemd/dream-host-agent.service" "$svc_tmp"
+                _install_esc=$(printf '%s\n' "$INSTALL_DIR" | sed 's/[&/\]/\\&/g')
+                _home_esc=$(printf '%s\n' "$HOME" | sed 's/[&/\]/\\&/g')
+                _python_esc=$(printf '%s\n' "$AGENT_PYTHON" | sed 's/[&/\]/\\&/g')
+                _sed_i "s|__INSTALL_DIR__|${_install_esc}|g" "$svc_tmp"
+                _sed_i "s|__HOME__|${_home_esc}|g" "$svc_tmp"
+                _sed_i "s|__PYTHON3__|${_python_esc}|g" "$svc_tmp"
+                cp "$svc_tmp" "$SYSTEMD_USER_DIR/dream-host-agent.service"
+                rm -f "$svc_tmp"
+            fi
+            systemctl --user daemon-reload 2>/dev/null || true
+            systemctl --user enable --now dream-host-agent.service >> "$LOG_FILE" 2>&1 && \
+                ai_ok "Dream host agent installed (systemd --user, port 7710)" || \
+                ai_warn "Dream host agent service failed to start — run: dream agent start"
+            loginctl enable-linger "$(whoami)" 2>/dev/null || \
+                sudo -n loginctl enable-linger "$(whoami)" 2>/dev/null || true
+        else
+            ai_warn "No systemd detected — dream host agent not auto-installed."
+            ai_warn "  Start manually: dream agent start"
+        fi
+    else
+        ai_warn "python3 not found — dream host agent not installed"
+    fi
+fi

@@ -1,0 +1,15 @@
+[Unit]
+Description=DreamServer Host Agent
+After=docker.service
+
+[Service]
+Type=simple
+ExecStart=__PYTHON3__ __INSTALL_DIR__/bin/dream-host-agent.py
+WorkingDirectory=__INSTALL_DIR__
+Environment=DREAM_HOME=__INSTALL_DIR__
+Environment=HOME=__HOME__
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

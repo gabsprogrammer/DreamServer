@@ -67,3 +67,8 @@ AMB='\033[0;33m'         # Amber -- warnings, ETA labels
 WHT='\033[1;37m'         # White -- key URLs
 NC='\033[0m'             # Reset
 CURSOR='█'               # Block cursor for typing
+
+# Dream Host Agent
+DREAM_AGENT_PORT=7710
+DREAM_AGENT_PLIST_LABEL="com.dreamserver.host-agent"
+DREAM_AGENT_PLIST="$HOME/Library/LaunchAgents/${DREAM_AGENT_PLIST_LABEL}.plist"

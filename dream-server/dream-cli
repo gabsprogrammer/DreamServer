@@ -1752,6 +1752,101 @@ cmd_rollback() {
     fi
 }
 
+cmd_agent() {
+    check_install
+    load_env 2>/dev/null || true
+
+    local action="${1:-status}"
+    local port="${DREAM_AGENT_PORT:-7710}"
+    local pid_file="$INSTALL_DIR/data/dream-host-agent.pid"
+    local log_file="$INSTALL_DIR/data/dream-host-agent.log"
+    local agent_script="$INSTALL_DIR/bin/dream-host-agent.py"
+
+    # Detect daemon type
+    local daemon_type="none"
+    case "$(uname -s)" in
+        Darwin) daemon_type="launchd" ;;
+        Linux)
+            if systemctl --user status >/dev/null 2>&1; then
+                daemon_type="systemd"
+            fi
+            ;;
+    esac
+
+    case "$action" in
+        status)
+            if curl -sf --max-time 2 "http://127.0.0.1:${port}/health" > /dev/null 2>&1; then
+                success "Dream host agent: running (port ${port}, ${daemon_type})"
+            else
+                warn "Dream host agent: not responding (port ${port})"
+            fi
+            ;;
+        start)
+            case "$daemon_type" in
+                launchd)
+                    launchctl bootstrap "gui/$(id -u)" \
+                        "$HOME/Library/LaunchAgents/com.dreamserver.host-agent.plist" 2>/dev/null && \
+                        success "Agent started (LaunchAgent)" || warn "Agent start failed"
+                    ;;
+                systemd)
+                    systemctl --user start dream-host-agent.service 2>/dev/null && \
+                        success "Agent started (systemd)" || warn "Agent start failed"
+                    ;;
+                *)
+                    # Fallback: nohup + PID file
+                    if [[ -f "$pid_file" ]]; then
+                        kill "$(cat "$pid_file")" 2>/dev/null || true
+                        rm -f "$pid_file"
+                    fi
+                    if ! command -v python3 &>/dev/null; then
+                        error "python3 not found in PATH"
+                        return 1
+                    fi
+                    nohup python3 "$agent_script" --pid-file "$pid_file" \
+                        >> "$log_file" 2>&1 &disown
+                    success "Agent started (background, PID $!)"
+                    ;;
+            esac
+            ;;
+        stop)
+            case "$daemon_type" in
+                launchd)
+                    launchctl bootout "gui/$(id -u)/com.dreamserver.host-agent" 2>/dev/null && \
+                        success "Agent stopped" || warn "Agent not running"
+                    ;;
+                systemd)
+                    systemctl --user stop dream-host-agent.service 2>/dev/null && \
+                        success "Agent stopped" || warn "Agent not running"
+                    ;;
+                *)
+                    if [[ -f "$pid_file" ]]; then
+                        kill "$(cat "$pid_file")" 2>/dev/null && \
+                            success "Agent stopped" || warn "Agent process not found"
+                        rm -f "$pid_file"
+                    else
+                        warn "Agent not running (no PID file)"
+                    fi
+                    ;;
+            esac
+            ;;
+        restart)
+            cmd_agent stop
+            sleep 1
+            cmd_agent start
+            ;;
+        logs)
+            if [[ -f "$log_file" ]]; then
+                tail -f "$log_file"
+            else
+                warn "No log file at $log_file"
+            fi
+            ;;
+        *)
+            log "Usage: dream agent [status|start|stop|restart|logs]"
+            ;;
+    esac
+}
+
 cmd_help() {
     sr_load
     cat << EOF
@@ -1786,6 +1881,7 @@ ${CYAN}Commands:${NC}
   benchmark           Run a quick performance test
   doctor [report]     Run diagnostics and write JSON report
   audit [extensions]  Audit extension manifests and compose contracts
+  agent [action]      Manage dream host agent (status|start|stop|restart|logs)
   help                Show this help
 
 ${CYAN}Preset Commands:${NC}
@@ -1854,6 +1950,8 @@ ${CYAN}Examples:${NC}
   dream config edit               # Edit .env file
   dream audit                     # Audit every extension contract
   dream audit --json whisper      # Audit one service as JSON
+  dream agent status              # Check host agent health
+  dream agent restart             # Restart host agent
 
 ${CYAN}Environment:${NC}
   DREAM_HOME          Installation directory (default: ~/dream-server)
@@ -1887,6 +1985,7 @@ case "${1:-help}" in
     benchmark|bench|b) cmd_benchmark ;;
     doctor|diag|d) shift; cmd_doctor "$@" ;;
     audit)        shift; cmd_audit "$@" ;;
+    agent)        shift; cmd_agent "$@" ;;
     help|h|--help|-h) cmd_help ;;
     version|v|--version|-v) echo "dream-cli v${VERSION}" ;;
     *)           error "Unknown command: $1. Run 'dream help' for usage." ;;
