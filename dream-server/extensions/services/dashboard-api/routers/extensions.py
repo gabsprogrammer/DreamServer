@@ -261,6 +261,7 @@ def _copytree_safe(src: Path, dst: Path) -> None:
 # --- Host Agent Helpers ---
 
 _AGENT_TIMEOUT = 300  # seconds — image pulls can take several minutes on first install
+_AGENT_LOG_TIMEOUT = 30  # seconds — log fetches should be fast
 
 
 def _call_agent(action: str, service_id: str) -> bool:
@@ -436,7 +437,7 @@ async def extension_logs(
     data = json.dumps({"service_id": service_id, "tail": 100}).encode()
     req = urllib.request.Request(url, data=data, headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=_AGENT_TIMEOUT) as resp:
+        with urllib.request.urlopen(req, timeout=_AGENT_LOG_TIMEOUT) as resp:
             return json.loads(resp.read().decode())
     except Exception:
         raise HTTPException(status_code=503, detail="Host agent unavailable — cannot fetch logs")

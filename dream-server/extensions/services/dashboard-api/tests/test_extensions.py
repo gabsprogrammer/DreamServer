@@ -462,8 +462,8 @@ class TestInstallExtension:
         assert resp.status_code == 400
         assert "Docker socket mount" in resp.json()["detail"]
 
-    def test_install_rejects_build_context(self, test_client, monkeypatch, tmp_path):
-        """400 when compose contains a build context."""
+    def test_install_allows_library_build_context(self, test_client, monkeypatch, tmp_path):
+        """Library extensions with build: context are allowed (trusted)."""
         bad_compose = "services:\n  svc:\n    build: .\n"
         lib_dir = _setup_library_ext(tmp_path, "bad-ext",
                                      compose_content=bad_compose)
@@ -473,8 +473,8 @@ class TestInstallExtension:
             "/api/extensions/bad-ext/install",
             headers=test_client.auth_headers,
         )
-        assert resp.status_code == 400
-        assert "build context" in resp.json()["detail"]
+        assert resp.status_code == 200
+        assert resp.json()["action"] == "installed"
 
     def test_install_requires_auth(self, test_client):
         """POST install without auth → 401."""
@@ -545,6 +545,24 @@ class TestEnableExtension:
         """POST enable without auth → 401."""
         resp = test_client.post("/api/extensions/my-ext/enable")
         assert resp.status_code == 401
+
+    def test_enable_rejects_build_context(self, test_client, monkeypatch, tmp_path):
+        """400 when user extension compose contains a build context."""
+        bad_compose = "services:\n  svc:\n    build: .\n"
+        user_dir = tmp_path / "user"
+        user_dir.mkdir(exist_ok=True)
+        ext_dir = user_dir / "bad-ext"
+        ext_dir.mkdir(exist_ok=True)
+        (ext_dir / "compose.yaml.disabled").write_text(bad_compose)
+        (ext_dir / "manifest.yaml").write_text("schema_version: dream.services.v1\nservice:\n  id: bad-ext\n  name: bad-ext\n")
+        _patch_mutation_config(monkeypatch, tmp_path, user_dir=user_dir)
+
+        resp = test_client.post(
+            "/api/extensions/bad-ext/enable",
+            headers=test_client.auth_headers,
+        )
+        assert resp.status_code == 400
+        assert "local build" in resp.json()["detail"]
 
 
 # --- Disable endpoint ---
