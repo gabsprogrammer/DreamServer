@@ -78,9 +78,10 @@ else
 fi
 
 # 4. .env with all required keys (minimal) → exit 0
-# Schema required: WEBUI_SECRET, N8N_USER, N8N_PASS, LITELLM_KEY, OPENCLAW_TOKEN
+# Schema required: WEBUI_SECRET, SEARXNG_SECRET, N8N_USER, N8N_PASS, LITELLM_KEY, OPENCLAW_TOKEN
 cat > "$TMP_DIR/valid.env" <<'EOF'
 WEBUI_SECRET=test-secret
+SEARXNG_SECRET=test-secret
 N8N_USER=admin
 N8N_PASS=testpass
 LITELLM_KEY=testkey
@@ -121,6 +122,7 @@ fi
 # 6. Unknown key (not in schema) → exit 2
 cat > "$TMP_DIR/unknown.env" <<'EOF'
 WEBUI_SECRET=test-secret
+SEARXNG_SECRET=test-secret
 N8N_USER=admin
 N8N_PASS=testpass
 LITELLM_KEY=testkey
