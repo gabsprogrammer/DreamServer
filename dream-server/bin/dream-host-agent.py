@@ -224,6 +224,8 @@ class AgentHandler(BaseHTTPRequestHandler):
             self._handle_extension(action)
         elif self.path == "/v1/extension/logs":
             self._handle_logs()
+        elif self.path == "/v1/extension/setup-hook":
+            self._handle_setup_hook()
         else:
             json_response(self, 404, {"error": "Not found"})
 
@@ -296,6 +298,88 @@ class AgentHandler(BaseHTTPRequestHandler):
             json_response(self, 503, {"error": "Log fetch timed out"})
         except Exception as exc:
             json_response(self, 500, {"error": f"Failed to fetch logs: {exc}"})
+
+
+    def _handle_setup_hook(self):
+        if not check_auth(self):
+            return
+        body = read_json_body(self)
+        if body is None:
+            return
+        service_id = validate_service_id(self, body)
+        if service_id is None:
+            return
+
+        # Read manifest to find setup_hook field
+        ext_dir = USER_EXTENSIONS_DIR / service_id
+        manifest_path = None
+        for name in ("manifest.yaml", "manifest.yml"):
+            candidate = ext_dir / name
+            if candidate.exists():
+                manifest_path = candidate
+                break
+        if manifest_path is None:
+            json_response(self, 404, {"error": f"No manifest found for {service_id}"})
+            return
+
+        try:
+            import yaml
+            manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+        except ImportError:
+            json_response(self, 500, {"error": "PyYAML not available on host"})
+            return
+        except (OSError, Exception) as exc:
+            json_response(self, 500, {"error": f"Failed to read manifest: {exc}"})
+            return
+
+        if not isinstance(manifest, dict):
+            json_response(self, 404, {"error": "Invalid manifest format"})
+            return
+        service_def = manifest.get("service", {})
+        if not isinstance(service_def, dict):
+            json_response(self, 404, {"error": "Invalid manifest: missing service section"})
+            return
+        setup_hook = service_def.get("setup_hook", "")
+        if not setup_hook:
+            json_response(self, 404, {"error": f"No setup_hook defined for {service_id}"})
+            return
+
+        # Security: resolve hook path and verify it stays inside ext_dir
+        hook_path = (ext_dir / setup_hook).resolve()
+        try:
+            hook_path.relative_to(ext_dir.resolve())
+        except ValueError:
+            logger.warning("Path traversal attempt in setup_hook for %s: %s", service_id, setup_hook)
+            json_response(self, 400, {"error": "setup_hook path escapes extension directory"})
+            return
+        if not hook_path.is_file():
+            json_response(self, 404, {"error": f"setup_hook file not found: {setup_hook}"})
+            return
+        if hook_path.is_symlink():
+            json_response(self, 400, {"error": "setup_hook must not be a symlink"})
+            return
+
+        logger.info("Running setup_hook for %s: %s", service_id, hook_path)
+        try:
+            result = subprocess.run(
+                ["bash", str(hook_path), str(INSTALL_DIR), GPU_BACKEND],
+                cwd=str(ext_dir),
+                capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT,
+            )
+            if result.returncode != 0:
+                logger.error("setup_hook failed for %s (exit %d): %s",
+                             service_id, result.returncode, result.stderr[:500])
+                json_response(self, 500, {
+                    "error": f"setup_hook exited with code {result.returncode}",
+                    "stderr": result.stderr[:500],
+                })
+                return
+        except subprocess.TimeoutExpired:
+            json_response(self, 500, {"error": "setup_hook timed out (120s)"})
+            return
+
+        logger.info("setup_hook completed for %s", service_id)
+        json_response(self, 200, {"status": "ok", "service_id": service_id})
 
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):

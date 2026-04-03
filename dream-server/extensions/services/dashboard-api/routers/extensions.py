@@ -281,6 +281,29 @@ def _call_agent(action: str, service_id: str) -> bool:
         return False
 
 
+def _call_agent_setup_hook(service_id: str) -> bool:
+    """Call host agent to run setup_hook for an extension. Returns True on success."""
+    url = f"{AGENT_URL}/v1/extension/setup-hook"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {DREAM_AGENT_KEY}",
+    }
+    data = json.dumps({"service_id": service_id}).encode()
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=_AGENT_TIMEOUT) as resp:
+            return resp.status == 200
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            # No setup_hook defined — not an error
+            return True
+        logger.warning("setup_hook failed for %s (HTTP %d)", service_id, exc.code)
+        return False
+    except Exception:
+        logger.warning("Host agent unreachable for setup_hook at %s", AGENT_URL)
+        return False
+
+
 _agent_cache_lock = threading.Lock()
 _agent_cache = {"available": False, "checked_at": 0.0}
 
@@ -510,6 +533,9 @@ def install_extension(service_id: str, api_key: str = Depends(verify_api_key)):
         finally:
             if Path(tmpdir).exists():
                 shutil.rmtree(tmpdir, ignore_errors=True)
+
+    # Run setup hook if extension has one (generates required env vars)
+    _call_agent_setup_hook(service_id)
 
     # Call agent to start the container (outside lock)
     agent_ok = _call_agent("start", service_id)
