@@ -329,8 +329,8 @@ echo "$REPORT_JSON" | python3 -c '
 import json,sys
 r=json.load(sys.stdin)
 s=r["summary"]
-print(f"  pass: {s[\"pass\"]}  warn: {s[\"warn\"]}  fail: {s[\"fail\"]}")
-print(f"  exit_ok: {s[\"exit_ok\"]}")
+print("  pass:", s["pass"], " warn:", s["warn"], " fail:", s["fail"])
+print("  exit_ok:", "true" if s["exit_ok"] else "false")
 '
 
 if [[ "$EXIT_CODE" -eq 0 ]]; then
