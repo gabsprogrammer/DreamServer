@@ -17,7 +17,13 @@ fi
 #=============================================================================
 # Configuration
 #=============================================================================
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_source="${BASH_SOURCE[0]}"
+while [[ -L "$_source" ]]; do
+    _dir="$(cd "$(dirname "$_source")" && pwd)"
+    _source="$(readlink "$_source")"
+    [[ "$_source" != /* ]] && _source="$_dir/$_source"
+done
+SCRIPT_DIR="$(cd "$(dirname "$_source")" && pwd)"
 INSTALL_DIR="${DREAM_HOME:-$HOME/dream-server}"
 VERSION="2.0.0"
 
