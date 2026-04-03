@@ -1303,6 +1303,9 @@ cmd_disable() {
 
 cmd_list() {
     sr_load
+    load_env 2>/dev/null || true
+    local active_flags
+    active_flags=$(get_compose_flags)
     echo -e "${BLUE}━━━ Available Services ━━━${NC}"
     printf "%-20s %-12s %-10s\n" "SERVICE" "CATEGORY" "STATUS"
     printf "%-20s %-12s %-10s\n" "───────" "────────" "──────"
@@ -1312,7 +1315,7 @@ cmd_list() {
         local status
         if [[ "$cat" == "core" ]]; then
             status="always-on"
-        elif [[ -n "$cf" && -f "$cf" ]]; then
+        elif [[ -n "$cf" && -f "$cf" && "$active_flags" == *"${cf#"$INSTALL_DIR/"}"* ]]; then
             status="enabled"
         else
             status="disabled"

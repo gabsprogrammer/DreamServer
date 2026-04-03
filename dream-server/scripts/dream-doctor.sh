@@ -107,10 +107,10 @@ if command -v docker >/dev/null 2>&1; then
 fi
 
 if command -v curl >/dev/null 2>&1; then
-    if curl -sf --max-time 10 "http://localhost:${_DASHBOARD_PORT}" >/dev/null 2>&1; then
+    if curl -sf --max-time 10 "http://127.0.0.1:${_DASHBOARD_PORT}" >/dev/null 2>&1; then
         DASHBOARD_HTTP="true"
     fi
-    if curl -sf --max-time 10 "http://localhost:${_WEBUI_PORT}" >/dev/null 2>&1; then
+    if curl -sf --max-time 10 "http://127.0.0.1:${_WEBUI_PORT}" >/dev/null 2>&1; then
         WEBUI_HTTP="true"
     fi
 fi
@@ -150,7 +150,7 @@ collect_extension_diagnostics() {
                 local port="${SERVICE_PORTS[$sid]:-0}"
                 local health="${SERVICE_HEALTH[$sid]:-}"
                 if [[ "$port" != "0" && -n "$health" ]]; then
-                    if curl -sf --max-time 5 "http://localhost:${port}${health}" >/dev/null 2>&1; then
+                    if curl -sf --max-time 5 "http://127.0.0.1:${port}${health}" >/dev/null 2>&1; then
                         health_status="healthy"
                     else
                         health_status="unhealthy"
