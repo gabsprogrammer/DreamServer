@@ -1493,6 +1493,11 @@ META
 
             log "Exporting preset '${name}'..."
 
+            # Resolve relative output path before cd changes the working directory
+            if [[ "$output" != /* ]]; then
+                output="$(pwd)/$output"
+            fi
+
             # Create archive (relative to presets dir to avoid absolute paths)
             cd "$PRESETS_DIR"
             if tar czf "$output" "$name" 2>/dev/null; then
