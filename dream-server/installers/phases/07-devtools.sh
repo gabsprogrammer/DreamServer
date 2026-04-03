@@ -197,13 +197,20 @@ if [[ -f "$INSTALL_DIR/bin/dream-host-agent.py" ]]; then
             if [[ -f "$INSTALL_DIR/scripts/systemd/dream-host-agent.service" ]]; then
                 svc_tmp="/tmp/dream-host-agent.service.$$"
                 cp "$INSTALL_DIR/scripts/systemd/dream-host-agent.service" "$svc_tmp"
-                _install_esc=$(printf '%s\n' "$INSTALL_DIR" | sed 's/[&/\]/\\&/g')
-                _home_esc=$(printf '%s\n' "$HOME" | sed 's/[&/\]/\\&/g')
-                _python_esc=$(printf '%s\n' "$AGENT_PYTHON" | sed 's/[&/\]/\\&/g')
-                _sed_i "s|__INSTALL_DIR__|${_install_esc}|g" "$svc_tmp"
-                _sed_i "s|__HOME__|${_home_esc}|g" "$svc_tmp"
-                _sed_i "s|__PYTHON3__|${_python_esc}|g" "$svc_tmp"
-                cp "$svc_tmp" "$SYSTEMD_USER_DIR/dream-host-agent.service"
+                # Substitute placeholders — use sed directly with | delimiter
+                # (paths contain / but never |, so | is a safe delimiter)
+                sed -i "s|__INSTALL_DIR__|${INSTALL_DIR}|g" "$svc_tmp" 2>/dev/null || \
+                    sed -i '' "s|__INSTALL_DIR__|${INSTALL_DIR}|g" "$svc_tmp"
+                sed -i "s|__HOME__|${HOME}|g" "$svc_tmp" 2>/dev/null || \
+                    sed -i '' "s|__HOME__|${HOME}|g" "$svc_tmp"
+                sed -i "s|__PYTHON3__|${AGENT_PYTHON}|g" "$svc_tmp" 2>/dev/null || \
+                    sed -i '' "s|__PYTHON3__|${AGENT_PYTHON}|g" "$svc_tmp"
+                # Verify placeholders were actually rendered
+                if grep -q '__INSTALL_DIR__\|__HOME__\|__PYTHON3__' "$svc_tmp"; then
+                    ai_warn "Host agent systemd unit has unrendered placeholders — check $svc_tmp"
+                else
+                    cp "$svc_tmp" "$SYSTEMD_USER_DIR/dream-host-agent.service"
+                fi
                 rm -f "$svc_tmp"
             fi
             systemctl --user daemon-reload 2>/dev/null || true
