@@ -70,7 +70,7 @@ services:
           memory: 256M
 
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:1234/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:1234/health"]
       interval: 30s
       timeout: 10s
       retries: 3
