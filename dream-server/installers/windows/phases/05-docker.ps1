@@ -133,7 +133,9 @@ if ($dryRun) {
             } else {
                 # Step 2: Install NVIDIA Container Toolkit in WSL2
                 Write-AI "  Installing NVIDIA Container Toolkit in WSL2..."
+                $toolkitTmp = Join-Path $env:TEMP "dream-nvidia-toolkit-install.sh"
                 $toolkitScript = @'
+#!/bin/bash
 set -e
 if command -v nvidia-ctk &>/dev/null; then
     echo "NVIDIA Container Toolkit already installed"
@@ -149,7 +151,10 @@ sudo apt-get update -qq
 sudo apt-get install -y -qq nvidia-container-toolkit
 sudo nvidia-ctk runtime configure --runtime=docker
 '@
-                $toolkitScript | & wsl bash 2>&1 | ForEach-Object { Write-Host "    $_" }
+                [System.IO.File]::WriteAllText($toolkitTmp, $toolkitScript.Replace("`r`n", "`n"))
+                $wslPath = & wsl wslpath -u ($toolkitTmp.Replace('\', '\\')) 2>$null
+                & wsl bash $wslPath 2>&1 | ForEach-Object { Write-Host "    $_" }
+                Remove-Item -Path $toolkitTmp -Force -ErrorAction SilentlyContinue
 
                 # Restart WSL to pick up the new runtime config
                 & wsl --shutdown 2>$null
