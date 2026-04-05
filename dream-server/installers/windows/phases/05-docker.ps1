@@ -97,44 +97,53 @@ if ($dryRun) {
     }
 
     # ── NVIDIA GPU passthrough smoke test ─────────────────────────────────────
-    # Only run if NVIDIA GPU detected AND WSL2 backend is confirmed.
-    # This test starts a minimal container with --gpus all and checks that
-    # nvidia-smi is accessible. If it fails, Phase 08 falls back to CPU-only
-    # inference (docker-compose.cpu.yml) instead of crashing docker compose up.
+    # Only run if NVIDIA GPU was detected and the Docker Desktop WSL2 backend
+    # is confirmed. This logic uses a three-state model:
+    #   - CONFIRMED: real GPU validation succeeded with nvidia-smi
+    #   - INCONCLUSIVE: NVIDIA-compatible runtime detected, but real validation
+    #                   was skipped because the CUDA test image is not cached
+    #                   locally (avoids a 150MB pull on fresh installs)
+    #   - FAILED: runtime missing after auto-install attempt, or GPU execution
+    #             failed after all recovery steps
+    #
+    # Phase 08 should fall back to CPU-only inference only on true FAILED.
     $script:gpuPassthroughFailed = $false
+
     if ($gpuInfo.Backend -eq "nvidia" -and $preflight_docker -and $preflight_docker.WSL2Backend) {
-        Write-AI "Testing NVIDIA GPU passthrough in Docker (non-fatal)..."
+        Write-AI "Testing NVIDIA GPU passthrough in Docker..."
+
         $prevEAP = $ErrorActionPreference
         $ErrorActionPreference = "SilentlyContinue"
-        $gpuTestOutput = & docker run --rm --gpus all nvidia/cuda:12.0.0-base-ubuntu22.04 nvidia-smi 2>&1
-        $gpuTestExit = $LASTEXITCODE
-        $ErrorActionPreference = $prevEAP
 
-        if ($gpuTestExit -eq 0) {
-            Write-AISuccess "NVIDIA GPU passthrough confirmed in Docker"
-            $script:gpuPassthroughFailed = $false
-        } else {
-            # Attempt automatic recovery before falling back to CPU
-            Write-AIWarn "GPU passthrough test failed. Attempting automatic fix..."
+        try {
+            $testImage = "nvidia/cuda:12.0.0-base-ubuntu22.04"
 
-            # Step 1: WSL kernel refresh (fixes post-driver-update staleness)
-            Write-AI "  Restarting WSL2 kernel..."
-            & wsl --shutdown 2>$null
-            Start-Sleep -Seconds 5
+            # ── Step 1: Check whether Docker exposes an NVIDIA-compatible runtime ──
+            # Use 'docker info' instead of pulling an image — no network cost.
+            $dockerRuntimesJson = & docker info --format '{{json .Runtimes}}' 2>&1
+            $detectedRuntime = $null
 
-            $ErrorActionPreference = "SilentlyContinue"
-            $retryOutput = & docker run --rm --gpus all nvidia/cuda:12.0.0-base-ubuntu22.04 nvidia-smi 2>&1
-            $retryExit = $LASTEXITCODE
-            $ErrorActionPreference = $prevEAP
+            if ($dockerRuntimesJson -match '"nvidia"') {
+                $detectedRuntime = "nvidia"
+            } elseif ($dockerRuntimesJson -match '"cdi"') {
+                $detectedRuntime = "cdi"
+            }
 
-            if ($retryExit -eq 0) {
-                Write-AISuccess "GPU passthrough recovered after WSL restart"
-                $script:gpuPassthroughFailed = $false
-            } else {
-                # Step 2: Install NVIDIA Container Toolkit in WSL2
-                Write-AI "  Installing NVIDIA Container Toolkit in WSL2..."
-                $toolkitTmp = Join-Path $env:TEMP "dream-nvidia-toolkit-install.sh"
-                $toolkitScript = @'
+            # ── Step 2: If no runtime found, attempt auto-install first ──
+            if (-not $detectedRuntime) {
+                Write-AIWarn "No NVIDIA-compatible Docker runtime detected. Attempting auto-install of NVIDIA Container Toolkit..."
+
+                # Detect the WSL2 distro before blindly calling apt-get
+                # (old code assumed Debian/Ubuntu — this is more robust)
+                $wslDistroId = & wsl bash -c '. /etc/os-release 2>/dev/null && echo ${ID}' 2>$null
+                $wslDistroId = ($wslDistroId | Select-Object -Last 1).Trim().ToLower()
+                $canAutoInstall = $wslDistroId -in @("ubuntu", "debian", "linuxmint", "pop", "zorin", "elementary")
+
+                if ($canAutoInstall) {
+                    Write-AI "  WSL2 distro detected: $wslDistroId — running apt-get install..."
+
+                    $toolkitTmp = Join-Path $env:TEMP "dream-nvidia-toolkit-install.sh"
+                    $toolkitScript = @'
 #!/bin/bash
 set -e
 if command -v nvidia-ctk &>/dev/null; then
@@ -151,31 +160,81 @@ sudo apt-get update -qq
 sudo apt-get install -y -qq nvidia-container-toolkit
 sudo nvidia-ctk runtime configure --runtime=docker
 '@
-                [System.IO.File]::WriteAllText($toolkitTmp, $toolkitScript.Replace("`r`n", "`n"))
-                $wslPath = & wsl wslpath -u ($toolkitTmp.Replace('\', '\\')) 2>$null
-                & wsl bash $wslPath 2>&1 | ForEach-Object { Write-Host "    $_" }
-                Remove-Item -Path $toolkitTmp -Force -ErrorAction SilentlyContinue
+                    [System.IO.File]::WriteAllText($toolkitTmp, $toolkitScript.Replace("`r`n", "`n"))
+                    $wslPath = & wsl wslpath -u ($toolkitTmp.Replace('\', '\\')) 2>$null
+                    & wsl bash $wslPath 2>&1 | ForEach-Object { Write-Host "    $_" }
+                    Remove-Item -Path $toolkitTmp -Force -ErrorAction SilentlyContinue
 
-                # Restart WSL to pick up the new runtime config
-                & wsl --shutdown 2>$null
-                Start-Sleep -Seconds 5
+                    Write-AI "  Restarting WSL2 to apply runtime configuration..."
+                    & wsl --shutdown 2>$null
+                    Start-Sleep -Seconds 5
 
-                # Step 3: Final retry
-                $ErrorActionPreference = "SilentlyContinue"
-                $finalOutput = & docker run --rm --gpus all nvidia/cuda:12.0.0-base-ubuntu22.04 nvidia-smi 2>&1
-                $finalExit = $LASTEXITCODE
-                $ErrorActionPreference = $prevEAP
-
-                if ($finalExit -eq 0) {
-                    Write-AISuccess "GPU passthrough working after toolkit installation"
-                    $script:gpuPassthroughFailed = $false
+                    # Re-check runtimes after install
+                    $dockerRuntimesJson = & docker info --format '{{json .Runtimes}}' 2>&1
+                    if ($dockerRuntimesJson -match '"nvidia"') {
+                        $detectedRuntime = "nvidia"
+                        Write-AISuccess "NVIDIA Container Toolkit installed successfully — runtime is now available."
+                    } else {
+                        Write-AIWarn "Toolkit install ran but Docker runtime still not detected."
+                    }
                 } else {
-                    Write-AIWarn "GPU passthrough still failing after auto-fix attempts."
-                    Write-AI "  Continuing with CPU-only inference (slower)."
-                    Write-AI "  Manual fix: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html"
-                    $script:gpuPassthroughFailed = $true
+                    Write-AIWarn "  WSL2 distro '$wslDistroId' is not apt-get compatible — skipping auto-install."
+                    Write-AI "  Install the NVIDIA Container Toolkit manually:"
+                    Write-AI "  https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html"
                 }
             }
+
+            # ── Step 3: If runtime still unavailable after install attempt, FAILED ──
+            if (-not $detectedRuntime) {
+                Write-AIError "GPU Passthrough Status: FAILED (no NVIDIA-compatible Docker runtime detected)"
+                Write-AI "  Installer will fall back to CPU-only inference."
+                Write-AI "  Ensure Docker Desktop is using the WSL2 backend and that Windows NVIDIA drivers are installed."
+                $script:gpuPassthroughFailed = $true
+            } else {
+                Write-AI "  Detected NVIDIA-compatible runtime: $detectedRuntime"
+
+                # ── Step 4: Validate with real GPU execution only if image is already cached ──
+                # This avoids pulling 150MB on a fresh install just to confirm what we already know.
+                $null = & docker image inspect $testImage 2>&1
+                $cudaImageCached = ($LASTEXITCODE -eq 0)
+
+                if ($cudaImageCached) {
+                    $null = & docker run --rm --gpus all --pull never $testImage nvidia-smi 2>&1
+                    $gpuTestExit = $LASTEXITCODE
+
+                    if ($gpuTestExit -eq 0) {
+                        Write-AISuccess "GPU Passthrough Status: CONFIRMED (real GPU validation passed)"
+                        $script:gpuPassthroughFailed = $false
+                    } else {
+                        # Runtime present but execution failed — try WSL restart (fixes post-driver staleness)
+                        Write-AIWarn "GPU execution failed with runtime present. Restarting WSL2..."
+                        & wsl --shutdown 2>$null
+                        Start-Sleep -Seconds 5
+
+                        $null = & docker run --rm --gpus all --pull never $testImage nvidia-smi 2>&1
+                        $retryExit = $LASTEXITCODE
+
+                        if ($retryExit -eq 0) {
+                            Write-AISuccess "GPU Passthrough Status: CONFIRMED (recovered after WSL restart)"
+                            $script:gpuPassthroughFailed = $false
+                        } else {
+                            Write-AIError "GPU Passthrough Status: FAILED (runtime detected, but GPU execution failed)"
+                            Write-AI "  Installer will fall back to CPU-only inference."
+                            Write-AI "  Ensure Windows NVIDIA drivers are up to date and Docker Desktop + WSL2 GPU support are healthy."
+                            $script:gpuPassthroughFailed = $true
+                        }
+                    }
+                } else {
+                    # CUDA image not cached locally — skip the 150MB pull, stay INCONCLUSIVE
+                    Write-AIWarn "GPU Passthrough Status: INCONCLUSIVE"
+                    Write-AI "  NVIDIA-compatible runtime was detected, but real GPU execution was not validated"
+                    Write-AI "  because the CUDA test image is not cached locally. Skipping CPU fallback."
+                    Write-AI ("  To validate manually later, run: docker run --rm --gpus all {0} nvidia-smi" -f $testImage)
+                    $script:gpuPassthroughFailed = $false
+                }
+            }
+        } finally {
+            $ErrorActionPreference = $prevEAP
         }
     }
 }
