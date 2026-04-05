@@ -5,8 +5,13 @@ import SetupWizard from './components/SetupWizard'
 import { useSystemStatus } from './hooks/useSystemStatus'
 import { useVersion } from './hooks/useVersion'
 import { getInternalRoutes } from './plugins/registry'
+import SplashScreen from './components/SplashScreen'
 
 function App() {
+  // Show splash only once per browser session — not on every F5 / new tab
+  const [splashDone, setSplashDone] = useState(
+    () => sessionStorage.getItem('dream-splash-shown') === '1'
+  )
   const { status, loading, error } = useSystemStatus()
   const { version, dismissUpdate } = useVersion()
   const [firstRun, setFirstRun] = useState(false)
@@ -34,7 +39,11 @@ function App() {
   const handleToggle = useCallback(() => setSidebarCollapsed(c => !c), [])
 
   return (
-    <div className="flex min-h-screen bg-theme-bg text-theme-text">
+    <div className="flex min-h-screen bg-theme-bg text-theme-text relative">
+      {!splashDone && <SplashScreen onComplete={() => {
+        sessionStorage.setItem('dream-splash-shown', '1')
+        setSplashDone(true)
+      }} />}
       <Sidebar
         status={status}
         collapsed={sidebarCollapsed}
