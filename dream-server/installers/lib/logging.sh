@@ -13,7 +13,8 @@
 # ============================================================================
 
 install_elapsed() {
-  local secs=$(( $(date +%s) - INSTALL_START_EPOCH ))
+  local now_epoch="${INSTALL_NOW_EPOCH:-$(date +%s)}"
+  local secs=$(( now_epoch - INSTALL_START_EPOCH ))
   local m=$(( secs / 60 ))
   local s=$(( secs % 60 ))
   printf '%dm %02ds' "$m" "$s"

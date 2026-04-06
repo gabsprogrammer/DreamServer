@@ -21,6 +21,7 @@ setup() {
 
     # INSTALL_START_EPOCH set to a known value
     export INSTALL_START_EPOCH=$(date +%s)
+    export INSTALL_NOW_EPOCH="$INSTALL_START_EPOCH"
 
     # Source the library under test
     source "$BATS_TEST_DIRNAME/../../installers/lib/logging.sh"
@@ -29,28 +30,32 @@ setup() {
 # ── install_elapsed ─────────────────────────────────────────────────────────
 
 @test "install_elapsed: returns 0m 00s when just started" {
-    INSTALL_START_EPOCH=$(date +%s)
+    INSTALL_START_EPOCH=1700000000
+    INSTALL_NOW_EPOCH=1700000000
     run install_elapsed
     assert_success
     assert_output "0m 00s"
 }
 
 @test "install_elapsed: returns correct elapsed time for 65 seconds" {
-    INSTALL_START_EPOCH=$(( $(date +%s) - 65 ))
+    INSTALL_START_EPOCH=1700000000
+    INSTALL_NOW_EPOCH=1700000065
     run install_elapsed
     assert_success
     assert_output "1m 05s"
 }
 
 @test "install_elapsed: returns correct elapsed time for 0 seconds" {
-    INSTALL_START_EPOCH=$(date +%s)
+    INSTALL_START_EPOCH=1700000000
+    INSTALL_NOW_EPOCH=1700000000
     run install_elapsed
     assert_success
     assert_output "0m 00s"
 }
 
 @test "install_elapsed: returns correct elapsed time for 120 seconds" {
-    INSTALL_START_EPOCH=$(( $(date +%s) - 120 ))
+    INSTALL_START_EPOCH=1700000000
+    INSTALL_NOW_EPOCH=1700000120
     run install_elapsed
     assert_success
     assert_output "2m 00s"

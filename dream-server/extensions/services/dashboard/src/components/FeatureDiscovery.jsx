@@ -38,7 +38,7 @@ export function FeatureDiscoveryBanner({ onDismiss }) {
   if (!topSuggestion || (summary.progress ?? 0) >= 80) return null
 
   return (
-    <div className="mb-6 p-4 bg-gradient-to-r from-theme-accent/10 to-purple-500/10 border border-theme-accent/30 rounded-xl">
+    <div className="liquid-metal-frame mb-6 p-4 bg-gradient-to-r from-theme-accent/10 to-purple-500/10 border border-theme-accent/30 rounded-xl">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-theme-accent/20 rounded-lg">
@@ -54,7 +54,7 @@ export function FeatureDiscoveryBanner({ onDismiss }) {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setExpanded(topSuggestion.featureId)}
-            className="px-4 py-2 bg-theme-accent hover:bg-theme-accent-hover text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+            className="liquid-metal-button px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
           >
             {topSuggestion.action}
             <ChevronRight size={16} />

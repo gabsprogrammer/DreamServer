@@ -18,6 +18,9 @@ export default function Sidebar({ status, collapsed, onToggle }) {
   const { theme, cycleTheme, labels } = useTheme()
   const [serviceTokens, setServiceTokens] = useState({})
   const [apiLinks, setApiLinks] = useState([])
+  const [showAllQuickLinks, setShowAllQuickLinks] = useState(false)
+  const dreamSidebarAccent = '#8a2cff'
+  const dreamSidebarAccentSoft = '#b56dff'
 
   useEffect(() => {
     fetch('/api/service-tokens')
@@ -47,6 +50,10 @@ export default function Sidebar({ status, collapsed, onToggle }) {
     })
   }, [status, serviceTokens, apiLinks])
 
+  const visibleExternalLinks = useMemo(() => {
+    return showAllQuickLinks ? externalLinks : externalLinks.filter(link => link.healthy)
+  }, [externalLinks, showAllQuickLinks])
+
   // Service counts with degraded nuance
   const services = status?.services || []
   const deployed = services.filter(s => s.status !== 'not_deployed')
@@ -64,7 +71,11 @@ export default function Sidebar({ status, collapsed, onToggle }) {
   const memUsed = isUnified ? (status?.ram?.used_gb || 0) : (status?.gpu?.vramUsed || 0)
   const memTotal = isUnified ? (status?.ram?.total_gb || 0) : (status?.gpu?.vramTotal || 0)
   const memLabel = isUnified ? 'Memory' : 'VRAM'
-  const memColor = memPct > 90 ? 'bg-red-500' : memPct > 75 ? 'bg-yellow-500' : 'bg-theme-accent'
+  const memFillClass = memPct > 90
+    ? 'liquid-metal-progress-fill liquid-metal-progress-fill--danger'
+    : memPct > 75
+      ? 'liquid-metal-progress-fill liquid-metal-progress-fill--warn'
+      : 'liquid-metal-progress-fill'
 
   // Footer status color
   const footerColor = degradedCount > 0
@@ -76,19 +87,40 @@ export default function Sidebar({ status, collapsed, onToggle }) {
         : 'text-theme-text-muted'
 
   return (
-    <aside className={`fixed left-0 top-0 h-screen ${collapsed ? 'w-20' : 'w-64'} bg-theme-sidebar border-r border-theme-border flex flex-col transition-all duration-200`}>
+    <aside
+      className={`fixed left-0 top-0 h-screen ${collapsed ? 'w-20' : 'w-64'} flex flex-col transition-all duration-200`}
+      style={{
+        background: `
+          radial-gradient(circle at top left, rgba(138,44,255,0.2), transparent 28%),
+          linear-gradient(180deg, #1a1722 0%, #17131f 58%, #110f17 100%)
+        `,
+        borderRight: '1px solid rgba(138,44,255,0.16)',
+        boxShadow: 'inset -1px 0 0 rgba(255,255,255,0.04)',
+      }}
+    >
       {/* Logo */}
-      <div className="px-4 pt-6 pb-5 border-b border-theme-border overflow-hidden">
+      <div className="px-4 pt-6 pb-5 border-b overflow-hidden" style={{ borderColor: 'rgba(138,44,255,0.14)' }}>
         {collapsed ? (
           <div className="flex flex-col items-center">
-            <span className="text-xl font-black text-theme-text font-mono tracking-tight">DS</span>
-            <p className="text-[8px] text-theme-text-muted font-mono mt-0.5">
+            <div
+              className="flex h-11 w-11 items-center justify-center rounded-xl border"
+              style={{
+                background: 'linear-gradient(180deg, rgba(138,44,255,0.18), rgba(138,44,255,0.06))',
+                borderColor: 'rgba(181,109,255,0.24)',
+              }}
+            >
+              <span className="text-lg font-black tracking-tight" style={{ color: dreamSidebarAccentSoft }}>DS</span>
+            </div>
+            <p className="text-[8px] font-mono mt-2 tracking-[0.18em] uppercase" style={{ color: 'rgba(226,223,255,0.62)' }}>
               v{status?.version || '...'}
             </p>
           </div>
         ) : (
           <>
-            <pre aria-hidden="true" className="text-[7.5px] leading-[8px] text-theme-text font-mono whitespace-pre select-none">{`    ____
+            <pre
+              aria-hidden="true"
+              className="dream-logo-liquid text-[7.5px] leading-[8px] font-mono whitespace-pre select-none"
+            >{`    ____
    / __ \\ _____ ___   ____ _ ____ ___
   / / / // ___// _ \\ / __ \`// __ \`__ \\
  / /_/ // /   /  __// /_/ // / / / / /
@@ -98,11 +130,11 @@ export default function Sidebar({ status, collapsed, onToggle }) {
    \\__ \\ / _ \\ / ___/| | / // _ \\ / ___/
   ___/ //  __// /    | |/ //  __// /
  /____/ \\___//_/     |___/ \\___//_/`}</pre>
-            <p className="text-[8px] text-theme-text-secondary font-mono tracking-widest mt-2">
+            <p className="text-[8px] font-mono tracking-[0.28em] mt-2.5 uppercase" style={{ color: dreamSidebarAccentSoft }}>
               LOCAL AI // SOVEREIGN INTELLIGENCE
             </p>
-            <p className="text-[10px] text-theme-text-secondary mt-0.5">
-              {status?.tier || 'Loading...'} • v{status?.version || '...'}
+            <p className="text-[10px] mt-1" style={{ color: 'rgba(226,223,255,0.72)' }}>
+              {status?.tier || 'Minimal'} • v{status?.version || '...'}
             </p>
           </>
         )}
@@ -110,7 +142,7 @@ export default function Sidebar({ status, collapsed, onToggle }) {
 
       {/* Navigation */}
       <nav className="flex-1 p-4 overflow-y-auto overflow-x-hidden">
-        <ul className="space-y-1">
+        <ul className="space-y-1.5">
           {navItems.map(({ path, icon: Icon, label }) => (
             <li key={path}>
               <NavLink
@@ -119,9 +151,18 @@ export default function Sidebar({ status, collapsed, onToggle }) {
                 className={({ isActive }) =>
                   `flex items-center ${collapsed ? 'justify-center' : ''} gap-3 px-3 py-2.5 rounded-lg transition-colors ${
                     isActive
-                      ? 'bg-theme-accent text-white relative before:content-[""] before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:bg-theme-accent-light before:rounded-r'
-                      : 'text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover'
+                      ? 'liquid-metal-nav text-white shadow-lg'
+                      : 'text-theme-text-muted hover:text-theme-text'
                   }`
+                }
+                style={({ isActive }) => isActive
+                  ? {
+                    border: '1px solid rgba(181,109,255,0.2)',
+                    boxShadow: '0 12px 28px rgba(126,34,206,0.24)',
+                  }
+                  : {
+                    background: 'transparent',
+                  }
                 }
               >
                 <Icon size={20} />
@@ -133,27 +174,45 @@ export default function Sidebar({ status, collapsed, onToggle }) {
 
         {/* External Links — hidden when collapsed */}
         {!collapsed && (
-          <div className="mt-4 pt-4 border-t border-theme-border/60">
-            <p className="px-3 text-[10px] font-semibold text-theme-text-muted/60 uppercase tracking-widest mb-1.5">
-              Quick Links
-            </p>
+          <div className="mt-4 pt-4 border-t" style={{ borderColor: 'rgba(181,109,255,0.14)' }}>
+            <div className="mb-2 flex items-center justify-between px-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ color: dreamSidebarAccentSoft }}>
+                Quick Links
+              </p>
+              {externalLinks.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllQuickLinks(current => !current)}
+                  className="text-[9px] font-mono uppercase tracking-[0.18em] transition-colors hover:text-theme-text"
+                  style={{ color: dreamSidebarAccentSoft }}
+                >
+                  {showAllQuickLinks ? 'Show open' : 'View all'}
+                </button>
+              )}
+            </div>
             <ul className="space-y-0">
-              {externalLinks.map(({ key, url, icon: Icon, label, healthy }) => (
+              {visibleExternalLinks.map(({ key, url, icon: Icon, label, healthy }) => (
                 <li key={key}>
                   <a
                     href={healthy ? url : undefined}
                     onClick={(e) => { if (!healthy) e.preventDefault() }}
                     target={healthy ? '_blank' : undefined}
                     rel={healthy ? 'noopener noreferrer' : undefined}
-                    className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition-colors ${
+                    className={`flex items-start gap-2.5 px-3 py-1.5 rounded-lg transition-colors ${
                       healthy
-                        ? 'text-theme-text-muted/80 hover:text-theme-text hover:bg-theme-surface-hover'
+                        ? 'hover:bg-white/[0.03]'
                         : 'text-theme-text-muted/40 cursor-not-allowed'
                     }`}
+                    style={healthy ? { color: 'rgba(238,236,255,0.82)' } : undefined}
                   >
-                    <Icon size={16} />
-                    <span className="text-[12px]">{label}</span>
-                    <span className={`ml-auto text-[9px] font-mono ${healthy ? 'text-theme-text-muted/50' : 'text-theme-text-muted/30'}`}>
+                    <span className="mt-0.5" style={{ color: healthy ? dreamSidebarAccentSoft : 'rgba(161,161,170,0.3)' }}>
+                      <Icon size={15} />
+                    </span>
+                    <span className="text-[12px] leading-4">{label}</span>
+                    <span
+                      className="ml-auto text-[9px] font-mono uppercase tracking-[0.18em]"
+                      style={{ color: healthy ? dreamSidebarAccentSoft : 'rgba(161,161,170,0.3)' }}
+                    >
                       {healthy ? 'OPEN' : '—'}
                     </span>
                   </a>
@@ -165,28 +224,30 @@ export default function Sidebar({ status, collapsed, onToggle }) {
       </nav>
 
       {/* Theme + Toggle buttons */}
-      <div className="mx-4 mb-2 flex items-center gap-1">
+      <div className={`mb-2 flex ${collapsed ? 'mx-2 flex-col items-center gap-2' : 'mx-4 items-center gap-1'}`}>
         <button
           onClick={cycleTheme}
-          className="flex items-center justify-center p-2 rounded-lg text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
+          className="flex items-center justify-center p-2 rounded-lg text-theme-text-muted hover:text-theme-text transition-colors"
           title={`Theme: ${labels[theme]} (click to cycle)`}
+          style={{ background: 'rgba(255,255,255,0.02)' }}
         >
           <Palette size={18} />
         </button>
         {!collapsed && (
-          <span className="text-xs text-theme-text-muted">{labels[theme]}</span>
+          <span className="text-xs" style={{ color: 'rgba(220,204,255,0.72)' }}>{labels[theme]}</span>
         )}
         <button
           onClick={onToggle}
-          className="ml-auto flex items-center justify-center p-2 rounded-lg text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-hover transition-colors"
+          className={`${collapsed ? '' : 'ml-auto'} flex items-center justify-center p-2 rounded-lg text-theme-text-muted hover:text-theme-text transition-colors`}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          style={{ background: 'rgba(255,255,255,0.02)' }}
         >
           {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
         </button>
       </div>
 
       {/* Status Footer */}
-      <div className="p-4 border-t border-theme-border">
+      <div className="p-4 border-t" style={{ borderColor: 'rgba(138,44,255,0.16)' }}>
         {!collapsed && (
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="text-theme-text-muted">Services</span>
@@ -206,9 +267,12 @@ export default function Sidebar({ status, collapsed, onToggle }) {
                 <span className="font-mono">{memUsed.toFixed ? memUsed.toFixed(1) : memUsed}/{memTotal.toFixed ? memTotal.toFixed(0) : memTotal} GB</span>
               </div>
             )}
-            <div className="h-1.5 bg-theme-border rounded-full overflow-hidden" title={collapsed ? `${memLabel}: ${memUsed.toFixed ? memUsed.toFixed(1) : memUsed}/${memTotal.toFixed ? memTotal.toFixed(0) : memTotal} GB` : undefined}>
+            <div
+              className="liquid-metal-progress-track h-1.5 rounded-full overflow-hidden"
+              title={collapsed ? `${memLabel}: ${memUsed.toFixed ? memUsed.toFixed(1) : memUsed}/${memTotal.toFixed ? memTotal.toFixed(0) : memTotal} GB` : undefined}
+            >
               <div
-                className={`h-full ${memColor} rounded-full transition-all`}
+                className={`h-full rounded-full transition-all ${memFillClass}`}
                 style={{ width: `${Math.min(memPct, 100)}%` }}
               />
             </div>

@@ -33,6 +33,14 @@ vi.mock('./components/SetupWizard', () => ({
   )
 }))
 
+vi.mock('./components/SplashScreen', () => ({
+  default: ({ onComplete }) => {
+    // In tests, immediately complete the splash so App renders normally
+    onComplete?.()
+    return null
+  }
+}))
+
 describe('App', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn(() =>
@@ -40,6 +48,7 @@ describe('App', () => {
     ))
     globalThis.localStorage.removeItem('dream-dashboard-visited')
     globalThis.localStorage.removeItem('dream-sidebar-collapsed')
+    globalThis.sessionStorage.removeItem('dream-splash-shown')
   })
 
   afterEach(() => {
