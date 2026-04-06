@@ -50,6 +50,19 @@
   --liquid-button-fill: linear-gradient(135deg, rgba(157, 0, 255, 0.98), rgba(120, 24, 216, 0.96));
   --liquid-nav-fill: linear-gradient(135deg, rgba(157, 0, 255, 0.96), rgba(120, 24, 216, 0.94));
   --liquid-progress-track: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+  --sidebar-bg: linear-gradient(180deg, #1a1722 0%, #17131f 58%, #110f17 100%);
+  --sidebar-bg-glow: radial-gradient(circle at top left, rgba(157,0,255,0.2), transparent 28%);
+  --sidebar-border: rgba(157,0,255,0.16);
+  --sidebar-accent: #8a2cff;
+  --sidebar-accent-soft: #b56dff;
+  --sidebar-text: rgba(226,223,255,0.82);
+  --sidebar-text-muted: rgba(226,223,255,0.62);
+  --sidebar-text-secondary: rgba(226,223,255,0.72);
+  --sidebar-label: rgba(220,204,255,0.72);
+  --sidebar-active-border: rgba(181,109,255,0.2);
+  --sidebar-active-shadow: 0 12px 28px rgba(126,34,206,0.24);
+  --sidebar-hover-bg: rgba(255,255,255,0.02);
+  --sidebar-inactive: rgba(161,161,170,0.3);
 }
 
 /* Lemonade — warm parchment theme matching lemonade-server.ai branding */
@@ -95,6 +108,19 @@
   --liquid-button-fill: linear-gradient(135deg, rgba(245,197,24,0.92), rgba(226,178,15,0.9));
   --liquid-nav-fill: linear-gradient(135deg, rgba(245,197,24,0.92), rgba(226,178,15,0.88));
   --liquid-progress-track: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(0,0,0,0.04));
+  --sidebar-bg: linear-gradient(180deg, #EFE4C6 0%, #E8DCBA 58%, #E2D5B0 100%);
+  --sidebar-bg-glow: radial-gradient(circle at top left, rgba(245,197,24,0.15), transparent 28%);
+  --sidebar-border: rgba(196,176,120,0.3);
+  --sidebar-accent: #D4A810;
+  --sidebar-accent-soft: #B8920D;
+  --sidebar-text: #3D3626;
+  --sidebar-text-muted: #8A8478;
+  --sidebar-text-secondary: #6B665C;
+  --sidebar-label: #8A8478;
+  --sidebar-active-border: rgba(245,197,24,0.3);
+  --sidebar-active-shadow: 0 12px 28px rgba(180,140,10,0.12);
+  --sidebar-hover-bg: rgba(0,0,0,0.03);
+  --sidebar-inactive: rgba(138,132,120,0.4);
 }
 
 /* Light — clean modern futuristic light theme */
@@ -139,6 +165,19 @@
   --liquid-button-fill: linear-gradient(135deg, rgba(37,99,235,0.94), rgba(29,78,216,0.9));
   --liquid-nav-fill: linear-gradient(135deg, rgba(37,99,235,0.94), rgba(29,78,216,0.88));
   --liquid-progress-track: linear-gradient(180deg, rgba(255,255,255,0.22), rgba(0,0,0,0.04));
+  --sidebar-bg: linear-gradient(180deg, #EAEAEC 0%, #E4E4E7 58%, #DDDDE0 100%);
+  --sidebar-bg-glow: radial-gradient(circle at top left, rgba(37,99,235,0.1), transparent 28%);
+  --sidebar-border: rgba(161,161,170,0.3);
+  --sidebar-accent: #2563EB;
+  --sidebar-accent-soft: #3B82F6;
+  --sidebar-text: #27272A;
+  --sidebar-text-muted: #A1A1AA;
+  --sidebar-text-secondary: #52525B;
+  --sidebar-label: #A1A1AA;
+  --sidebar-active-border: rgba(37,99,235,0.25);
+  --sidebar-active-shadow: 0 12px 28px rgba(37,99,235,0.12);
+  --sidebar-hover-bg: rgba(0,0,0,0.03);
+  --sidebar-inactive: rgba(161,161,170,0.4);
 }
 
 /* Arctic — cool light theme with ice blue accents */
@@ -183,6 +222,19 @@
   --liquid-button-fill: linear-gradient(135deg, rgba(14,165,233,0.94), rgba(2,132,199,0.9));
   --liquid-nav-fill: linear-gradient(135deg, rgba(14,165,233,0.94), rgba(2,132,199,0.88));
   --liquid-progress-track: linear-gradient(180deg, rgba(255,255,255,0.22), rgba(0,0,0,0.04));
+  --sidebar-bg: linear-gradient(180deg, #E4EEF8 0%, #DCE8F4 58%, #D4E2F0 100%);
+  --sidebar-bg-glow: radial-gradient(circle at top left, rgba(14,165,233,0.12), transparent 28%);
+  --sidebar-border: rgba(168,200,232,0.4);
+  --sidebar-accent: #0EA5E9;
+  --sidebar-accent-soft: #38BDF8;
+  --sidebar-text: #1A2332;
+  --sidebar-text-muted: #8AA0B8;
+  --sidebar-text-secondary: #4A6178;
+  --sidebar-label: #8AA0B8;
+  --sidebar-active-border: rgba(14,165,233,0.25);
+  --sidebar-active-shadow: 0 12px 28px rgba(14,165,233,0.12);
+  --sidebar-hover-bg: rgba(0,0,0,0.03);
+  --sidebar-inactive: rgba(138,160,184,0.4);
 }
 
 /* ── Card styling (shadow + radius from theme) ──────────── */
