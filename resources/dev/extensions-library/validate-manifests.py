@@ -62,7 +62,7 @@ def main():
             failed += 1
             continue
 
-        errors = list(jsonschema.Draft202012Validator(schema).iter_errors(data))
+        errors = list(jsonschema.Draft7Validator(schema).iter_errors(data))
         if errors:
             failed += 1
             print(f"FAIL  {service_name}:")
