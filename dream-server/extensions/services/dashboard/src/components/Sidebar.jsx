@@ -15,7 +15,7 @@ const getExternalUrl = (port) =>
     : `http://localhost:${port}`
 
 export default function Sidebar({ status, collapsed, onToggle }) {
-  const { theme, cycleTheme, labels } = useTheme()
+  const { theme, cycleTheme, labels } = useTheme() // eslint-disable-line no-unused-vars -- theme switcher temporarily hidden
   const [serviceTokens, setServiceTokens] = useState({})
   const [apiLinks, setApiLinks] = useState([])
   const [showAllQuickLinks, setShowAllQuickLinks] = useState(false)
@@ -219,8 +219,10 @@ export default function Sidebar({ status, collapsed, onToggle }) {
       </nav>
 
       {/* Theme + Toggle buttons */}
+      {/* Theme switcher hidden until Lemonade/Light/Arctic themes are polished for liquid metal design.
+          To restore: uncomment the Palette button and label below. */}
       <div className={`mb-2 flex ${collapsed ? 'mx-2 flex-col items-center gap-2' : 'mx-4 items-center gap-1'}`}>
-        <button
+        {/* <button
           onClick={cycleTheme}
           className="flex items-center justify-center p-2 rounded-lg text-theme-text-muted hover:text-theme-text transition-colors"
           title={`Theme: ${labels[theme]} (click to cycle)`}
@@ -230,7 +232,7 @@ export default function Sidebar({ status, collapsed, onToggle }) {
         </button>
         {!collapsed && (
           <span className="text-xs" style={{ color: 'var(--sidebar-label)' }}>{labels[theme]}</span>
-        )}
+        )} */}
         <button
           onClick={onToggle}
           className={`${collapsed ? '' : 'ml-auto'} flex items-center justify-center p-2 rounded-lg text-theme-text-muted hover:text-theme-text transition-colors`}
