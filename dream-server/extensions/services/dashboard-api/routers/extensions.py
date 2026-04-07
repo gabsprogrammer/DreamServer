@@ -112,7 +112,14 @@ def _compute_extension_status(ext: dict, services_by_id: dict) -> str:
     if progress:
         ps = progress.get("status", "")
         if ps in ("pulling", "starting"):
-            return "installing"
+            # If the progress was never updated by the host agent (started_at == updated_at)
+            # and is older than 2 min, the agent likely never picked it up — ignore.
+            started = progress.get("started_at", "")
+            updated = progress.get("updated_at", "")
+            if started == updated and _is_stale(updated, max_age_seconds=120):
+                pass  # fall through to normal status logic
+            else:
+                return "installing"
         if ps == "setup_hook":
             return "setting_up"
         if ps == "error":
@@ -561,7 +568,8 @@ async def extensions_catalog(
         ext_id = ext["id"]
         user_dir = USER_EXTENSIONS_DIR / ext_id
         source = "user" if user_dir.is_dir() else ("core" if ext_id in SERVICES else "library")
-        enriched = {**ext, "status": status, "installable": installable, "source": source}
+        has_data = (Path(DATA_DIR) / ext_id).is_dir()
+        enriched = {**ext, "status": status, "installable": installable, "source": source, "has_data": has_data}
 
         if category and ext.get("category") != category:
             continue
