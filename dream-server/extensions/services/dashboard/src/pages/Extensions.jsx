@@ -132,7 +132,7 @@ export default function Extensions() {
 
   useEffect(() => {
     if (toast && toast.type !== 'info') {
-      const t = setTimeout(() => setToast(null), 5000)
+      const t = setTimeout(() => setToast(null), 8000)
       return () => clearTimeout(t)
     }
   }, [toast])
@@ -602,7 +602,7 @@ function ExtensionCard({ ext, gpuBackend, agentAvailable, onDetails, onConsole, 
               {isMutating ? <Loader2 size={12} className="animate-spin" /> : <><Trash2 size={12} /> Remove</>}
             </button>
           )}
-          {showRemove && (
+          {showRemove && ext.has_data && (
             <button
               disabled={actionDisabled}
               title={disabledTitle || 'Permanently delete service data'}
