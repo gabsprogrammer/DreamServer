@@ -38,7 +38,8 @@ log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 # Get current version
 get_current_version() {
     if [[ -f "$VERSION_FILE" ]]; then
-        cat "$VERSION_FILE" | tr -d '[:space:]'
+        jq -r '.version // empty' "$VERSION_FILE" 2>/dev/null \
+            || cat "$VERSION_FILE" | tr -d '[:space:]'
     else
         echo "0.0.0"
     fi
