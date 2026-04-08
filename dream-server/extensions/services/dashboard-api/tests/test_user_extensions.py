@@ -79,8 +79,8 @@ class TestScanUserExtensions:
         result = scan_user_extension_services(user_dir)
         assert result == {}
 
-    def test_scan_no_health_endpoint_skipped(self, tmp_path):
-        """Extension with manifest but no health field is skipped."""
+    def test_scan_no_health_endpoint_included_with_empty_health(self, tmp_path):
+        """Extension without health field is included with empty health."""
         user_dir = tmp_path / "user"
         ext_dir = user_dir / "my-ext"
         ext_dir.mkdir(parents=True)
@@ -90,7 +90,9 @@ class TestScanUserExtensions:
         (ext_dir / "compose.yaml").write_text("services: {}\n")
 
         result = scan_user_extension_services(user_dir)
-        assert result == {}
+        assert "my-ext" in result
+        assert result["my-ext"]["health"] == ""
+        assert result["my-ext"]["port"] == 8080
 
     def test_scan_health_path_validation(self, tmp_path):
         """Reject paths with .., @, ?, #, and scheme prefixes."""
