@@ -8,10 +8,10 @@
 #   ARC_LITE tier — Arc A750 8 GB, A380 6 GB
 #
 # Build arguments (customise via .env or shell export):
-#   LLAMA_TAG       llama.cpp git tag (default: b4601)
+#   LLAMA_TAG       llama.cpp git tag (default: b8248)
 #   ONEAPI_VERSION  oneAPI Base Toolkit image tag (default: 2025.0.0-0-devel-ubuntu22.04)
 #   LLAMA_ARC_IMAGE Override to a pre-built image and skip the local build entirely
-#                   e.g. LLAMA_ARC_IMAGE=ghcr.io/ggml-org/llama.cpp:server-intel-b4601
+#                   e.g. LLAMA_ARC_IMAGE=ghcr.io/ggml-org/llama.cpp:server-intel-b8248
 #
 # First-run note:
 #   The SYCL build compiles llama.cpp with Intel icx/icpx. Allow 10–20 min
@@ -28,7 +28,7 @@ services:
       context: ./images/llama-sycl
       dockerfile: Dockerfile
       args:
-        LLAMA_TAG: ${LLAMA_TAG:-b4601}
+        LLAMA_TAG: ${LLAMA_TAG:-b8248}
         ONEAPI_VERSION: ${ONEAPI_VERSION:-2025.0.0-0-devel-ubuntu22.04}
     # Set LLAMA_ARC_IMAGE in .env to skip the local build and pull a pre-built image.
     image: ${LLAMA_ARC_IMAGE:-dream-llama-sycl:local}

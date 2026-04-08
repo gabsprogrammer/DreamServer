@@ -11,7 +11,7 @@
 #
 # Build args:
 #   ONEAPI_VERSION  oneAPI Base Toolkit image tag (default: 2025.0.0-0-devel-ubuntu22.04)
-#   LLAMA_TAG       llama.cpp git tag to build (default: b4601)
+#   LLAMA_TAG       llama.cpp git tag to build (default: b8248)
 #
 # Layers ordered for optimal Docker cache re-use:
 #   1. System build deps       — rarely changes; rebuilds only on ONEAPI_VERSION bump
@@ -29,7 +29,7 @@ ARG ONEAPI_VERSION=2025.0.0-0-devel-ubuntu22.04
 # ---------------------------------------------------------------------------
 FROM intel/oneapi-basekit:${ONEAPI_VERSION} AS builder
 
-ARG LLAMA_TAG=b4601
+ARG LLAMA_TAG=b8248
 ENV DEBIAN_FRONTEND=noninteractive
 
 # cmake + ninja for fast parallel builds; libcurl for model URL loading

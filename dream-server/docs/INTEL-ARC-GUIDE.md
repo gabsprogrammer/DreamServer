@@ -143,7 +143,7 @@ docker compose -f docker-compose.base.yml -f docker-compose.arc.yml up -d --buil
 docker compose -f docker-compose.base.yml -f docker-compose.arc.yml up -d
 
 # Skip local build — use a pre-built image
-LLAMA_ARC_IMAGE=ghcr.io/ggml-org/llama.cpp:server-intel-b4601 \
+LLAMA_ARC_IMAGE=ghcr.io/ggml-org/llama.cpp:server-intel-b8248 \
   docker compose -f docker-compose.base.yml -f docker-compose.arc.yml up -d
 ```
 
