@@ -873,6 +873,10 @@ cmd_update() {
         _env_set "DREAM_VERSION" "$_COMPAT_TARGET_VER"
     fi
 
+    # Restart host agent so new endpoints / code changes take effect
+    log "Restarting host agent..."
+    cmd_agent restart || warn "Host agent restart failed (non-fatal)"
+
     success "Update complete"
 
     cmd_status
@@ -1215,7 +1219,9 @@ cmd_enable() {
     done
     _ENABLE_VISITED+=("$service_id")
 
+    # Check built-in extensions first, then dashboard-installed user extensions
     local ext_dir="$INSTALL_DIR/extensions/services/$service_id"
+    [[ ! -d "$ext_dir" ]] && ext_dir="$INSTALL_DIR/data/user-extensions/$service_id"
     [[ -d "$ext_dir" ]] || error "Unknown service: $input"
 
     local cf="$ext_dir/compose.yaml"
@@ -1318,7 +1324,9 @@ cmd_disable() {
 
     local service_id
     service_id=$(sr_resolve "$input")
+    # Check built-in extensions first, then dashboard-installed user extensions
     local ext_dir="$INSTALL_DIR/extensions/services/$service_id"
+    [[ ! -d "$ext_dir" ]] && ext_dir="$INSTALL_DIR/data/user-extensions/$service_id"
     local cf="$ext_dir/compose.yaml"
 
     # Check it's not a core service
