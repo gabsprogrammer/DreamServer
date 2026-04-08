@@ -301,7 +301,14 @@ MODELS_INI_EOF
     _build_count=0
     _build_services=(dashboard dashboard-api ape token-spy privacy-shield)
     [[ "$ENABLE_COMFYUI" == "true" ]] && _build_services+=(comfyui)
-    [[ "${ENABLE_DREAMFORGE:-}" == "true" ]] && _build_services+=(dreamforge)
+    if [[ "${ENABLE_DREAMFORGE:-}" == "true" ]]; then
+        _dreamforge_image="${DREAMFORGE_IMAGE:-ghcr.io/light-heart-labs/dreamforge:latest}"
+        if ! docker image inspect "$_dreamforge_image" &>/dev/null; then
+            _build_services+=(dreamforge)
+        else
+            log "DreamForge image found locally — skipping source build"
+        fi
+    fi
     [[ "$GPU_BACKEND" == "amd" ]] && _build_services+=(llama-server)
     if [[ "$GPU_BACKEND" == "nvidia" && " ${_build_services[*]} " == *" comfyui "* ]]; then
         ai "ComfyUI is compiling from source for NVIDIA — this takes 25-40 minutes on first run."
