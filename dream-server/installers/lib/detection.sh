@@ -104,6 +104,24 @@ detect_gpu() {
             GPU_COUNT=$(echo "$GPU_INFO" | wc -l)
             # Sum VRAM across all GPUs (each line = one GPU)
             GPU_VRAM=$(echo "$GPU_INFO" | cut -d',' -f2 | grep -oE '[0-9]+' | awk '{s+=$1} END {print s+0}')
+            # Check for unified memory (GB10, GB200): nvidia-smi reports [N/A]
+            # for memory.total when GPU shares system RAM.
+            if [[ $GPU_VRAM -eq 0 ]]; then
+                local vram_field
+                vram_field=$(echo "$GPU_INFO" | head -1 | cut -d',' -f2 | xargs)
+                if [[ "$vram_field" == "[N/A]" || "$vram_field" == "N/A" ]]; then
+                    GPU_MEMORY_TYPE="unified"
+                    local ram_kb
+                    ram_kb=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}')
+                    if [[ -n "$ram_kb" && "$ram_kb" -gt 0 ]]; then
+                        GPU_VRAM=$((ram_kb / 1024))
+                        log "GPU: $GPU_NAME — unified memory detected ([N/A] from nvidia-smi)"
+                        log "Using system RAM as VRAM budget: ${GPU_VRAM}MB"
+                    else
+                        warn "Cannot determine system RAM for unified memory GPU"
+                    fi
+                fi
+            fi
             # Extract PCI device ID from first GPU
             local pci_id
             pci_id=$(nvidia-smi --query-gpu=pci.device_id --format=csv,noheader 2>/dev/null | head -1 | xargs)

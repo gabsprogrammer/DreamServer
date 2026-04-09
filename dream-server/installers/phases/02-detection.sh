@@ -343,6 +343,21 @@ if [[ -z "$TIER" ]]; then
         else
             TIER="SH_COMPACT"
         fi
+    elif [[ "$GPU_BACKEND" == "nvidia" && "$GPU_MEMORY_TYPE" == "unified" ]]; then
+        # NVIDIA Grace Blackwell (GB10, GB200) — unified CPU+GPU memory
+        unified_gb=$((GPU_VRAM / 1024))
+        if [[ $unified_gb -ge 90 ]]; then
+            TIER="NV_ULTRA"
+        elif [[ $unified_gb -ge 48 ]]; then
+            TIER=4
+        elif [[ $unified_gb -ge 20 ]]; then
+            TIER=3
+        elif [[ $unified_gb -ge 12 ]]; then
+            TIER=2
+        else
+            TIER=1
+        fi
+        log "NVIDIA unified memory: ${unified_gb}GB → Tier $TIER"
     elif [[ $GPU_VRAM -ge 90000 ]]; then
         TIER="NV_ULTRA"
     elif [[ $GPU_COUNT -ge 2 ]]; then
