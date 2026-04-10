@@ -1275,6 +1275,12 @@ def purge_extension_data(
         if data_path.exists():
             raise HTTPException(status_code=500, detail=f"Could not fully remove data/{service_id}. Some files may be owned by root.")
 
+        # Also clean up the per-service install-progress file so
+        # _compute_extension_status does not keep showing a stale "installing"
+        # entry after the user purges an extension's data.
+        progress_file = Path(DATA_DIR) / "extension-progress" / f"{service_id}.json"
+        progress_file.unlink(missing_ok=True)
+
         return {"id": service_id, "action": "purged", "size_gb_freed": size_gb}
 
 

@@ -1378,6 +1378,34 @@ class TestPurgeExtensionData:
         assert data["size_gb_freed"] == 1.5
         assert not data_dir.exists()
 
+    def test_purge_unlinks_progress_file(self, test_client, monkeypatch, tmp_path):
+        """Purge also deletes the per-service install-progress entry so the UI
+        does not keep showing a stale 'installing' status."""
+        _patch_mutation_config(monkeypatch, tmp_path)
+        data_dir = tmp_path / "my-ext"
+        data_dir.mkdir()
+        (data_dir / "some-file.db").write_text("data")
+        progress_dir = tmp_path / "extension-progress"
+        progress_dir.mkdir()
+        progress_file = progress_dir / "my-ext.json"
+        progress_file.write_text(
+            '{"service_id": "my-ext", "status": "started",'
+            ' "phase_label": "stale", "error": null,'
+            ' "started_at": "2026-04-10T00:00:00+00:00",'
+            ' "updated_at": "2026-04-10T00:00:00+00:00"}'
+        )
+
+        with patch("routers.extensions._extensions_lock", return_value=contextlib.nullcontext()), \
+             patch("helpers.dir_size_gb", return_value=0.1):
+            resp = test_client.request(
+                "DELETE", "/api/extensions/my-ext/data",
+                headers=test_client.auth_headers,
+                json={"confirm": True},
+            )
+
+        assert resp.status_code == 200
+        assert not progress_file.exists(), "purge must unlink the progress file"
+
     def test_purge_400_when_enabled_builtin(self, test_client, monkeypatch, tmp_path):
         """400 when extension is still enabled (compose.yaml in built-in dir)."""
         _patch_mutation_config(monkeypatch, tmp_path)
