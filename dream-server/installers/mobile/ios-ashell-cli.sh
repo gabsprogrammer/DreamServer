@@ -355,7 +355,7 @@ prompt_once() {
         "${DREAM_MOBILE_WASM_RUNNER}" "${DREAM_MOBILE_WASM_BINARY}" \
             -m "${DREAM_MOBILE_MODEL_PATH}" \
             -c "${DREAM_MOBILE_CONTEXT:-2048}" \
-            -n 256 \
+            -n 64 \
             -p "$*"
         return 0
     fi

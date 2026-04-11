@@ -11,7 +11,7 @@ static void usage(const char * argv0) {
 }
 
 static void quiet_log_callback(enum ggml_log_level level, const char * text, void * /*user_data*/) {
-    if (level >= GGML_LOG_LEVEL_WARN) {
+    if (level >= GGML_LOG_LEVEL_ERROR) {
         std::fputs(text, stderr);
     }
 }
@@ -35,7 +35,8 @@ static bool run_completion(
         const std::string & prompt_text,
         int n_predict,
         int n_ctx,
-        std::string * generated_text) {
+        std::string * generated_text,
+        bool stream_output) {
     const llama_vocab * vocab = llama_model_get_vocab(model);
     const int prompt_bytes = static_cast<int>(prompt_text.size());
     const int n_prompt = -llama_tokenize(vocab, prompt_text.c_str(), prompt_bytes, nullptr, 0, true, true);
@@ -97,6 +98,10 @@ static bool run_completion(
         }
 
         generated_text->append(piece, static_cast<size_t>(n_piece));
+        if (stream_output) {
+            std::fwrite(piece, 1, static_cast<size_t>(n_piece), stdout);
+            std::fflush(stdout);
+        }
         batch = llama_batch_get_one(const_cast<llama_token *>(&token), 1);
     }
 
@@ -132,12 +137,15 @@ static int run_interactive_chat(llama_model * model, int n_predict, int n_ctx) {
                 : transcript + "\nUser: " + user_input + "\nAssistant:";
 
         std::string reply;
-        if (!run_completion(model, prompt_text, n_predict, n_ctx, &reply)) {
+        std::fputs("assistant> ", stdout);
+        std::fflush(stdout);
+
+        if (!run_completion(model, prompt_text, n_predict, n_ctx, &reply, true)) {
             return 1;
         }
 
         reply = trim_newlines(reply);
-        std::printf("assistant> %s\n", reply.c_str());
+        std::fputc('\n', stdout);
         std::fflush(stdout);
 
         if (transcript.empty()) {
@@ -198,12 +206,11 @@ int main(int argc, char ** argv) {
     }
 
     std::string generated;
-    if (!run_completion(model, ensure_chat_prompt(prompt), n_predict, n_ctx, &generated)) {
+    if (!run_completion(model, ensure_chat_prompt(prompt), n_predict, n_ctx, &generated, true)) {
         llama_model_free(model);
         return 1;
     }
 
-    std::fputs(generated.c_str(), stdout);
     std::fputc('\n', stdout);
     llama_model_free(model);
     return 0;
