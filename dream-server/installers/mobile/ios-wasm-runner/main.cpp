@@ -11,6 +11,7 @@
 
 static constexpr const char * kSystemPrompt =
     "You are Dream Server running locally on an iPhone shell. "
+    "/no_think "
     "Reply in the same language as the user. "
     "Be concise, helpful, and direct. "
     "Do not reveal chain-of-thought. "
