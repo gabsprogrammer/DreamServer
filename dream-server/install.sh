@@ -6,8 +6,29 @@
 
 if [ -z "${BASH_VERSION:-}" ]; then
     SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+    CONFIG_FILE="$SCRIPT_DIR/.dream-mobile.env"
 
+    if [ -f "$CONFIG_FILE" ] && grep -q 'DREAM_MOBILE_PLATFORM="ios-ashell"' "$CONFIG_FILE" 2>/dev/null; then
+        sh "$SCRIPT_DIR/installers/mobile/install-mobile.sh" "$@"
+        exit $?
+    fi
     if [ "${TERM_PROGRAM:-}" = "a-Shell" ] || [ "${TERM_PROGRAM:-}" = "a-Shell mini" ] || [ -n "${ASHELL:-}" ]; then
+        sh "$SCRIPT_DIR/installers/mobile/install-mobile.sh" "$@"
+        exit $?
+    fi
+    case "$SCRIPT_DIR" in
+        /private/var/mobile/Containers/Data/Application/*|/var/mobile/Containers/Data/Application/*)
+            sh "$SCRIPT_DIR/installers/mobile/install-mobile.sh" "$@"
+            exit $?
+            ;;
+    esac
+    case "${HOME:-}" in
+        /private/var/mobile/Containers/Data/Application/*|/var/mobile/Containers/Data/Application/*)
+            sh "$SCRIPT_DIR/installers/mobile/install-mobile.sh" "$@"
+            exit $?
+            ;;
+    esac
+    if [ "$(uname -s 2>/dev/null || echo unknown)" = "Darwin" ] && [ -d /private/var/mobile/Containers/Data/Application ]; then
         sh "$SCRIPT_DIR/installers/mobile/install-mobile.sh" "$@"
         exit $?
     fi

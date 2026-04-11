@@ -46,6 +46,12 @@ load_config() {
     . "$CONFIG_FILE"
 }
 
+require_config_var() {
+    var_name="$1"
+    eval "var_value=\${$var_name-}"
+    [ -n "$var_value" ] || fail "iOS preview config is incomplete: missing $var_name. Run 'sh ./install.sh' again."
+}
+
 json_escape() {
     printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
@@ -282,6 +288,11 @@ local_wasm_ready() {
 
 status() {
     load_config
+    require_config_var DREAM_MOBILE_PLATFORM
+    require_config_var DREAM_MOBILE_MODE
+    require_config_var DREAM_MOBILE_ENGINE
+    require_config_var DREAM_MOBILE_MODEL_NAME
+    require_config_var DREAM_MOBILE_MODEL_PATH
 
     echo "Platform:  ${DREAM_MOBILE_PLATFORM}"
     echo "Mode:      ${DREAM_MOBILE_MODE}"
