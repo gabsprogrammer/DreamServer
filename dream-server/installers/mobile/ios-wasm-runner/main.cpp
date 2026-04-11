@@ -7,6 +7,14 @@
 #include <utility>
 #include <vector>
 
+static constexpr const char * kSystemPrompt =
+    "You are Dream Server running locally on an iPhone shell. "
+    "Reply in the same language as the user. "
+    "Be concise, helpful, and direct. "
+    "Do not reveal chain-of-thought. "
+    "Never output <think> tags or hidden reasoning. "
+    "Give only the final answer.";
+
 static void usage(const char * argv0) {
     std::fprintf(stderr, "usage: %s -m model.gguf [-p prompt] [-n n_predict] [-c ctx] [-i]\n", argv0);
 }
@@ -39,6 +47,11 @@ struct chat_turn {
     std::string content;
 };
 
+struct render_filter_state {
+    bool in_think = false;
+    std::string carry;
+};
+
 static std::string strip_assistant_prefix(std::string text) {
     text = trim_space(std::move(text));
 
@@ -59,6 +72,101 @@ static std::string strip_assistant_prefix(std::string text) {
     }
 
     return text;
+}
+
+static size_t suffix_prefix_overlap(const std::string & text, const char * pattern) {
+    const size_t pattern_len = std::strlen(pattern);
+    const size_t max_overlap = text.size() < pattern_len ? text.size() : pattern_len - 1;
+
+    for (size_t overlap = max_overlap; overlap > 0; --overlap) {
+        if (text.compare(text.size() - overlap, overlap, pattern, overlap) == 0) {
+            return overlap;
+        }
+    }
+
+    return 0;
+}
+
+static void emit_visible_text(
+        const std::string & chunk,
+        std::string * generated_text,
+        bool stream_output) {
+    if (chunk.empty()) {
+        return;
+    }
+
+    generated_text->append(chunk);
+    if (stream_output) {
+        std::fwrite(chunk.data(), 1, chunk.size(), stdout);
+        std::fflush(stdout);
+    }
+}
+
+static void consume_filtered_piece(
+        render_filter_state * state,
+        const std::string & piece,
+        std::string * generated_text,
+        bool stream_output) {
+    static constexpr const char * kOpenTag = "<think>";
+    static constexpr const char * kCloseTag = "</think>";
+    const std::string open_tag(kOpenTag);
+    const std::string close_tag(kCloseTag);
+
+    state->carry += piece;
+
+    while (true) {
+        if (state->in_think) {
+            const size_t close_pos = state->carry.find(close_tag);
+            if (close_pos == std::string::npos) {
+                const size_t keep = suffix_prefix_overlap(state->carry, kCloseTag);
+                if (state->carry.size() > keep) {
+                    state->carry.erase(0, state->carry.size() - keep);
+                }
+                return;
+            }
+
+            state->carry.erase(0, close_pos + close_tag.size());
+            state->in_think = false;
+            continue;
+        }
+
+        const size_t open_pos = state->carry.find(open_tag);
+        if (open_pos == std::string::npos) {
+            const size_t keep = suffix_prefix_overlap(state->carry, kOpenTag);
+            const size_t emit_len = state->carry.size() - keep;
+            if (emit_len > 0) {
+                emit_visible_text(state->carry.substr(0, emit_len), generated_text, stream_output);
+                state->carry.erase(0, emit_len);
+            }
+            return;
+        }
+
+        if (open_pos > 0) {
+            emit_visible_text(state->carry.substr(0, open_pos), generated_text, stream_output);
+        }
+
+        state->carry.erase(0, open_pos + open_tag.size());
+        state->in_think = true;
+    }
+}
+
+static void flush_filtered_output(
+        render_filter_state * state,
+        std::string * generated_text,
+        bool stream_output) {
+    if (state->in_think) {
+        state->carry.clear();
+        return;
+    }
+
+    static constexpr const char * kOpenTag = "<think>";
+    if (!state->carry.empty() && std::string(kOpenTag).rfind(state->carry, 0) == 0) {
+        state->carry.clear();
+        return;
+    }
+
+    emit_visible_text(state->carry, generated_text, stream_output);
+    state->carry.clear();
 }
 
 static std::string build_fallback_chat_prompt(const std::vector<chat_turn> & turns, bool add_assistant) {
@@ -165,6 +273,7 @@ static bool run_completion(
     sparams.no_perf = true;
     llama_sampler * sampler = llama_sampler_chain_init(sparams);
     llama_sampler_chain_add(sampler, llama_sampler_init_greedy());
+    render_filter_state render_state;
 
     llama_batch batch = llama_batch_get_one(prompt_tokens.data(), n_prompt);
     int processed = 0;
@@ -193,21 +302,22 @@ static bool run_completion(
             return false;
         }
 
-        generated_text->append(piece, static_cast<size_t>(n_piece));
-        if (stream_output) {
-            std::fwrite(piece, 1, static_cast<size_t>(n_piece), stdout);
-            std::fflush(stdout);
-        }
+        consume_filtered_piece(
+            &render_state,
+            std::string(piece, static_cast<size_t>(n_piece)),
+            generated_text,
+            stream_output);
         batch = llama_batch_get_one(const_cast<llama_token *>(&token), 1);
     }
 
+    flush_filtered_output(&render_state, generated_text, stream_output);
     llama_sampler_free(sampler);
     llama_free(ctx);
     return true;
 }
 
 static int run_interactive_chat(llama_model * model, int n_predict, int n_ctx) {
-    std::vector<chat_turn> transcript;
+    std::vector<chat_turn> transcript = { { "system", kSystemPrompt } };
     char line[2048];
 
     while (true) {
@@ -296,7 +406,7 @@ int main(int argc, char ** argv) {
     }
 
     std::string generated;
-    const std::string prompt_text = build_chat_prompt(model, { { "user", prompt } }, true);
+    const std::string prompt_text = build_chat_prompt(model, { { "system", kSystemPrompt }, { "user", prompt } }, true);
     if (!run_completion(model, prompt_text, n_predict, n_ctx, &generated, true)) {
         llama_model_free(model);
         return 1;
