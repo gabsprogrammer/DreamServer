@@ -325,12 +325,12 @@ doctor() {
     fi
 
     warn "The Qwen GGUF can be downloaded on iOS today, but chat still needs a linked wasm runtime at ${DREAM_MOBILE_WASM_BINARY}."
-    warn "The current host-side build path reaches llama.cpp successfully, but the published wasi-sdk still fails to link the C++ exception runtime symbols that llama.cpp needs on wasm32-wasi-threads."
-    echo "Missing symbols seen in the current build path include:"
-    echo "  __cxa_allocate_exception"
-    echo "  __cxa_throw"
-    echo "  __wasm_lpad_context"
-    echo "  _Unwind_CallPersonality"
+    warn "The iOS / a-Shell runtime now needs the custom exceptions-enabled wasi-sdk helper plus the linked wasm binary in the repo path above."
+    echo "Host helpers:"
+    echo "  runtime build: ${DREAM_MOBILE_WASM_BUILD_HELPER}"
+    echo "  sdk build:     ${ROOT_DIR}/installers/mobile/build-ios-ashell-wasm-sdk.sh"
+    echo "Current notes:"
+    echo "  ${DREAM_MOBILE_WASM_BUILD_DOC}"
 }
 
 intent_json() {

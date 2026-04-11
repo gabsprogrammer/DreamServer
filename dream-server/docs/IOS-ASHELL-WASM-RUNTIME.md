@@ -12,29 +12,42 @@ mobile-runtime/ios-ashell/bin/llama-cli.wasm
 
 ## What exists now
 
-The repo now includes a host-side experimental builder:
+The repo now includes a working host-side build chain:
 
 ```sh
+bash dream-server/installers/mobile/build-ios-ashell-wasm-sdk.sh
 bash dream-server/installers/mobile/build-ios-ashell-wasm-runtime.sh
 ```
 
-That builder:
+That build chain:
 
+- bootstraps a custom `wasi-sdk` sysroot with `WASI_SDK_EXCEPTIONS=ON`
 - clones a pinned `llama.cpp` checkout
 - generates a tiny prompt-only WASI runner
-- drives the official `wasi-sdk` Docker image
+- drives the official `wasi-sdk` Docker image plus the custom exported sysroot
+- now injects an explicit `__cpp_exception` wasm tag object into the runner link
+- now stubs `dlopen` / `dlsym` / `dlclose` for the WASI path
 - copies the output into the exact path that the iOS preview already checks
 
-## Current blocker
+## Published-image blocker
 
-Today the build reaches almost all of `llama.cpp`, but the final link still fails on the published `wasi-sdk` image because the required C++ exception runtime symbols are missing for `wasm32-wasi-threads`.
+If you try to skip the custom sysroot helper and use only a published `wasi-sdk` image, the link still fails for the `a-Shell` path because the required C++ exception runtime support is incomplete without an exceptions-enabled sysroot.
 
-The missing symbols in the current path include:
+The first blocker we hit on published images was:
 
 - `__cxa_allocate_exception`
 - `__cxa_throw`
 - `__wasm_lpad_context`
 - `_Unwind_CallPersonality`
+
+The successful host build now pairs the runner with:
+
+- `wasm32-wasip1`
+- `-fwasm-exceptions`
+- `-lunwind`
+- an explicit `__cpp_exception` tag object
+- a custom sysroot built with `WASI_SDK_EXCEPTIONS=ON`
+- WASI-safe dynamic loading stubs for the static CPU backend path
 
 This is why the iPhone can already:
 
@@ -42,11 +55,9 @@ This is why the iPhone can already:
 - report `Downloaded:true`
 - keep a stable `prompt` / `chat` shell contract
 
-but still cannot run local Qwen inference in `a-Shell` yet.
-
 ## What success looks like
 
-Once the runtime links cleanly, the iOS flow does not need a new interface. The existing commands can switch over:
+Once `mobile-runtime/ios-ashell/bin/llama-cli.wasm` is present in the repo state that the iPhone pulls, the iOS flow does not need a new interface. The existing commands can switch over:
 
 ```sh
 sh ./dream-mobile.sh status
@@ -70,4 +81,4 @@ Wasm ready:true
 
 ## Practical note
 
-This builder is meant to run on a desktop host with Docker, not inside `a-Shell`.
+These builders are meant to run on a desktop host with Docker, not inside `a-Shell`.
