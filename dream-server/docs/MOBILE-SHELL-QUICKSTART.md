@@ -57,7 +57,7 @@ a-Shell now has a **CLI + Shortcuts preview path**.
 
 What works today:
 
-- `sh ./install.sh` sets up the iOS preview files
+- `sh ./install.sh` sets up the iOS preview files and downloads `Qwen3-0.6B` by default
 - `sh ./dream-mobile.sh intent "abrir calculadora"` returns JSON for Apple Shortcuts
 - `sh ./dream-mobile.sh prompt "abrir safari no github"` uses the same routing contract
 - `sh ./dream-mobile.sh apps` lists the stable `app_id` values to route inside Shortcuts

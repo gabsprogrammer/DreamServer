@@ -19,6 +19,13 @@ sh ./install.sh
 sh ./dream-mobile.sh status
 ```
 
+By default, `sh ./install.sh` also downloads `Qwen3-0.6B-Q4_0.gguf` into `data/models/mobile/`.
+If you want to skip the model download on a specific run:
+
+```sh
+sh ./install.sh --no-model-download
+```
+
 ## Quick tests
 
 ```sh

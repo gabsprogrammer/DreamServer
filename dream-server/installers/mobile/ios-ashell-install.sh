@@ -20,7 +20,7 @@ fail()    { printf '%s[error]%s %s\n' "$RED" "$NC" "$1" >&2; exit 1; }
 
 DRY_RUN=false
 FORCE=false
-DOWNLOAD_MODEL=false
+DOWNLOAD_MODEL=true
 MODEL_ID="qwen3-0.6b"
 MOBILE_CONTEXT=2048
 IGNORED_FLAGS=""
@@ -44,14 +44,15 @@ Usage:
 Options:
   --model NAME           Model preset to track in config (default: qwen3-0.6b)
   --context N            Context size to use when a wasm runtime is available
-  --download-model       Download the GGUF now
-  --no-model-download    Skip the GGUF download for now (default)
+  --download-model       Download the GGUF during install (default)
+  --no-model-download    Skip the default GGUF download for now
   --force                Re-write config and re-download the model if requested
   --dry-run              Show what would happen without writing files
   -h, --help             Show this help
 
 Notes:
   - This iOS preview is CLI-first and Shortcut-friendly.
+  - The install step downloads Qwen3-0.6B by default.
   - It can return JSON intents today for Apple Shortcuts.
   - If a local wasm llama runtime is added later, the same commands can use it.
 EOF
@@ -217,7 +218,7 @@ EOF
 
 download_model() {
     if [ "$DOWNLOAD_MODEL" != "true" ]; then
-        warn "Skipping GGUF download for now. Add --download-model when you want the file on-device."
+        warn "Skipping GGUF download because --no-model-download was used."
         return 0
     fi
 
@@ -253,9 +254,14 @@ print_summary() {
     echo "  $SHORTCUTS_DOC"
     echo ""
     if [ "$DOWNLOAD_MODEL" != "true" ]; then
-        echo "Model download is optional for this first iOS preview."
+        echo "Model download was skipped for this run."
         echo "When you want the GGUF on-device:"
         echo "  sh ./dream-mobile.sh install --download-model"
+        echo ""
+    else
+        echo "Model download is enabled by default on iOS install."
+        echo "If you want to skip it on a specific run:"
+        echo "  sh ./dream-mobile.sh install --no-model-download"
         echo ""
     fi
     if [ ! -f "$WASM_RUNTIME_PATH" ]; then
