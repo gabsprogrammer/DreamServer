@@ -168,15 +168,10 @@ prepare_sdk_install() {
 
 docker_run_build() {
     local log_file="$LOG_DIR/build.log"
-    local user_args=()
-
-    if command -v id >/dev/null 2>&1; then
-        user_args=(--user "$(id -u):$(id -g)")
-    fi
 
     if [ "$DRY_RUN" = "true" ]; then
-        printf '[dry-run] docker run %s -e DREAM_LLAMA_CPP_SOURCE=/src -v %s:/src -v %s:/sdk -v %s:/runner -v %s:/build %s ...\n' \
-            "${user_args[*]:-}" "$LLAMA_DIR" "$SDK_INSTALL_DIR" "$RUNNER_DIR" "$BUILD_DIR" "$DOCKER_IMAGE"
+        printf '[dry-run] docker run -e DREAM_LLAMA_CPP_SOURCE=/src -v %s:/src -v %s:/sdk -v %s:/runner -v %s:/build %s ...\n' \
+            "$LLAMA_DIR" "$SDK_INSTALL_DIR" "$RUNNER_DIR" "$BUILD_DIR" "$DOCKER_IMAGE"
         return 0
     fi
 
@@ -184,7 +179,6 @@ docker_run_build() {
     mkdir -p "$BUILD_DIR"
 
     docker run --rm \
-        "${user_args[@]}" \
         -e DREAM_LLAMA_CPP_SOURCE=/src \
         -v "$LLAMA_DIR:/src" \
         -v "$SDK_INSTALL_DIR:/sdk" \
@@ -211,6 +205,7 @@ copy_artifact() {
     fi
 
     [ -f "$BUILD_DIR/dream-llama-wasi" ] || fail "Build finished without producing $BUILD_DIR/dream-llama-wasi"
+    run_cmd rm -f "$OUT_BIN"
     run_cmd cp "$BUILD_DIR/dream-llama-wasi" "$OUT_BIN"
     log "Copied runtime to $OUT_BIN"
 }
