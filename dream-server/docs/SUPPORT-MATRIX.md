@@ -13,7 +13,7 @@ Last updated: 2026-04-11
 | **Windows (Docker Desktop + WSL2)** | **Supported** | Complete install and runtime via `.\install.ps1`. GPU auto-detection (NVIDIA/AMD). |
 | **macOS (Apple Silicon)** | **Supported** | Complete install and runtime via `./install.sh`. Native Metal inference + Docker services. |
 | **Android + Termux** | **Preview** | Shell-only local chat bootstrap. Builds `llama.cpp`, downloads `Qwen3-0.6B`, and chats via `./dream-mobile.sh chat`. No Docker stack, dashboard, voice, workflows, or agents yet. |
-| **iOS + a-Shell** | **Detected, not supported for local inference** | Installer now recognizes a-Shell and exits cleanly with an explanation instead of attempting the desktop stack. |
+| **iOS + a-Shell** | **Preview** | CLI + Apple Shortcuts preview. `sh ./install.sh` configures the shell path, `sh ./dream-mobile.sh intent` returns JSON intents, and `prompt` can later switch to a local wasm backend without changing the shell contract. |
 | **Linux + Intel Arc (SYCL)** | **Experimental** | Installer auto-detects Arc, assigns ARC/ARC\_LITE tier, and selects `docker-compose.arc.yml`. End-to-end runtime on A770/A750. See [INTEL-ARC-GUIDE.md](INTEL-ARC-GUIDE.md). |
 
 ## Support Tiers
@@ -32,7 +32,7 @@ Last updated: 2026-04-11
 | Windows (Docker Desktop + WSL2) | NVIDIA/AMD via Docker Desktop | Tier B | Standalone installer (`.\install.ps1`) with GPU auto-detection, Docker orchestration, health checks, and desktop shortcuts |
 | macOS (Apple Silicon) | Metal (native llama-server) | Tier B | Standalone installer (`./install.sh`) with chip detection, native Metal inference, Docker services, and LaunchAgent auto-start |
 | Android (Termux) | CPU / shell-only `llama.cpp` CLI | Preview | Mobile bootstrap only. Installs build deps, compiles `llama.cpp`, downloads `Qwen3-0.6B`, and chats in-shell via `./dream-mobile.sh`. |
-| iOS (a-Shell) | — | Tier C | Platform is detected explicitly, but local shell inference is blocked for now because the current preview depends on native `llama.cpp` CLI behavior that a-Shell does not provide. |
+| iOS (a-Shell) | CLI + Shortcut intent bridge | Tier C | Platform is detected explicitly and routed into a local CLI preview for Apple Shortcuts. The default engine is rule-based; a future wasm backend can slot into the same contract. |
 
 ## GPU Tier Map
 
@@ -58,7 +58,7 @@ Last updated: 2026-04-11
 - Windows native installer UX is Tier B (delegated via Docker Desktop + WSL2).
 - macOS installs via `./install.sh` — llama-server runs natively with Metal acceleration, all other services in Docker.
 - Android / Termux is a preview path for shell chat only. It does not launch the full Dream Server service graph.
-- iOS / a-Shell is detected and blocked intentionally for local shell inference instead of falling through to the unsupported desktop installer.
+- iOS / a-Shell is a preview path for CLI + Shortcut intents. It does not launch the full Dream Server service graph.
 - **Intel Arc (SYCL) is Tier C / experimental.** The installer auto-detects and selects the correct compose overlay and tier. Runtime works on A770/A750 (Linux). ComfyUI and Whisper GPU acceleration are not yet available for Arc. See [INTEL-ARC-GUIDE.md](INTEL-ARC-GUIDE.md) for limitations.
 - For release gates (CI), macOS (Apple Silicon) is documented as Tier C (installer MVP) in manifest; SUPPORT-MATRIX table may show Tier B for user-facing status.
 - Version baselines for triage are in `docs/KNOWN-GOOD-VERSIONS.md`.

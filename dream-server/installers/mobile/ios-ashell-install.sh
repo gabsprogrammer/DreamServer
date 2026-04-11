@@ -1,0 +1,280 @@
+#!/bin/sh
+# ============================================================================
+# Dream Server iOS / a-Shell CLI + Shortcuts Preview Installer
+# ============================================================================
+
+set -eu
+
+ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+
+RED='[0;31m'
+GREEN='[0;32m'
+YELLOW='[1;33m'
+CYAN='[0;36m'
+NC='[0m'
+
+log()     { printf '%s[dream-ios]%s %s\n' "$CYAN" "$NC" "$1"; }
+success() { printf '%s[ok]%s %s\n' "$GREEN" "$NC" "$1"; }
+warn()    { printf '%s[warn]%s %s\n' "$YELLOW" "$NC" "$1"; }
+fail()    { printf '%s[error]%s %s\n' "$RED" "$NC" "$1" >&2; exit 1; }
+
+DRY_RUN=false
+FORCE=false
+DOWNLOAD_MODEL=false
+MODEL_ID="qwen3-0.6b"
+MOBILE_CONTEXT=2048
+IGNORED_FLAGS=""
+
+IOS_RUNTIME_DIR="$ROOT_DIR/mobile-runtime/ios-ashell"
+IOS_BIN_DIR="$IOS_RUNTIME_DIR/bin"
+IOS_SHORTCUTS_DIR="$IOS_RUNTIME_DIR/shortcuts"
+MODEL_DIR="$ROOT_DIR/data/models/mobile"
+CONFIG_FILE="$ROOT_DIR/.dream-mobile.env"
+SHORTCUTS_DOC="$ROOT_DIR/docs/IOS-ASHELL-SHORTCUTS.md"
+SAMPLE_JSON="$IOS_SHORTCUTS_DIR/intent-sample.json"
+
+usage() {
+    cat <<'EOF'
+Dream Server iOS / a-Shell Preview
+
+Usage:
+  sh ./install.sh
+  sh ./dream-mobile.sh install
+
+Options:
+  --model NAME           Model preset to track in config (default: qwen3-0.6b)
+  --context N            Context size to use when a wasm runtime is available
+  --download-model       Download the GGUF now
+  --no-model-download    Skip the GGUF download for now (default)
+  --force                Re-write config and re-download the model if requested
+  --dry-run              Show what would happen without writing files
+  -h, --help             Show this help
+
+Notes:
+  - This iOS preview is CLI-first and Shortcut-friendly.
+  - It can return JSON intents today for Apple Shortcuts.
+  - If a local wasm llama runtime is added later, the same commands can use it.
+EOF
+}
+
+run_cmd() {
+    if [ "$DRY_RUN" = "true" ]; then
+        printf '[dry-run]'
+        for arg in "$@"; do
+            printf ' %s' "$arg"
+        done
+        printf '\n'
+    else
+        "$@"
+    fi
+}
+
+ensure_integer() {
+    case "${1:-}" in
+        ''|*[!0-9]*)
+            fail "Expected an integer, got: ${1:-<empty>}"
+            ;;
+    esac
+}
+
+resolve_model() {
+    case "$(printf '%s' "$MODEL_ID" | tr '[:upper:]' '[:lower:]')" in
+        qwen3-0.6b|qwen3|qwen-0.6b)
+            MODEL_NAME="Qwen3-0.6B"
+            MODEL_REPO="ggml-org/Qwen3-0.6B-GGUF"
+            MODEL_FILE="Qwen3-0.6B-Q4_0.gguf"
+            MODEL_URL="https://huggingface.co/ggml-org/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_0.gguf"
+            MODEL_SIZE_MB=429
+            ;;
+        *)
+            fail "Unsupported iOS model preset: $MODEL_ID"
+            ;;
+    esac
+
+    ensure_integer "$MOBILE_CONTEXT"
+    MODEL_PATH="$MODEL_DIR/$MODEL_FILE"
+    WASM_RUNTIME_PATH="$IOS_BIN_DIR/llama-cli.wasm"
+}
+
+parse_args() {
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --model)
+                MODEL_ID="${2:-}"
+                shift 2
+                ;;
+            --context|--ctx|--ctx-size)
+                MOBILE_CONTEXT="${2:-}"
+                shift 2
+                ;;
+            --download-model)
+                DOWNLOAD_MODEL=true
+                shift
+                ;;
+            --no-model-download)
+                DOWNLOAD_MODEL=false
+                shift
+                ;;
+            --force)
+                FORCE=true
+                shift
+                ;;
+            --dry-run)
+                DRY_RUN=true
+                shift
+                ;;
+            --non-interactive)
+                shift
+                ;;
+            --tier|--summary-json)
+                IGNORED_FLAGS="$IGNORED_FLAGS $1 ${2:-}"
+                shift 2
+                ;;
+            --skip-docker|--voice|--workflows|--rag|--openclaw|--all|--cloud|--offline|--no-bootstrap|--bootstrap|--comfyui|--no-comfyui|--dreamforge|--no-dreamforge)
+                IGNORED_FLAGS="$IGNORED_FLAGS $1"
+                shift
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            *)
+                fail "Unknown option for iOS / a-Shell preview: $1"
+                ;;
+        esac
+    done
+}
+
+warn_ignored_flags() {
+    [ -n "$IGNORED_FLAGS" ] || return 0
+    warn "Ignoring desktop-only flags in the iOS preview:$IGNORED_FLAGS"
+}
+
+prepare_dirs() {
+    run_cmd mkdir -p "$IOS_RUNTIME_DIR" "$IOS_BIN_DIR" "$IOS_SHORTCUTS_DIR" "$MODEL_DIR"
+}
+
+write_sample_json() {
+    if [ "$DRY_RUN" = "true" ]; then
+        log "Would write Shortcut sample JSON to $SAMPLE_JSON"
+        return 0
+    fi
+
+    cat > "$SAMPLE_JSON" <<'EOF'
+{
+  "ok": true,
+  "engine": "rules",
+  "mode": "ios-shortcuts-preview",
+  "action": {
+    "type": "open_app",
+    "app_id": "calculator",
+    "app_label": "Calculadora"
+  },
+  "spoken_response": "Abrindo a Calculadora.",
+  "confidence": 0.98
+}
+EOF
+}
+
+write_config() {
+    ENGINE="rules"
+    WASM_READY="false"
+    MODEL_DOWNLOADED="false"
+
+    if [ -f "$WASM_RUNTIME_PATH" ]; then
+        ENGINE="wasm"
+        WASM_READY="true"
+    fi
+    if [ -f "$MODEL_PATH" ]; then
+        MODEL_DOWNLOADED="true"
+    fi
+
+    if [ "$DRY_RUN" = "true" ]; then
+        log "Would write iOS config to $CONFIG_FILE"
+        return 0
+    fi
+
+    cat > "$CONFIG_FILE" <<EOF
+DREAM_MOBILE_PLATFORM="ios-ashell"
+DREAM_MOBILE_MODE="ios-shortcuts-preview"
+DREAM_MOBILE_ENGINE="$ENGINE"
+DREAM_MOBILE_INTENT_FORMAT="json"
+DREAM_MOBILE_MODEL_ID="$MODEL_ID"
+DREAM_MOBILE_MODEL_NAME="$MODEL_NAME"
+DREAM_MOBILE_MODEL_REPO="$MODEL_REPO"
+DREAM_MOBILE_MODEL_FILE="$MODEL_FILE"
+DREAM_MOBILE_MODEL_URL="$MODEL_URL"
+DREAM_MOBILE_MODEL_PATH="$MODEL_PATH"
+DREAM_MOBILE_MODEL_DOWNLOADED="$MODEL_DOWNLOADED"
+DREAM_MOBILE_WASM_RUNNER="wasm"
+DREAM_MOBILE_WASM_BINARY="$WASM_RUNTIME_PATH"
+DREAM_MOBILE_WASM_READY="$WASM_READY"
+DREAM_MOBILE_CONTEXT="$MOBILE_CONTEXT"
+DREAM_MOBILE_SHORTCUTS_DOC="$SHORTCUTS_DOC"
+DREAM_MOBILE_SHORTCUTS_SAMPLE="$SAMPLE_JSON"
+EOF
+}
+
+download_model() {
+    if [ "$DOWNLOAD_MODEL" != "true" ]; then
+        warn "Skipping GGUF download for now. Add --download-model when you want the file on-device."
+        return 0
+    fi
+
+    if [ -f "$MODEL_PATH" ] && [ "$FORCE" != "true" ]; then
+        success "Model already present: $MODEL_FILE"
+        return 0
+    fi
+
+    log "Downloading $MODEL_NAME ($MODEL_SIZE_MB MB)"
+    run_cmd curl -L --fail --progress-bar -C - -o "$MODEL_PATH" "$MODEL_URL"
+}
+
+print_summary() {
+    ENGINE="rules"
+    [ -f "$WASM_RUNTIME_PATH" ] && ENGINE="wasm"
+
+    echo ""
+    success "Dream Server iOS / a-Shell preview is ready."
+    echo ""
+    echo "Platform:   iOS / a-Shell"
+    echo "Mode:       CLI + Apple Shortcuts"
+    echo "Engine:     $ENGINE"
+    echo "Model:      $MODEL_NAME"
+    echo "Model file: $MODEL_PATH"
+    echo "Wasm path:  $WASM_RUNTIME_PATH"
+    echo ""
+    echo "Use now:"
+    echo "  sh ./dream-mobile.sh status"
+    echo "  sh ./dream-mobile.sh intent \"abrir calculadora\""
+    echo "  sh ./dream-mobile.sh prompt \"abrir safari no github\""
+    echo ""
+    echo "Shortcut guide:"
+    echo "  $SHORTCUTS_DOC"
+    echo ""
+    if [ "$DOWNLOAD_MODEL" != "true" ]; then
+        echo "Model download is optional for this first iOS preview."
+        echo "When you want the GGUF on-device:"
+        echo "  sh ./dream-mobile.sh install --download-model"
+        echo ""
+    fi
+    if [ ! -f "$WASM_RUNTIME_PATH" ]; then
+        echo "Today the iOS path uses a local rule-based intent engine by default."
+        echo "If you later drop a wasm llama runtime at:"
+        echo "  $WASM_RUNTIME_PATH"
+        echo "the same CLI can switch to local prompt inference."
+    fi
+}
+
+main() {
+    parse_args "$@"
+    warn_ignored_flags
+    resolve_model
+    prepare_dirs
+    write_sample_json
+    download_model
+    write_config
+    print_summary
+}
+
+main "$@"

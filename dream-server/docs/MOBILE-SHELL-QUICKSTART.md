@@ -4,14 +4,18 @@ Last updated: 2026-04-11
 
 ## What this is
 
-Dream Server now has a first-pass mobile shell preview for **Android / Termux**.
+Dream Server now has a first-pass mobile shell preview for:
+
+- **Android / Termux**
+- **iOS / a-Shell**
 
 This path is intentionally small:
 
 - it does **not** start the full Docker stack
 - it does **not** enable dashboard, voice, workflows, agents, or RAG
-- it **does** build a local `llama.cpp` CLI runtime
-- it **does** download a small local model and let you chat with it from the shell
+- it **does** keep the interface shell-first
+- it **does** provide a stable CLI contract for future local runtimes
+- it **does** expose an intent-style bridge for Apple Shortcuts on iOS
 
 ## Current mobile target
 
@@ -49,27 +53,44 @@ Useful commands:
 
 ## iOS / a-Shell
 
-a-Shell is now detected explicitly, but the local shell preview stops there for now.
+a-Shell now has a **CLI + Shortcuts preview path**.
 
-Why:
+What works today:
 
-- a-Shell runs C/C++ shell programs as WebAssembly.
-- the current Dream Server mobile preview depends on a native `llama.cpp` CLI runtime.
-- the full Dream Server stack is also out of scope for iOS shell mode.
+- `sh ./install.sh` sets up the iOS preview files
+- `sh ./dream-mobile.sh intent "abrir calculadora"` returns JSON for Apple Shortcuts
+- `sh ./dream-mobile.sh prompt "abrir safari no github"` uses the same routing contract
+- `sh ./dream-mobile.sh apps` lists the stable `app_id` values to route inside Shortcuts
 
-Result:
+Current engine behavior:
 
-- Android / Termux: preview works
-- iOS / a-Shell: detected cleanly, then blocked with a clear message
+- default engine: local rule-based intent router
+- optional future engine: local `wasm` llama runtime if you drop it into the expected path
+- full Dream Server service graph: still out of scope for iOS shell mode
+
+Example flow:
+
+```bash
+sh ./install.sh
+sh ./dream-mobile.sh status
+sh ./dream-mobile.sh intent "abrir calculadora"
+sh ./dream-mobile.sh prompt "abrir safari no github"
+```
+
+The `prompt` and `intent` commands are intentionally compatible with a future local runtime:
+
+- if a local wasm backend is present, `prompt` can use it
+- if not, `prompt` falls back to the local intent router so the Shortcut loop still works
+
+Shortcut setup guidance lives in [IOS-ASHELL-SHORTCUTS.md](IOS-ASHELL-SHORTCUTS.md).
 
 ## Scope guardrail
 
-This mobile preview is meant for **testing the local shell flow first**.
-
-It is the right place to prove:
+This mobile preview is meant for **testing the mobile control loop first**:
 
 - platform detection
-- lightweight model bootstrap
-- shell chat UX
+- local shell command contract
+- app-routing intents
+- Shortcut integration
 
 It is **not** yet the mobile version of full Dream Server.

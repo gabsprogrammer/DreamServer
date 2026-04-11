@@ -3,8 +3,8 @@
 # Dream Server Mobile Shell Preview Installer
 # ============================================================================
 # Scope:
-#   - Android / Termux: supported preview path
-#   - iOS / a-Shell: detected, but local shell inference is not supported yet
+#   - Android / Termux: supported local shell preview path
+#   - iOS / a-Shell: CLI + Apple Shortcuts preview path
 #
 # This intentionally does NOT try to boot the full Dream Server stack.
 # Mobile shell mode is a lightweight, model-in-shell preview for early testing.
@@ -12,20 +12,7 @@
 
 if [ -z "${BASH_VERSION:-}" ]; then
     if [ "${TERM_PROGRAM:-}" = "a-Shell" ] || [ "${TERM_PROGRAM:-}" = "a-Shell mini" ] || [ -n "${ASHELL:-}" ]; then
-        cat <<'EOF'
-
-Dream Server detected iOS a-Shell.
-
-This mobile shell preview stops here on purpose:
-  - a-Shell runs shell C/C++ programs through WebAssembly.
-  - the current Dream Server mobile preview expects a native llama.cpp CLI runtime.
-  - the full Dream Server Docker stack is also out of scope for iOS shell mode.
-
-Result:
-  - Android / Termux works for the current mobile preview.
-  - iOS / a-Shell is detected cleanly, but local shell inference is not supported yet.
-EOF
-        exit 1
+        exec sh "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/ios-ashell-install.sh" "$@"
     fi
 
     if command -v bash >/dev/null 2>&1; then
@@ -87,7 +74,7 @@ Options:
 Notes:
   - This mobile preview is shell-only.
   - Android Termux is supported for local chat with Qwen3-0.6B.
-  - iOS a-Shell is detected, but local shell inference is not supported yet.
+  - iOS a-Shell uses the CLI + Shortcuts preview path.
 EOF
 }
 
@@ -195,22 +182,6 @@ parse_args() {
 
 detect_mobile_platform() {
     detect_platform
-}
-
-show_ashell_blocker() {
-    cat <<'EOF'
-
-Dream Server detected iOS a-Shell.
-
-This repo now recognizes a-Shell explicitly, but the local shell preview stops here on purpose:
-  - a-Shell runs C/C++ shell programs as WebAssembly, not native phone binaries.
-  - the current Dream Server mobile preview depends on a native llama.cpp CLI runtime.
-  - the full Docker-based Dream Server stack is also out of scope for iOS shell mode.
-
-Result:
-  - Android / Termux works for this first mobile preview.
-  - iOS / a-Shell is detected cleanly and blocked with an honest message instead of trying a broken desktop install.
-EOF
 }
 
 ensure_termux_dependencies() {
@@ -326,8 +297,7 @@ main() {
             log "Detected Android / Termux mobile shell"
             ;;
         ios-ashell)
-            show_ashell_blocker
-            exit 1
+            exec sh "$ROOT_DIR/installers/mobile/ios-ashell-install.sh" "$@"
             ;;
         *)
             fail "Mobile shell preview only supports Android / Termux today. Detected platform: $platform"

@@ -17,7 +17,8 @@ if [ -z "${BASH_VERSION:-}" ]; then
     fi
 
     echo "[ERROR] This installer needs bash on this platform." >&2
-    echo "        On iOS a-Shell, local shell inference is not supported yet." >&2
+    echo "        On iOS a-Shell, use the POSIX shell preview path instead:" >&2
+    echo "        sh ./install.sh" >&2
     exit 1
 fi
 

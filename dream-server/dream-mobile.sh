@@ -2,6 +2,10 @@
 # Lightweight shell wrapper for Dream Server mobile preview.
 
 if [ -z "${BASH_VERSION:-}" ]; then
+    SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+    if [ "${TERM_PROGRAM:-}" = "a-Shell" ] || [ "${TERM_PROGRAM:-}" = "a-Shell mini" ] || [ -n "${ASHELL:-}" ]; then
+        exec sh "$SCRIPT_DIR/installers/mobile/ios-ashell-cli.sh" "$@"
+    fi
     if command -v bash >/dev/null 2>&1; then
         exec bash "$0" "$@"
     fi

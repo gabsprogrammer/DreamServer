@@ -18,9 +18,9 @@
 > | **macOS** (Apple Silicon) | **Supported** — install and run today |
 > | **Windows** (NVIDIA + AMD) | **Supported** — install and run today |
 > | **Android** (Termux) | **Preview** — shell-only local chat bootstrap |
-> | **iOS** (a-Shell) | **Detected** — local shell inference not supported yet |
+> | **iOS** (a-Shell) | **Preview** — CLI + Apple Shortcuts intent bridge |
 >
-> Linux, Windows, and macOS are the fully supported desktop paths. Android / Termux is a preview path, and iOS / a-Shell is detected but not yet supported for local shell inference. See [`docs/SUPPORT-MATRIX.md`](docs/SUPPORT-MATRIX.md) for detailed status.
+> Linux, Windows, and macOS are the fully supported desktop paths. Android / Termux and iOS / a-Shell are preview paths. See [`docs/SUPPORT-MATRIX.md`](docs/SUPPORT-MATRIX.md) for detailed status.
 
 See [`docs/SUPPORT-MATRIX.md`](docs/SUPPORT-MATRIX.md) for current support tiers and platform status.
 Launch-claim guardrails: [`docs/PLATFORM-TRUTH-TABLE.md`](docs/PLATFORM-TRUTH-TABLE.md)
@@ -99,6 +99,17 @@ See [`docs/WINDOWS-QUICKSTART.md`](docs/WINDOWS-QUICKSTART.md) for details.
 On Termux, `./install.sh` now switches into a shell-only mobile preview: it installs build dependencies, compiles `llama.cpp`, downloads `Qwen3-0.6B`, and leaves you with `./dream-mobile.sh` for chatting locally in the shell.
 
 See [`docs/MOBILE-SHELL-QUICKSTART.md`](docs/MOBILE-SHELL-QUICKSTART.md) for the current scope and limitations.
+
+### iOS (a-Shell preview)
+
+```bash
+sh ./install.sh
+sh ./dream-mobile.sh intent "abrir calculadora"
+```
+
+On iOS, the preview now targets a CLI + Apple Shortcuts loop. `sh ./dream-mobile.sh intent` returns stable JSON for Shortcut routing, and `prompt` keeps the same interface so a future local wasm backend can slot in without changing the shell contract.
+
+See [`docs/IOS-ASHELL-SHORTCUTS.md`](docs/IOS-ASHELL-SHORTCUTS.md) for the current flow.
 
 ---
 

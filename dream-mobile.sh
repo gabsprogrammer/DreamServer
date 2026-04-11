@@ -1,11 +1,9 @@
 #!/bin/sh
 
 if [ -z "${BASH_VERSION:-}" ]; then
-    if command -v bash >/dev/null 2>&1; then
-        exec bash "$0" "$@"
-    fi
-    echo "[error] dream-mobile.sh requires bash." >&2
-    exit 1
+    SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+    INNER="$SCRIPT_DIR/dream-server/dream-mobile.sh"
+    exec sh "$INNER" "$@"
 fi
 
 set -euo pipefail

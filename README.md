@@ -32,7 +32,7 @@ If AI is becoming critical infrastructure, it shouldn’t be rented. Self-hostin
 > | **Windows** (NVIDIA + AMD) | **Supported** — install and run today |
 > | **macOS** (Apple Silicon) | **Supported** — install and run today |
 > | **Android** (Termux) | **Preview** — shell-only local chat bootstrap |
-> | **iOS** (a-Shell) | **Detected** — local shell inference not supported yet |
+> | **iOS** (a-Shell) | **Preview** — CLI + Apple Shortcuts intent bridge |
 >
 > **Tested Linux distros:** Ubuntu 24.04/22.04, Debian 12, Fedora 41+, Arch Linux, CachyOS, openSUSE Tumbleweed. Other distros using apt, dnf, pacman, or zypper should also work — [open an issue](https://github.com/Light-Heart-Labs/DreamServer/issues) if yours doesn't.
 >
@@ -142,6 +142,20 @@ cd DreamServer
 This preview path detects Termux, builds a local `llama.cpp` CLI runtime, downloads `Qwen3-0.6B`, and lets you chat in the shell. It does **not** launch the full Docker-based Dream Server stack yet.
 
 See the [Mobile Shell Quickstart](dream-server/docs/MOBILE-SHELL-QUICKSTART.md) for details.
+
+</details>
+
+<details>
+<summary><b>iOS (a-Shell preview)</b></summary>
+
+```sh
+sh ./install.sh
+sh ./dream-mobile.sh intent "abrir calculadora"
+```
+
+This preview path is CLI-first and Shortcut-friendly. It sets up an iOS shell contract that returns JSON intents for Apple Shortcuts today, while keeping room for a future local wasm backend behind the same commands.
+
+See the [iOS a-Shell + Apple Shortcuts guide](dream-server/docs/IOS-ASHELL-SHORTCUTS.md) for details.
 
 </details>
 
