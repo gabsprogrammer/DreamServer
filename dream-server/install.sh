@@ -1,8 +1,24 @@
-#!/bin/bash
+#!/bin/sh
 # Dream Server Installer entrypoint (PR-1 dispatcher)
 # Pass-through options (implemented in install-core.sh):
 # --dry-run --skip-docker --force --tier --voice --workflows --rag
 # --openclaw --all --non-interactive --no-bootstrap --bootstrap --offline
+
+if [ -z "${BASH_VERSION:-}" ]; then
+    SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+
+    if [ "${TERM_PROGRAM:-}" = "a-Shell" ] || [ "${TERM_PROGRAM:-}" = "a-Shell mini" ] || [ -n "${ASHELL:-}" ]; then
+        exec sh "$SCRIPT_DIR/installers/mobile/install-mobile.sh" "$@"
+    fi
+
+    if command -v bash >/dev/null 2>&1; then
+        exec bash "$0" "$@"
+    fi
+
+    echo "[ERROR] This installer needs bash on this platform." >&2
+    echo "        On iOS a-Shell, local shell inference is not supported yet." >&2
+    exit 1
+fi
 
 set -euo pipefail
 

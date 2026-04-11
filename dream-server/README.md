@@ -17,8 +17,10 @@
 > | **Linux** (NVIDIA + AMD) | **Supported** — install and run today |
 > | **macOS** (Apple Silicon) | **Supported** — install and run today |
 > | **Windows** (NVIDIA + AMD) | **Supported** — install and run today |
+> | **Android** (Termux) | **Preview** — shell-only local chat bootstrap |
+> | **iOS** (a-Shell) | **Detected** — local shell inference not supported yet |
 >
-> All three platforms are fully supported with one-command installers. See [`docs/SUPPORT-MATRIX.md`](docs/SUPPORT-MATRIX.md) for detailed tier status.
+> Linux, Windows, and macOS are the fully supported desktop paths. Android / Termux is a preview path, and iOS / a-Shell is detected but not yet supported for local shell inference. See [`docs/SUPPORT-MATRIX.md`](docs/SUPPORT-MATRIX.md) for detailed status.
 
 See [`docs/SUPPORT-MATRIX.md`](docs/SUPPORT-MATRIX.md) for current support tiers and platform status.
 Launch-claim guardrails: [`docs/PLATFORM-TRUTH-TABLE.md`](docs/PLATFORM-TRUTH-TABLE.md)
@@ -86,6 +88,17 @@ llama-server runs natively with Metal GPU acceleration; all other services run i
 ```
 
 See [`docs/WINDOWS-QUICKSTART.md`](docs/WINDOWS-QUICKSTART.md) for details.
+
+### Android (Termux preview)
+
+```bash
+./install.sh
+./dream-mobile.sh chat
+```
+
+On Termux, `./install.sh` now switches into a shell-only mobile preview: it installs build dependencies, compiles `llama.cpp`, downloads `Qwen3-0.6B`, and leaves you with `./dream-mobile.sh` for chatting locally in the shell.
+
+See [`docs/MOBILE-SHELL-QUICKSTART.md`](docs/MOBILE-SHELL-QUICKSTART.md) for the current scope and limitations.
 
 ---
 

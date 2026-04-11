@@ -31,6 +31,8 @@ If AI is becoming critical infrastructure, it shouldn’t be rented. Self-hostin
 > | **Linux** (NVIDIA + AMD) | **Supported** — install and run today |
 > | **Windows** (NVIDIA + AMD) | **Supported** — install and run today |
 > | **macOS** (Apple Silicon) | **Supported** — install and run today |
+> | **Android** (Termux) | **Preview** — shell-only local chat bootstrap |
+> | **iOS** (a-Shell) | **Detected** — local shell inference not supported yet |
 >
 > **Tested Linux distros:** Ubuntu 24.04/22.04, Debian 12, Fedora 41+, Arch Linux, CachyOS, openSUSE Tumbleweed. Other distros using apt, dnf, pacman, or zypper should also work — [open an issue](https://github.com/Light-Heart-Labs/DreamServer/issues) if yours doesn't.
 >
@@ -124,6 +126,22 @@ cd DreamServer/dream-server
 The installer detects your chip, picks the right model for your unified memory, launches llama-server natively with Metal acceleration, and starts all other services in Docker. Manage with `./dream-macos.sh status`.
 
 See the [macOS Quickstart](dream-server/docs/MACOS-QUICKSTART.md) for details.
+
+</details>
+
+<details>
+<summary><b>Android (Termux preview)</b></summary>
+
+```bash
+git clone https://github.com/gabsprogrammer/DreamServer.git
+cd DreamServer
+./install.sh
+./dream-mobile.sh chat
+```
+
+This preview path detects Termux, builds a local `llama.cpp` CLI runtime, downloads `Qwen3-0.6B`, and lets you chat in the shell. It does **not** launch the full Docker-based Dream Server stack yet.
+
+See the [Mobile Shell Quickstart](dream-server/docs/MOBILE-SHELL-QUICKSTART.md) for details.
 
 </details>
 
