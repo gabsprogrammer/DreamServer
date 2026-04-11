@@ -33,6 +33,23 @@ CONFIG_FILE="$ROOT_DIR/.dream-mobile.env"
 SHORTCUTS_DOC="$ROOT_DIR/docs/IOS-ASHELL-SHORTCUTS.md"
 SAMPLE_JSON="$IOS_SHORTCUTS_DIR/intent-sample.json"
 
+write_lines_file() {
+    target_path="$1"
+    shift
+    tmp_path="${target_path}.tmp"
+
+    if [ "$DRY_RUN" = "true" ]; then
+        return 0
+    fi
+
+    rm -f "$tmp_path"
+    : > "$tmp_path"
+    for line in "$@"; do
+        printf '%s\n' "$line" >> "$tmp_path"
+    done
+    mv "$tmp_path" "$target_path"
+}
+
 usage() {
     cat <<'EOF'
 Dream Server iOS / a-Shell Preview
@@ -161,20 +178,19 @@ write_sample_json() {
         return 0
     fi
 
-    cat > "$SAMPLE_JSON" <<'EOF'
-{
-  "ok": true,
-  "engine": "rules",
-  "mode": "ios-shortcuts-preview",
-  "action": {
-    "type": "open_app",
-    "app_id": "calculator",
-    "app_label": "Calculadora"
-  },
-  "spoken_response": "Abrindo a Calculadora.",
-  "confidence": 0.98
-}
-EOF
+    write_lines_file "$SAMPLE_JSON" \
+        "{" \
+        "  \"ok\": true," \
+        "  \"engine\": \"rules\"," \
+        "  \"mode\": \"ios-shortcuts-preview\"," \
+        "  \"action\": {" \
+        "    \"type\": \"open_app\"," \
+        "    \"app_id\": \"calculator\"," \
+        "    \"app_label\": \"Calculadora\"" \
+        "  }," \
+        "  \"spoken_response\": \"Abrindo a Calculadora.\"," \
+        "  \"confidence\": 0.98" \
+        "}"
 }
 
 write_config() {
@@ -195,25 +211,26 @@ write_config() {
         return 0
     fi
 
-    cat > "$CONFIG_FILE" <<EOF
-DREAM_MOBILE_PLATFORM="ios-ashell"
-DREAM_MOBILE_MODE="ios-shortcuts-preview"
-DREAM_MOBILE_ENGINE="$ENGINE"
-DREAM_MOBILE_INTENT_FORMAT="json"
-DREAM_MOBILE_MODEL_ID="$MODEL_ID"
-DREAM_MOBILE_MODEL_NAME="$MODEL_NAME"
-DREAM_MOBILE_MODEL_REPO="$MODEL_REPO"
-DREAM_MOBILE_MODEL_FILE="$MODEL_FILE"
-DREAM_MOBILE_MODEL_URL="$MODEL_URL"
-DREAM_MOBILE_MODEL_PATH="$MODEL_PATH"
-DREAM_MOBILE_MODEL_DOWNLOADED="$MODEL_DOWNLOADED"
-DREAM_MOBILE_WASM_RUNNER="wasm"
-DREAM_MOBILE_WASM_BINARY="$WASM_RUNTIME_PATH"
-DREAM_MOBILE_WASM_READY="$WASM_READY"
-DREAM_MOBILE_CONTEXT="$MOBILE_CONTEXT"
-DREAM_MOBILE_SHORTCUTS_DOC="$SHORTCUTS_DOC"
-DREAM_MOBILE_SHORTCUTS_SAMPLE="$SAMPLE_JSON"
-EOF
+    write_lines_file "$CONFIG_FILE" \
+        "DREAM_MOBILE_PLATFORM=\"ios-ashell\"" \
+        "DREAM_MOBILE_MODE=\"ios-shortcuts-preview\"" \
+        "DREAM_MOBILE_ENGINE=\"$ENGINE\"" \
+        "DREAM_MOBILE_INTENT_FORMAT=\"json\"" \
+        "DREAM_MOBILE_MODEL_ID=\"$MODEL_ID\"" \
+        "DREAM_MOBILE_MODEL_NAME=\"$MODEL_NAME\"" \
+        "DREAM_MOBILE_MODEL_REPO=\"$MODEL_REPO\"" \
+        "DREAM_MOBILE_MODEL_FILE=\"$MODEL_FILE\"" \
+        "DREAM_MOBILE_MODEL_URL=\"$MODEL_URL\"" \
+        "DREAM_MOBILE_MODEL_PATH=\"$MODEL_PATH\"" \
+        "DREAM_MOBILE_MODEL_DOWNLOADED=\"$MODEL_DOWNLOADED\"" \
+        "DREAM_MOBILE_WASM_RUNNER=\"wasm\"" \
+        "DREAM_MOBILE_WASM_BINARY=\"$WASM_RUNTIME_PATH\"" \
+        "DREAM_MOBILE_WASM_READY=\"$WASM_READY\"" \
+        "DREAM_MOBILE_CONTEXT=\"$MOBILE_CONTEXT\"" \
+        "DREAM_MOBILE_SHORTCUTS_DOC=\"$SHORTCUTS_DOC\"" \
+        "DREAM_MOBILE_SHORTCUTS_SAMPLE=\"$SAMPLE_JSON\""
+
+    success "Wrote iOS preview config"
 }
 
 download_model() {
