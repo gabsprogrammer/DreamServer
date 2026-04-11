@@ -7,6 +7,7 @@
 if [ -z "${BASH_VERSION:-}" ]; then
     SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
     CONFIG_FILE="$SCRIPT_DIR/.dream-mobile.env"
+    IOS_CONTAINER_PATTERN='^(/private)?/var/mobile/Containers/Data/Application/'
 
     if [ -f "$CONFIG_FILE" ] && grep -q 'DREAM_MOBILE_PLATFORM="ios-ashell"' "$CONFIG_FILE" 2>/dev/null; then
         sh "$SCRIPT_DIR/installers/mobile/install-mobile.sh" "$@"
@@ -16,18 +17,14 @@ if [ -z "${BASH_VERSION:-}" ]; then
         sh "$SCRIPT_DIR/installers/mobile/install-mobile.sh" "$@"
         exit $?
     fi
-    case "$SCRIPT_DIR" in
-        /private/var/mobile/Containers/Data/Application/*|/var/mobile/Containers/Data/Application/*)
-            sh "$SCRIPT_DIR/installers/mobile/install-mobile.sh" "$@"
-            exit $?
-            ;;
-    esac
-    case "${HOME:-}" in
-        /private/var/mobile/Containers/Data/Application/*|/var/mobile/Containers/Data/Application/*)
-            sh "$SCRIPT_DIR/installers/mobile/install-mobile.sh" "$@"
-            exit $?
-            ;;
-    esac
+    if printf '%s\n' "$SCRIPT_DIR" | grep -Eq "$IOS_CONTAINER_PATTERN"; then
+        sh "$SCRIPT_DIR/installers/mobile/install-mobile.sh" "$@"
+        exit $?
+    fi
+    if printf '%s\n' "${HOME:-}" | grep -Eq "$IOS_CONTAINER_PATTERN"; then
+        sh "$SCRIPT_DIR/installers/mobile/install-mobile.sh" "$@"
+        exit $?
+    fi
     if [ "$(uname -s 2>/dev/null || echo unknown)" = "Darwin" ] && [ -d /private/var/mobile/Containers/Data/Application ]; then
         sh "$SCRIPT_DIR/installers/mobile/install-mobile.sh" "$@"
         exit $?

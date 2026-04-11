@@ -4,22 +4,19 @@
 if [ -z "${BASH_VERSION:-}" ]; then
     SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
     CONFIG_FILE="$SCRIPT_DIR/.dream-mobile.env"
+    IOS_CONTAINER_PATTERN='^(/private)?/var/mobile/Containers/Data/Application/'
     if [ -f "$CONFIG_FILE" ] && grep -q 'DREAM_MOBILE_PLATFORM="ios-ashell"' "$CONFIG_FILE" 2>/dev/null; then
         exec sh "$SCRIPT_DIR/installers/mobile/ios-ashell-cli.sh" "$@"
     fi
     if [ "${TERM_PROGRAM:-}" = "a-Shell" ] || [ "${TERM_PROGRAM:-}" = "a-Shell mini" ] || [ -n "${ASHELL:-}" ]; then
         exec sh "$SCRIPT_DIR/installers/mobile/ios-ashell-cli.sh" "$@"
     fi
-    case "$SCRIPT_DIR" in
-        /private/var/mobile/Containers/Data/Application/*|/var/mobile/Containers/Data/Application/*)
-            exec sh "$SCRIPT_DIR/installers/mobile/ios-ashell-cli.sh" "$@"
-            ;;
-    esac
-    case "${HOME:-}" in
-        /private/var/mobile/Containers/Data/Application/*|/var/mobile/Containers/Data/Application/*)
-            exec sh "$SCRIPT_DIR/installers/mobile/ios-ashell-cli.sh" "$@"
-            ;;
-    esac
+    if printf '%s\n' "$SCRIPT_DIR" | grep -Eq "$IOS_CONTAINER_PATTERN"; then
+        exec sh "$SCRIPT_DIR/installers/mobile/ios-ashell-cli.sh" "$@"
+    fi
+    if printf '%s\n' "${HOME:-}" | grep -Eq "$IOS_CONTAINER_PATTERN"; then
+        exec sh "$SCRIPT_DIR/installers/mobile/ios-ashell-cli.sh" "$@"
+    fi
     if [ "$(uname -s 2>/dev/null || echo unknown)" = "Darwin" ] && [ -d /private/var/mobile/Containers/Data/Application ]; then
         exec sh "$SCRIPT_DIR/installers/mobile/ios-ashell-cli.sh" "$@"
     fi
