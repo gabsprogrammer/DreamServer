@@ -9,7 +9,8 @@ if [ -z "${BASH_VERSION:-}" ]; then
         echo "Expected: $SCRIPT_DIR/dream-server" >&2
         exit 1
     fi
-    exec sh "$SCRIPT_DIR/dream-server/install.sh" "$@"
+    sh "$SCRIPT_DIR/dream-server/install.sh" "$@"
+    exit $?
 fi
 
 set -euo pipefail
