@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <utility>
 #include <vector>
 
 static void usage(const char * argv0) {
@@ -23,11 +24,106 @@ static std::string trim_newlines(std::string text) {
     return text;
 }
 
-static std::string ensure_chat_prompt(const std::string & raw_input) {
-    if (raw_input.find("Assistant:") != std::string::npos || raw_input.find("User:") != std::string::npos) {
-        return raw_input;
+static std::string trim_space(std::string text) {
+    while (!text.empty() && (text.front() == ' ' || text.front() == '\n' || text.front() == '\r' || text.front() == '\t')) {
+        text.erase(text.begin());
     }
-    return "User: " + raw_input + "\nAssistant:";
+    while (!text.empty() && (text.back() == ' ' || text.back() == '\n' || text.back() == '\r' || text.back() == '\t')) {
+        text.pop_back();
+    }
+    return text;
+}
+
+struct chat_turn {
+    std::string role;
+    std::string content;
+};
+
+static std::string strip_assistant_prefix(std::string text) {
+    text = trim_space(std::move(text));
+
+    const char * prefixes[] = {
+        "Assistant:",
+        "assistant:",
+        "ASSISTANT:",
+        "<|im_start|>assistant",
+        "<|assistant|>",
+    };
+
+    for (const char * prefix : prefixes) {
+        const std::string value(prefix);
+        if (text.rfind(value, 0) == 0) {
+            text.erase(0, value.size());
+            return trim_space(std::move(text));
+        }
+    }
+
+    return text;
+}
+
+static std::string build_fallback_chat_prompt(const std::vector<chat_turn> & turns, bool add_assistant) {
+    std::string prompt;
+    for (const chat_turn & turn : turns) {
+        if (!prompt.empty()) {
+            prompt += "\n";
+        }
+
+        if (turn.role == "assistant") {
+            prompt += "Assistant: ";
+        } else if (turn.role == "system") {
+            prompt += "System: ";
+        } else {
+            prompt += "User: ";
+        }
+
+        prompt += turn.content;
+    }
+
+    if (add_assistant) {
+        if (!prompt.empty()) {
+            prompt += "\n";
+        }
+        prompt += "Assistant:";
+    }
+
+    return prompt;
+}
+
+static std::string build_chat_prompt(llama_model * model, const std::vector<chat_turn> & turns, bool add_assistant) {
+    const char * tmpl = llama_model_chat_template(model, nullptr);
+    if (tmpl == nullptr || turns.empty()) {
+        return build_fallback_chat_prompt(turns, add_assistant);
+    }
+
+    std::vector<llama_chat_message> messages;
+    messages.reserve(turns.size());
+    for (const chat_turn & turn : turns) {
+        messages.push_back({ turn.role.c_str(), turn.content.c_str() });
+    }
+
+    int32_t needed = llama_chat_apply_template(tmpl, messages.data(), messages.size(), add_assistant, nullptr, 0);
+    if (needed <= 0) {
+        return build_fallback_chat_prompt(turns, add_assistant);
+    }
+
+    std::string rendered(static_cast<size_t>(needed), '\0');
+    const int32_t written = llama_chat_apply_template(
+        tmpl,
+        messages.data(),
+        messages.size(),
+        add_assistant,
+        rendered.data(),
+        static_cast<int32_t>(rendered.size()));
+
+    if (written <= 0) {
+        return build_fallback_chat_prompt(turns, add_assistant);
+    }
+
+    if (written < static_cast<int32_t>(rendered.size())) {
+        rendered.resize(static_cast<size_t>(written));
+    }
+
+    return rendered;
 }
 
 static bool run_completion(
@@ -111,7 +207,7 @@ static bool run_completion(
 }
 
 static int run_interactive_chat(llama_model * model, int n_predict, int n_ctx) {
-    std::string transcript;
+    std::vector<chat_turn> transcript;
     char line[2048];
 
     while (true) {
@@ -131,10 +227,8 @@ static int run_interactive_chat(llama_model * model, int n_predict, int n_ctx) {
             return 0;
         }
 
-        const std::string prompt_text =
-            transcript.empty()
-                ? ensure_chat_prompt(user_input)
-                : transcript + "\nUser: " + user_input + "\nAssistant:";
+        transcript.push_back({ "user", user_input });
+        const std::string prompt_text = build_chat_prompt(model, transcript, true);
 
         std::string reply;
         std::fputs("assistant> ", stdout);
@@ -144,15 +238,11 @@ static int run_interactive_chat(llama_model * model, int n_predict, int n_ctx) {
             return 1;
         }
 
-        reply = trim_newlines(reply);
+        reply = strip_assistant_prefix(trim_newlines(reply));
         std::fputc('\n', stdout);
         std::fflush(stdout);
 
-        if (transcript.empty()) {
-            transcript = "User: " + user_input + "\nAssistant: " + reply;
-        } else {
-            transcript += "\nUser: " + user_input + "\nAssistant: " + reply;
-        }
+        transcript.push_back({ "assistant", reply });
     }
 }
 
@@ -206,11 +296,13 @@ int main(int argc, char ** argv) {
     }
 
     std::string generated;
-    if (!run_completion(model, ensure_chat_prompt(prompt), n_predict, n_ctx, &generated, true)) {
+    const std::string prompt_text = build_chat_prompt(model, { { "user", prompt } }, true);
+    if (!run_completion(model, prompt_text, n_predict, n_ctx, &generated, true)) {
         llama_model_free(model);
         return 1;
     }
 
+    generated = strip_assistant_prefix(trim_newlines(generated));
     std::fputc('\n', stdout);
     llama_model_free(model);
     return 0;
