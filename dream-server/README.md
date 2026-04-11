@@ -104,12 +104,13 @@ See [`docs/MOBILE-SHELL-QUICKSTART.md`](docs/MOBILE-SHELL-QUICKSTART.md) for the
 
 ```bash
 sh ./install.sh
-sh ./dream-mobile.sh intent "abrir calculadora"
+sh ./dream-mobile.sh status
+sh ./dream-mobile.sh doctor
 ```
 
-On iOS, the preview now targets a CLI + Apple Shortcuts loop. `sh ./dream-mobile.sh intent` returns stable JSON for Shortcut routing, and `prompt` keeps the same interface so a future local wasm backend can slot in without changing the shell contract.
+On iOS, the preview now targets a CLI + Apple Shortcuts loop. `sh ./dream-mobile.sh intent` returns stable JSON for Shortcut routing, `install` downloads `Qwen3-0.6B`, and the repo now includes a host-side experimental WASI builder for the future `llama-cli.wasm` runtime. Real local Qwen chat in `a-Shell` is still blocked by the published `wasi-sdk` exception runtime.
 
-See [`docs/IOS-ASHELL-SHORTCUTS.md`](docs/IOS-ASHELL-SHORTCUTS.md) for the current flow.
+See [`docs/IOS-ASHELL-SHORTCUTS.md`](docs/IOS-ASHELL-SHORTCUTS.md) and [`docs/IOS-ASHELL-WASM-RUNTIME.md`](docs/IOS-ASHELL-WASM-RUNTIME.md) for the current flow and blocker.
 
 ---
 

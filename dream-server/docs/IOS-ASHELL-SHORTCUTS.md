@@ -112,4 +112,12 @@ The same CLI also reserves a slot for a future local wasm backend:
 - expected runner: `wasm`
 - expected binary path: `mobile-runtime/ios-ashell/bin/llama-cli.wasm`
 
+There is now a host-side experimental builder for that runtime in:
+
+- `dream-server/installers/mobile/build-ios-ashell-wasm-runtime.sh`
+
+Current runtime notes, including the `wasi-sdk` exception-runtime blocker, live in:
+
+- [`IOS-ASHELL-WASM-RUNTIME.md`](IOS-ASHELL-WASM-RUNTIME.md)
+
 When that runtime exists, `sh ./dream-mobile.sh prompt "..."` can switch to local prompt inference without changing the Shortcut contract.

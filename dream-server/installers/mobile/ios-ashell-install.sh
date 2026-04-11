@@ -32,6 +32,8 @@ MODEL_DIR="$ROOT_DIR/data/models/mobile"
 CONFIG_FILE="$ROOT_DIR/.dream-mobile.env"
 SHORTCUTS_DOC="$ROOT_DIR/docs/IOS-ASHELL-SHORTCUTS.md"
 SAMPLE_JSON="$IOS_SHORTCUTS_DIR/intent-sample.json"
+WASM_BUILD_HELPER="$ROOT_DIR/installers/mobile/build-ios-ashell-wasm-runtime.sh"
+WASM_BUILD_DOC="$ROOT_DIR/docs/IOS-ASHELL-WASM-RUNTIME.md"
 
 write_lines_file() {
     target_path="$1"
@@ -226,6 +228,8 @@ write_config() {
         "DREAM_MOBILE_WASM_RUNNER=\"wasm\"" \
         "DREAM_MOBILE_WASM_BINARY=\"$WASM_RUNTIME_PATH\"" \
         "DREAM_MOBILE_WASM_READY=\"$WASM_READY\"" \
+        "DREAM_MOBILE_WASM_BUILD_HELPER=\"$WASM_BUILD_HELPER\"" \
+        "DREAM_MOBILE_WASM_BUILD_DOC=\"$WASM_BUILD_DOC\"" \
         "DREAM_MOBILE_CONTEXT=\"$MOBILE_CONTEXT\"" \
         "DREAM_MOBILE_SHORTCUTS_DOC=\"$SHORTCUTS_DOC\"" \
         "DREAM_MOBILE_SHORTCUTS_SAMPLE=\"$SAMPLE_JSON\""
@@ -261,9 +265,11 @@ print_summary() {
     echo "Model:      $MODEL_NAME"
     echo "Model file: $MODEL_PATH"
     echo "Wasm path:  $WASM_RUNTIME_PATH"
+    echo "Host build: $WASM_BUILD_HELPER"
     echo ""
     echo "Use now:"
     echo "  sh ./dream-mobile.sh status"
+    echo "  sh ./dream-mobile.sh doctor"
     echo "  sh ./dream-mobile.sh intent \"abrir calculadora\""
     echo "  sh ./dream-mobile.sh prompt \"abrir safari no github\""
     echo ""
@@ -283,7 +289,11 @@ print_summary() {
     fi
     if [ ! -f "$WASM_RUNTIME_PATH" ]; then
         echo "Today the iOS path uses a local rule-based intent engine by default."
-        echo "If you later drop a wasm llama runtime at:"
+        echo "The repo also ships a host-side experimental builder here:"
+        echo "  $WASM_BUILD_HELPER"
+        echo "Current runtime notes live here:"
+        echo "  $WASM_BUILD_DOC"
+        echo "If you later drop a working wasm llama runtime at:"
         echo "  $WASM_RUNTIME_PATH"
         echo "the same CLI can switch to local prompt inference."
     fi

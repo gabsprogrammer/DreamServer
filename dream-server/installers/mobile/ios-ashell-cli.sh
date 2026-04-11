@@ -11,11 +11,13 @@ INSTALLER="$ROOT_DIR/installers/mobile/ios-ashell-install.sh"
 
 RED='[0;31m'
 GREEN='[0;32m'
+YELLOW='[1;33m'
 CYAN='[0;36m'
 NC='[0m'
 
 log()     { printf '%s[dream-ios]%s %s\n' "$CYAN" "$NC" "$1"; }
 success() { printf '%s[ok]%s %s\n' "$GREEN" "$NC" "$1"; }
+warn()    { printf '%s[warn]%s %s\n' "$YELLOW" "$NC" "$1"; }
 fail()    { printf '%s[error]%s %s\n' "$RED" "$NC" "$1" >&2; exit 1; }
 
 usage() {
@@ -25,6 +27,7 @@ Dream Server iOS / a-Shell Preview
 Usage:
   sh ./dream-mobile.sh install
   sh ./dream-mobile.sh status
+  sh ./dream-mobile.sh doctor
   sh ./dream-mobile.sh apps
   sh ./dream-mobile.sh intent "abrir calculadora"
   sh ./dream-mobile.sh prompt "abrir safari no github"
@@ -32,6 +35,7 @@ Usage:
 Commands:
   install      Set up the iOS preview files and Shortcut examples
   status       Show engine/runtime status
+  doctor       Explain why local Qwen chat is or is not ready
   apps         List the stable app IDs exposed for Shortcuts
   intent       Return JSON for Apple Shortcuts
   intent-text  Return pipe-delimited text for simple Shortcut parsing
@@ -286,6 +290,11 @@ local_wasm_ready() {
     return 0
 }
 
+print_wasm_followup() {
+    [ -n "${DREAM_MOBILE_WASM_BUILD_HELPER:-}" ] && echo "Wasm builder: ${DREAM_MOBILE_WASM_BUILD_HELPER}"
+    [ -n "${DREAM_MOBILE_WASM_BUILD_DOC:-}" ] && echo "Wasm notes: ${DREAM_MOBILE_WASM_BUILD_DOC}"
+}
+
 status() {
     load_config
     require_config_var DREAM_MOBILE_PLATFORM
@@ -303,7 +312,25 @@ status() {
     echo "Wasm bin:  ${DREAM_MOBILE_WASM_BINARY}"
     echo "Wasm ready:${DREAM_MOBILE_WASM_READY}"
     echo "Shortcut doc: ${DREAM_MOBILE_SHORTCUTS_DOC}"
+    print_wasm_followup
     success "iOS preview config loaded"
+}
+
+doctor() {
+    status
+
+    if local_wasm_ready; then
+        success "The local wasm runtime is present, so 'prompt' and 'chat' can talk to the model."
+        return 0
+    fi
+
+    warn "The Qwen GGUF can be downloaded on iOS today, but chat still needs a linked wasm runtime at ${DREAM_MOBILE_WASM_BINARY}."
+    warn "The current host-side build path reaches llama.cpp successfully, but the published wasi-sdk still fails to link the C++ exception runtime symbols that llama.cpp needs on wasm32-wasi-threads."
+    echo "Missing symbols seen in the current build path include:"
+    echo "  __cxa_allocate_exception"
+    echo "  __cxa_throw"
+    echo "  __wasm_lpad_context"
+    echo "  _Unwind_CallPersonality"
 }
 
 intent_json() {
@@ -340,7 +367,7 @@ prompt_once() {
 interactive_chat() {
     load_config
     if ! local_wasm_ready; then
-        fail "Interactive chat on iOS needs a local wasm llama runtime plus the GGUF file. Use 'prompt' or 'intent' for the current Shortcut-driven preview."
+        fail "Interactive chat on iOS still needs a linked wasm runtime at ${DREAM_MOBILE_WASM_BINARY:-<unset>}. Run 'sh ./dream-mobile.sh doctor' for the current blocker and host build helper."
     fi
 
     exec "${DREAM_MOBILE_WASM_RUNNER}" "${DREAM_MOBILE_WASM_BINARY}" \
@@ -358,6 +385,10 @@ case "$cmd" in
     status)
         shift
         status "$@"
+        ;;
+    doctor)
+        shift
+        doctor "$@"
         ;;
     apps)
         shift

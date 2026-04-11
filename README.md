@@ -150,12 +150,13 @@ See the [Mobile Shell Quickstart](dream-server/docs/MOBILE-SHELL-QUICKSTART.md) 
 
 ```sh
 sh ./install.sh
-sh ./dream-mobile.sh intent "abrir calculadora"
+sh ./dream-mobile.sh status
+sh ./dream-mobile.sh doctor
 ```
 
-This preview path is CLI-first and Shortcut-friendly. It sets up an iOS shell contract that returns JSON intents for Apple Shortcuts today, while keeping room for a future local wasm backend behind the same commands.
+This preview path is CLI-first and Shortcut-friendly. It downloads `Qwen3-0.6B` on-device today, returns JSON intents for Apple Shortcuts, and now ships a host-side experimental WASI builder for the future `llama-cli.wasm` runtime. The current blocker for real local Qwen chat in `a-Shell` is the published `wasi-sdk` exception runtime, which the repo documents explicitly.
 
-See the [iOS a-Shell + Apple Shortcuts guide](dream-server/docs/IOS-ASHELL-SHORTCUTS.md) for details.
+See the [iOS a-Shell + Apple Shortcuts guide](dream-server/docs/IOS-ASHELL-SHORTCUTS.md) and the [iOS a-Shell WASM runtime notes](dream-server/docs/IOS-ASHELL-WASM-RUNTIME.md) for details.
 
 </details>
 
