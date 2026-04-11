@@ -308,6 +308,9 @@ status() {
     echo "Engine:    ${DREAM_MOBILE_ENGINE}"
     echo "Model:     ${DREAM_MOBILE_MODEL_NAME}"
     echo "Model file:${DREAM_MOBILE_MODEL_PATH}"
+    echo "Context:   ${DREAM_MOBILE_CONTEXT}"
+    echo "Reply tok: ${DREAM_MOBILE_REPLY_TOKENS:-48}"
+    echo "History:   ${DREAM_MOBILE_HISTORY_MESSAGES:-5} messages"
     echo "Downloaded:${DREAM_MOBILE_MODEL_DOWNLOADED}"
     echo "Wasm bin:  ${DREAM_MOBILE_WASM_BINARY}"
     echo "Wasm ready:${DREAM_MOBILE_WASM_READY}"
@@ -355,7 +358,7 @@ prompt_once() {
         "${DREAM_MOBILE_WASM_RUNNER}" "${DREAM_MOBILE_WASM_BINARY}" \
             -m "${DREAM_MOBILE_MODEL_PATH}" \
             -c "${DREAM_MOBILE_CONTEXT:-2048}" \
-            -n 64 \
+            -n "${DREAM_MOBILE_REPLY_TOKENS:-48}" \
             -p "$*"
         return 0
     fi
@@ -373,6 +376,8 @@ interactive_chat() {
     exec "${DREAM_MOBILE_WASM_RUNNER}" "${DREAM_MOBILE_WASM_BINARY}" \
         -m "${DREAM_MOBILE_MODEL_PATH}" \
         -c "${DREAM_MOBILE_CONTEXT:-2048}" \
+        -n "${DREAM_MOBILE_REPLY_TOKENS:-48}" \
+        --history "${DREAM_MOBILE_HISTORY_MESSAGES:-5}" \
         -i
 }
 

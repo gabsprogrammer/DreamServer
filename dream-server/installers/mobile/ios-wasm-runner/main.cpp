@@ -1,5 +1,7 @@
 #include "llama.h"
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -14,9 +16,10 @@ static constexpr const char * kSystemPrompt =
     "Do not reveal chain-of-thought. "
     "Never output <think> tags or hidden reasoning. "
     "Give only the final answer.";
+static constexpr size_t kDefaultMaxHistoryMessages = 5;
 
 static void usage(const char * argv0) {
-    std::fprintf(stderr, "usage: %s -m model.gguf [-p prompt] [-n n_predict] [-c ctx] [-i]\n", argv0);
+    std::fprintf(stderr, "usage: %s -m model.gguf [-p prompt] [-n n_predict] [-c ctx] [--history n_messages] [-i]\n", argv0);
 }
 
 static void quiet_log_callback(enum ggml_log_level level, const char * text, void * /*user_data*/) {
@@ -169,6 +172,22 @@ static void flush_filtered_output(
     state->carry.clear();
 }
 
+static void trim_transcript_for_speed(std::vector<chat_turn> * transcript, size_t max_history_messages) {
+    if (transcript->size() <= 1) {
+        return;
+    }
+
+    const size_t non_system_messages = transcript->size() - 1;
+    if (non_system_messages <= max_history_messages) {
+        return;
+    }
+
+    const size_t drop_count = non_system_messages - max_history_messages;
+    transcript->erase(
+        transcript->begin() + 1,
+        transcript->begin() + 1 + static_cast<std::ptrdiff_t>(drop_count));
+}
+
 static std::string build_fallback_chat_prompt(const std::vector<chat_turn> & turns, bool add_assistant) {
     std::string prompt;
     for (const chat_turn & turn : turns) {
@@ -316,7 +335,7 @@ static bool run_completion(
     return true;
 }
 
-static int run_interactive_chat(llama_model * model, int n_predict, int n_ctx) {
+static int run_interactive_chat(llama_model * model, int n_predict, int n_ctx, size_t max_history_messages) {
     std::vector<chat_turn> transcript = { { "system", kSystemPrompt } };
     char line[2048];
 
@@ -338,6 +357,7 @@ static int run_interactive_chat(llama_model * model, int n_predict, int n_ctx) {
         }
 
         transcript.push_back({ "user", user_input });
+        trim_transcript_for_speed(&transcript, max_history_messages);
         const std::string prompt_text = build_chat_prompt(model, transcript, true);
 
         std::string reply;
@@ -359,8 +379,9 @@ static int run_interactive_chat(llama_model * model, int n_predict, int n_ctx) {
 int main(int argc, char ** argv) {
     const char * model_path = nullptr;
     const char * prompt = "oi";
-    int n_predict = 64;
+    int n_predict = 48;
     int n_ctx = 2048;
+    size_t max_history_messages = kDefaultMaxHistoryMessages;
     bool interactive = false;
 
     for (int i = 1; i < argc; ++i) {
@@ -372,6 +393,8 @@ int main(int argc, char ** argv) {
             n_predict = std::atoi(argv[++i]);
         } else if (std::strcmp(argv[i], "-c") == 0 && i + 1 < argc) {
             n_ctx = std::atoi(argv[++i]);
+        } else if ((std::strcmp(argv[i], "--history") == 0 || std::strcmp(argv[i], "--history-messages") == 0) && i + 1 < argc) {
+            max_history_messages = static_cast<size_t>(std::max(0, std::atoi(argv[++i])));
         } else if (std::strcmp(argv[i], "-i") == 0) {
             interactive = true;
         } else {
@@ -400,7 +423,7 @@ int main(int argc, char ** argv) {
     }
 
     if (interactive) {
-        const int rc = run_interactive_chat(model, n_predict, n_ctx);
+        const int rc = run_interactive_chat(model, n_predict, n_ctx, max_history_messages);
         llama_model_free(model);
         return rc;
     }
