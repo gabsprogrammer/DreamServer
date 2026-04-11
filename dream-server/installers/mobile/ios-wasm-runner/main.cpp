@@ -20,7 +20,7 @@ static constexpr const char * kSystemPrompt =
 static constexpr size_t kDefaultMaxHistoryMessages = 5;
 
 static void usage(const char * argv0) {
-    std::fprintf(stderr, "usage: %s -m model.gguf [-p prompt] [-n n_predict] [-c ctx] [--history n_messages] [-i]\n", argv0);
+    std::fprintf(stderr, "usage: %s -m model.gguf [-p prompt] [-n n_predict] [-c ctx] [--history n_messages] [--fast-prompt] [--fast-chat] [-i]\n", argv0);
 }
 
 static void quiet_log_callback(enum ggml_log_level level, const char * text, void * /*user_data*/) {
@@ -403,6 +403,47 @@ static int run_interactive_chat(llama_model * model, int n_predict, int n_ctx, s
     }
 }
 
+static int run_interactive_fast_chat(llama_model * model, int n_predict, int n_ctx, size_t max_history_messages) {
+    std::vector<chat_turn> transcript;
+    char line[2048];
+
+    while (true) {
+        std::fputs("you> ", stdout);
+        std::fflush(stdout);
+
+        if (std::fgets(line, sizeof(line), stdin) == nullptr) {
+            std::fputc('\n', stdout);
+            return 0;
+        }
+
+        std::string user_input = trim_newlines(line);
+        if (user_input.empty()) {
+            continue;
+        }
+        if (user_input == "/exit" || user_input == "exit" || user_input == "quit" || user_input == "/quit") {
+            return 0;
+        }
+
+        transcript.push_back({ "user", "/no_think " + user_input });
+        trim_transcript_for_speed(&transcript, max_history_messages);
+        const std::string prompt_text = build_fallback_chat_prompt(transcript, true);
+
+        std::string reply;
+        std::fputs("assistant> ", stdout);
+        std::fflush(stdout);
+
+        if (!run_completion(model, prompt_text, n_predict, n_ctx, &reply, true)) {
+            return 1;
+        }
+
+        reply = strip_assistant_prefix(trim_newlines(reply));
+        std::fputc('\n', stdout);
+        std::fflush(stdout);
+
+        transcript.push_back({ "assistant", reply });
+    }
+}
+
 int main(int argc, char ** argv) {
     const char * model_path = nullptr;
     const char * prompt = "oi";
@@ -410,6 +451,8 @@ int main(int argc, char ** argv) {
     int n_ctx = 2048;
     size_t max_history_messages = kDefaultMaxHistoryMessages;
     bool interactive = false;
+    bool fast_prompt = false;
+    bool fast_chat = false;
 
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "-m") == 0 && i + 1 < argc) {
@@ -422,6 +465,10 @@ int main(int argc, char ** argv) {
             n_ctx = std::atoi(argv[++i]);
         } else if ((std::strcmp(argv[i], "--history") == 0 || std::strcmp(argv[i], "--history-messages") == 0) && i + 1 < argc) {
             max_history_messages = static_cast<size_t>(std::max(0, std::atoi(argv[++i])));
+        } else if (std::strcmp(argv[i], "--fast-prompt") == 0) {
+            fast_prompt = true;
+        } else if (std::strcmp(argv[i], "--fast-chat") == 0) {
+            fast_chat = true;
         } else if (std::strcmp(argv[i], "-i") == 0) {
             interactive = true;
         } else {
@@ -450,15 +497,22 @@ int main(int argc, char ** argv) {
     }
 
     if (interactive) {
-        const int rc = run_interactive_chat(model, n_predict, n_ctx, max_history_messages);
+        const int rc = fast_chat
+            ? run_interactive_fast_chat(model, n_predict, n_ctx, max_history_messages)
+            : run_interactive_chat(model, n_predict, n_ctx, max_history_messages);
         llama_model_free(model);
         return rc;
     }
 
     std::string generated;
-    const std::string prompt_text = build_chat_prompt(model, { { "system", kSystemPrompt }, { "user", prompt } }, true);
-    const int retry_n_predict = std::max(n_predict * 2, 96);
-    if (!run_completion_with_retry(model, prompt_text, n_predict, retry_n_predict, n_ctx, &generated, true)) {
+    const std::string prompt_text = fast_prompt
+        ? build_fallback_chat_prompt({ { "user", "/no_think " + std::string(prompt) } }, true)
+        : build_chat_prompt(model, { { "system", kSystemPrompt }, { "user", prompt } }, true);
+
+    const bool ok = fast_prompt
+        ? run_completion(model, prompt_text, n_predict, n_ctx, &generated, true)
+        : run_completion_with_retry(model, prompt_text, n_predict, std::max(n_predict * 2, 96), n_ctx, &generated, true);
+    if (!ok) {
         llama_model_free(model);
         return 1;
     }

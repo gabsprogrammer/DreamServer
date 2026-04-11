@@ -39,8 +39,9 @@ Commands:
   apps         List the stable app IDs exposed for Shortcuts
   intent       Return JSON for Apple Shortcuts
   intent-text  Return pipe-delimited text for simple Shortcut parsing
-  prompt       Use local wasm inference when available; otherwise fall back to intent mode
-  chat         Interactive chat when a wasm runtime is available
+  prompt       Fast one-shot prompt for iPhone shell use
+  chat         Fast interactive chat for iPhone shell use
+  chat-safe    Slower but more structured interactive chat
 EOF
 }
 
@@ -309,8 +310,8 @@ status() {
     echo "Model:     ${DREAM_MOBILE_MODEL_NAME}"
     echo "Model file:${DREAM_MOBILE_MODEL_PATH}"
     echo "Context:   ${DREAM_MOBILE_CONTEXT}"
-    echo "Prompt tok:${DREAM_MOBILE_REPLY_TOKENS:-48}"
-    echo "Chat tok:  ${DREAM_MOBILE_CHAT_REPLY_TOKENS:-72}"
+    echo "Prompt tok:${DREAM_MOBILE_REPLY_TOKENS:-64}"
+    echo "Chat tok:  ${DREAM_MOBILE_CHAT_REPLY_TOKENS:-128}"
     echo "History:   ${DREAM_MOBILE_HISTORY_MESSAGES:-5} messages"
     echo "Downloaded:${DREAM_MOBILE_MODEL_DOWNLOADED}"
     echo "Wasm bin:  ${DREAM_MOBILE_WASM_BINARY}"
@@ -359,7 +360,8 @@ prompt_once() {
         "${DREAM_MOBILE_WASM_RUNNER}" "${DREAM_MOBILE_WASM_BINARY}" \
             -m "${DREAM_MOBILE_MODEL_PATH}" \
             -c "${DREAM_MOBILE_CONTEXT:-2048}" \
-            -n "${DREAM_MOBILE_REPLY_TOKENS:-48}" \
+            -n "${DREAM_MOBILE_REPLY_TOKENS:-64}" \
+            --fast-prompt \
             -p "$*"
         return 0
     fi
@@ -377,7 +379,22 @@ interactive_chat() {
     exec "${DREAM_MOBILE_WASM_RUNNER}" "${DREAM_MOBILE_WASM_BINARY}" \
         -m "${DREAM_MOBILE_MODEL_PATH}" \
         -c "${DREAM_MOBILE_CONTEXT:-2048}" \
-        -n "${DREAM_MOBILE_CHAT_REPLY_TOKENS:-72}" \
+        -n "${DREAM_MOBILE_CHAT_REPLY_TOKENS:-128}" \
+        --history "${DREAM_MOBILE_HISTORY_MESSAGES:-5}" \
+        --fast-chat \
+        -i
+}
+
+interactive_chat_safe() {
+    load_config
+    if ! local_wasm_ready; then
+        fail "Interactive chat on iOS still needs a linked wasm runtime at ${DREAM_MOBILE_WASM_BINARY:-<unset>}. Run 'sh ./dream-mobile.sh doctor' for the current blocker and host build helper."
+    fi
+
+    exec "${DREAM_MOBILE_WASM_RUNNER}" "${DREAM_MOBILE_WASM_BINARY}" \
+        -m "${DREAM_MOBILE_MODEL_PATH}" \
+        -c "${DREAM_MOBILE_CONTEXT:-2048}" \
+        -n "${DREAM_MOBILE_CHAT_REPLY_TOKENS:-128}" \
         --history "${DREAM_MOBILE_HISTORY_MESSAGES:-5}" \
         -i
 }
@@ -415,6 +432,10 @@ case "$cmd" in
     chat)
         shift
         interactive_chat "$@"
+        ;;
+    chat-safe)
+        shift
+        interactive_chat_safe "$@"
         ;;
     -h|--help|help)
         usage
