@@ -24,6 +24,7 @@ DOWNLOAD_MODEL=true
 MODEL_ID="qwen3-0.6b"
 MOBILE_CONTEXT=1024
 MOBILE_REPLY_TOKENS=48
+MOBILE_CHAT_REPLY_TOKENS=96
 MOBILE_HISTORY_MESSAGES=5
 IGNORED_FLAGS=""
 
@@ -66,6 +67,7 @@ Options:
   --model NAME           Model preset to track in config (default: qwen3-0.6b)
   --context N            Context size to use when a wasm runtime is available
   --reply-tokens N       Default max reply tokens for prompt/chat on iOS
+  --chat-reply-tokens N  Default max reply tokens for interactive chat on iOS
   --history-messages N   Max recent chat messages to keep in the fast iOS profile
   --download-model       Download the GGUF during install (default)
   --no-model-download    Skip the default GGUF download for now
@@ -118,6 +120,7 @@ resolve_model() {
 
     ensure_integer "$MOBILE_CONTEXT"
     ensure_integer "$MOBILE_REPLY_TOKENS"
+    ensure_integer "$MOBILE_CHAT_REPLY_TOKENS"
     ensure_integer "$MOBILE_HISTORY_MESSAGES"
     MODEL_PATH="$MODEL_DIR/$MODEL_FILE"
     WASM_RUNTIME_PATH="$IOS_BIN_DIR/llama-cli.wasm"
@@ -136,6 +139,10 @@ parse_args() {
                 ;;
             --reply-tokens|--max-tokens)
                 MOBILE_REPLY_TOKENS="${2:-}"
+                shift 2
+                ;;
+            --chat-reply-tokens)
+                MOBILE_CHAT_REPLY_TOKENS="${2:-}"
                 shift 2
                 ;;
             --history-messages|--history)
@@ -247,6 +254,7 @@ write_config() {
         "DREAM_MOBILE_WASM_BUILD_DOC=\"$WASM_BUILD_DOC\"" \
         "DREAM_MOBILE_CONTEXT=\"$MOBILE_CONTEXT\"" \
         "DREAM_MOBILE_REPLY_TOKENS=\"$MOBILE_REPLY_TOKENS\"" \
+        "DREAM_MOBILE_CHAT_REPLY_TOKENS=\"$MOBILE_CHAT_REPLY_TOKENS\"" \
         "DREAM_MOBILE_HISTORY_MESSAGES=\"$MOBILE_HISTORY_MESSAGES\"" \
         "DREAM_MOBILE_SHORTCUTS_DOC=\"$SHORTCUTS_DOC\"" \
         "DREAM_MOBILE_SHORTCUTS_SAMPLE=\"$SAMPLE_JSON\""
@@ -282,7 +290,8 @@ print_summary() {
     echo "Model:      $MODEL_NAME"
     echo "Model file: $MODEL_PATH"
     echo "Context:    $MOBILE_CONTEXT"
-    echo "Reply tok:  $MOBILE_REPLY_TOKENS"
+    echo "Prompt tok: $MOBILE_REPLY_TOKENS"
+    echo "Chat tok:   $MOBILE_CHAT_REPLY_TOKENS"
     echo "History:    $MOBILE_HISTORY_MESSAGES messages"
     echo "Wasm path:  $WASM_RUNTIME_PATH"
     echo "Host build: $WASM_BUILD_HELPER"

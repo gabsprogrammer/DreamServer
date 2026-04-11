@@ -335,6 +335,27 @@ static bool run_completion(
     return true;
 }
 
+static bool run_completion_with_retry(
+        llama_model * model,
+        const std::string & prompt_text,
+        int n_predict,
+        int retry_n_predict,
+        int n_ctx,
+        std::string * generated_text,
+        bool stream_output) {
+    generated_text->clear();
+
+    if (!run_completion(model, prompt_text, n_predict, n_ctx, generated_text, stream_output)) {
+        return false;
+    }
+
+    if (!generated_text->empty() || retry_n_predict <= n_predict) {
+        return true;
+    }
+
+    return run_completion(model, prompt_text, retry_n_predict, n_ctx, generated_text, stream_output);
+}
+
 static int run_interactive_chat(llama_model * model, int n_predict, int n_ctx, size_t max_history_messages) {
     std::vector<chat_turn> transcript = { { "system", kSystemPrompt } };
     char line[2048];
@@ -364,11 +385,16 @@ static int run_interactive_chat(llama_model * model, int n_predict, int n_ctx, s
         std::fputs("assistant> ", stdout);
         std::fflush(stdout);
 
-        if (!run_completion(model, prompt_text, n_predict, n_ctx, &reply, true)) {
+        const int retry_n_predict = std::max(n_predict * 2, 128);
+        if (!run_completion_with_retry(model, prompt_text, n_predict, retry_n_predict, n_ctx, &reply, true)) {
             return 1;
         }
 
         reply = strip_assistant_prefix(trim_newlines(reply));
+        if (reply.empty()) {
+            reply = "Desculpe, fiquei sem resposta visivel. Tente uma pergunta mais curta.";
+            std::fputs(reply.c_str(), stdout);
+        }
         std::fputc('\n', stdout);
         std::fflush(stdout);
 
@@ -430,12 +456,17 @@ int main(int argc, char ** argv) {
 
     std::string generated;
     const std::string prompt_text = build_chat_prompt(model, { { "system", kSystemPrompt }, { "user", prompt } }, true);
-    if (!run_completion(model, prompt_text, n_predict, n_ctx, &generated, true)) {
+    const int retry_n_predict = std::max(n_predict * 2, 96);
+    if (!run_completion_with_retry(model, prompt_text, n_predict, retry_n_predict, n_ctx, &generated, true)) {
         llama_model_free(model);
         return 1;
     }
 
     generated = strip_assistant_prefix(trim_newlines(generated));
+    if (generated.empty()) {
+        generated = "Desculpe, fiquei sem resposta visivel. Tente uma pergunta mais curta.";
+        std::fputs(generated.c_str(), stdout);
+    }
     std::fputc('\n', stdout);
     llama_model_free(model);
     return 0;
