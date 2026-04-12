@@ -32,6 +32,7 @@ sh ./install.sh --no-model-download
 sh ./dream-mobile.sh intent "abrir calculadora"
 sh ./dream-mobile.sh intent "abrir safari no github"
 sh ./dream-mobile.sh act "enviar email para ksgeladeira@gmail.com sobre confirmar a reuniao de amanha as 14h"
+sh ./dream-mobile.sh chat
 sh ./dream-mobile.sh prompt "pesquisar clima em sao paulo"
 sh ./dream-mobile.sh apps
 ```
@@ -69,6 +70,7 @@ For `compose_email`, the payload now also includes a ready-to-open `mailto_url`.
 
 - `intent`: only returns the structured action payload
 - `act`: tries to perform the action directly inside `a-Shell`
+- `chat`: smart shell chat; action-like requests are routed automatically
 
 Today, `act` can directly handle:
 
@@ -83,6 +85,25 @@ sh ./dream-mobile.sh act "enviar email para ksgeladeira@gmail.com sobre confirma
 ```
 
 That should open a draft in the current default email app on iPhone.
+
+## Direct Email Sending
+
+Direct invisible sending is not something `a-Shell` can force into Mail or Gmail by itself.
+
+The practical automatic route on iPhone is:
+
+1. create one Shortcut once, for example `Dream Server Send Email`
+2. make that Shortcut accept text input
+3. parse the JSON input into `to`, `subject`, and `body`
+4. use a Mail / `Send Email` action inside the Shortcut
+
+Then install Dream Server with:
+
+```sh
+sh ./install.sh --email-shortcut "Dream Server Send Email"
+```
+
+After that, `act` and `chat` can route email sends into that Shortcut automatically instead of opening a draft.
 
 ## Recommended Shortcut shape
 
@@ -171,6 +192,28 @@ That flow is still a single tap for the user:
 - the Shortcut opens the ready email draft automatically
 
 If you want automatic sending later, swap step 5 for a Mail / `Send Email` action that uses `action.to`, `action.subject`, and `action.body`.
+
+## Smart Chat
+
+`chat` now runs in a shell-controlled mode:
+
+- normal questions go to the local Qwen model
+- action requests like `enviar email para ...` are routed automatically
+
+Examples:
+
+```sh
+sh ./dream-mobile.sh chat
+```
+
+Inside chat:
+
+```text
+you> quem foi alan turing
+you> enviar email para ksgeladeira@gmail.com sobre confirmar a reuniao de amanha as 14h
+```
+
+If `DREAM_MOBILE_EMAIL_SHORTCUT_NAME` is configured, the second line can trigger the configured Shortcut automatically.
 
 ## Why app IDs instead of app names
 

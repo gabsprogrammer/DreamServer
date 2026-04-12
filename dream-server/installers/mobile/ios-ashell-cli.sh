@@ -42,7 +42,8 @@ Commands:
   intent-text  Return pipe-delimited text for simple Shortcut parsing
   act          Perform supported actions directly in a-Shell when possible
   prompt       Legacy-fast one-shot prompt for iPhone shell use
-  chat         Legacy-fast interactive chat for iPhone shell use
+  chat         Smart shell chat with direct action routing
+  chat-raw     Legacy-fast interactive model chat
   chat-safe    Slower but more structured interactive chat
 EOF
 }
@@ -374,6 +375,25 @@ run_shortcut_direct() {
     open_url_direct "shortcuts://x-callback-url/run-shortcut?name=$encoded_name"
 }
 
+run_shortcut_direct_with_text() {
+    shortcut_name="$1"
+    shortcut_text="$2"
+    encoded_name=$(url_encode "$shortcut_name")
+    encoded_text=$(url_encode "$shortcut_text")
+    open_url_direct "shortcuts://x-callback-url/run-shortcut?name=$encoded_name&input=text&text=$encoded_text"
+}
+
+build_email_shortcut_payload_json() {
+    email_to="$1"
+    email_subject="$2"
+    email_body="$3"
+    printf '{'
+    printf '"to":"%s",' "$(json_escape "$email_to")"
+    printf '"subject":"%s",' "$(json_escape "$email_subject")"
+    printf '"body":"%s"' "$(json_escape "$email_body")"
+    printf '}\n'
+}
+
 perform_action() {
     action_type="$1"
     action_value="$2"
@@ -386,6 +406,12 @@ perform_action() {
             remainder=${action_value#*"$tab_char"}
             email_subject=${remainder%%"$tab_char"*}
             email_body=${remainder#*"$tab_char"}
+            if [ -n "${DREAM_MOBILE_EMAIL_SHORTCUT_NAME:-}" ]; then
+                payload=$(build_email_shortcut_payload_json "$email_to" "$email_subject" "$email_body")
+                run_shortcut_direct_with_text "${DREAM_MOBILE_EMAIL_SHORTCUT_NAME}" "$payload"
+                success "Envio delegando ao atalho ${DREAM_MOBILE_EMAIL_SHORTCUT_NAME}."
+                return 0
+            fi
             open_url_direct "$(build_mailto_url "$email_to" "$email_subject" "$email_body")"
             success "$spoken"
             ;;
@@ -517,6 +543,7 @@ status() {
     echo "Prompt tok:${DREAM_MOBILE_REPLY_TOKENS:-48}"
     echo "Chat tok:  ${DREAM_MOBILE_CHAT_REPLY_TOKENS:-64}"
     echo "History:   ${DREAM_MOBILE_HISTORY_MESSAGES:-1} turns"
+    echo "Email sc.: ${DREAM_MOBILE_EMAIL_SHORTCUT_NAME:-<draft-mode>}"
     echo "Downloaded:${DREAM_MOBILE_MODEL_DOWNLOADED}"
     echo "Wasm bin:  ${DREAM_MOBILE_WASM_BINARY}"
     echo "Wasm ready:${DREAM_MOBILE_WASM_READY}"
@@ -582,7 +609,88 @@ prompt_once() {
     print_json_reply "$ACTION_TYPE" "$ACTION_VALUE" "$SPOKEN" "$CONFIDENCE"
 }
 
-interactive_chat() {
+generate_model_text() {
+    model_prompt="$1"
+    "${DREAM_MOBILE_WASM_RUNNER}" "${DREAM_MOBILE_WASM_BINARY}" \
+        -m "${DREAM_MOBILE_MODEL_PATH}" \
+        -c "${DREAM_MOBILE_CONTEXT:-2048}" \
+        -n "${DREAM_MOBILE_CHAT_REPLY_TOKENS:-64}" \
+        --fast-prompt \
+        -p "$model_prompt"
+}
+
+cleanup_model_reply() {
+    printf '%s' "$1" \
+        | tr -d '\r' \
+        | sed '/^<think>/d; /^<\/think>/d; s/^Assistant:[[:space:]]*//; s/^assistant>[[:space:]]*//'
+}
+
+build_agent_prompt() {
+    last_user="$1"
+    last_assistant="$2"
+    current_user="$3"
+    cat <<EOF
+Voce e um assistente util no iPhone.
+Responda no mesmo idioma do usuario.
+Seja curto, direto e natural.
+Nao mostre raciocinio interno.
+
+Ultima troca:
+User: $last_user
+Assistant: $last_assistant
+
+User: $current_user
+Assistant:
+EOF
+}
+
+interactive_chat_agent() {
+    load_config
+    if ! local_wasm_ready; then
+        fail "Interactive chat on iOS still needs a linked wasm runtime at ${DREAM_MOBILE_WASM_BINARY:-<unset>}. Run 'sh ./dream-mobile.sh doctor' for the current blocker and host build helper."
+    fi
+
+    last_user=""
+    last_assistant=""
+
+    printf '%s\n' "Dream Server smart chat. Type /exit to leave."
+    printf '%s\n' "Action requests like 'enviar email ...' will be routed automatically."
+
+    while true; do
+        printf 'you> '
+        IFS= read -r user_input || break
+        user_input=$(trim_text "$user_input")
+        [ -n "$user_input" ] || continue
+
+        case "$user_input" in
+            /exit|exit|quit)
+                break
+                ;;
+        esac
+
+        intent_core "$user_input"
+        case "$ACTION_TYPE" in
+            compose_email|open_url|run_shortcut)
+                perform_action "$ACTION_TYPE" "$ACTION_VALUE" "$SPOKEN"
+                last_user="$user_input"
+                last_assistant="$SPOKEN"
+                continue
+                ;;
+        esac
+
+        agent_prompt=$(build_agent_prompt "$last_user" "$last_assistant" "$user_input")
+        raw_reply=$(generate_model_text "$agent_prompt")
+        clean_reply=$(cleanup_model_reply "$raw_reply")
+        clean_reply=$(trim_text "$clean_reply")
+        [ -n "$clean_reply" ] || clean_reply="Nao consegui responder direito agora. Tente reformular em uma frase curta."
+
+        printf 'assistant> %s\n' "$clean_reply"
+        last_user="$user_input"
+        last_assistant="$clean_reply"
+    done
+}
+
+interactive_chat_raw() {
     load_config
     if ! local_wasm_ready; then
         fail "Interactive chat on iOS still needs a linked wasm runtime at ${DREAM_MOBILE_WASM_BINARY:-<unset>}. Run 'sh ./dream-mobile.sh doctor' for the current blocker and host build helper."
@@ -647,7 +755,11 @@ case "$cmd" in
         ;;
     chat)
         shift
-        interactive_chat "$@"
+        interactive_chat_agent "$@"
+        ;;
+    chat-raw)
+        shift
+        interactive_chat_raw "$@"
         ;;
     chat-safe)
         shift
