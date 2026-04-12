@@ -362,7 +362,7 @@ prompt_once() {
             -m "${DREAM_MOBILE_MODEL_PATH}" \
             -c "${DREAM_MOBILE_CONTEXT:-2048}" \
             -n "${DREAM_MOBILE_REPLY_TOKENS:-64}" \
-            --legacy-prompt \
+            --fast-prompt \
             -p "$*"
         return 0
     fi
@@ -382,7 +382,7 @@ interactive_chat() {
         -c "${DREAM_MOBILE_CONTEXT:-2048}" \
         -n "${DREAM_MOBILE_CHAT_REPLY_TOKENS:-96}" \
         --history "${DREAM_MOBILE_HISTORY_MESSAGES:-3}" \
-        --legacy-chat \
+        --fast-chat \
         -i
 }
 
