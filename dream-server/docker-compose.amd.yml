@@ -42,9 +42,9 @@ services:
       - "${VIDEO_GID:-44}"
       - "${RENDER_GID:-992}"
     environment:
-      - HSA_OVERRIDE_GFX_VERSION=11.5.1
-      - HSA_XNACK=1
-      - ROCBLAS_USE_HIPBLASLT=1
+      - HSA_OVERRIDE_GFX_VERSION=${HSA_OVERRIDE_GFX_VERSION:-11.5.1}
+      - HSA_XNACK=${HSA_XNACK:-1}
+      - ROCBLAS_USE_HIPBLASLT=${ROCBLAS_USE_HIPBLASLT:-1}
       - LEMONADE_LLAMACPP_BACKEND=rocm
       - LEMONADE_LLAMACPP_ROCM_BIN=/opt/llama-custom/llama-server
       - LEMONADE_CTX_SIZE=${CTX_SIZE:-131072}
