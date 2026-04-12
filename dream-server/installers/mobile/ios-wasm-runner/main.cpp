@@ -17,7 +17,12 @@ static constexpr const char * kSystemPrompt =
     "Do not reveal chain-of-thought. "
     "Never output <think> tags or hidden reasoning. "
     "Give only the final answer.";
-static constexpr size_t kDefaultMaxHistoryMessages = 5;
+static constexpr const char * kLegacyFastSystemPrompt =
+    "Reply in the user's language. "
+    "Answer only the latest user message. "
+    "Avoid repeating old answers. "
+    "Keep replies short and direct.";
+static constexpr size_t kDefaultMaxHistoryMessages = 2;
 
 static void usage(const char * argv0) {
     std::fprintf(stderr, "usage: %s -m model.gguf [-p prompt] [-n n_predict] [-c ctx] [--history n_turns] [--legacy-prompt] [--legacy-chat] [-i]\n", argv0);
@@ -34,14 +39,6 @@ static std::string trim_newlines(std::string text) {
         text.pop_back();
     }
     return text;
-}
-
-static std::string ensure_chat_prompt(const std::string & raw_input) {
-    if (raw_input.find("Assistant:") != std::string::npos || raw_input.find("User:") != std::string::npos) {
-        return raw_input;
-    }
-
-    return "User: " + raw_input + "\nAssistant:";
 }
 
 static std::string trim_space(std::string text) {
@@ -198,20 +195,31 @@ static void trim_transcript_for_speed(std::vector<chat_turn> * transcript, size_
         transcript->begin() + static_cast<std::ptrdiff_t>(start_index + drop_count));
 }
 
-static void trim_fast_chat_turns(std::vector<chat_turn> * transcript, size_t max_turns) {
+static void trim_legacy_transcript(std::vector<chat_turn> * transcript, size_t max_turns) {
     if (transcript->empty()) {
         return;
     }
 
-    const size_t max_messages = max_turns * 2;
-    if (transcript->size() <= max_messages) {
+    const size_t start_index = transcript->front().role == "system" ? 1 : 0;
+    if (transcript->size() <= start_index) {
         return;
     }
 
-    const size_t drop_count = transcript->size() - max_messages;
-    transcript->erase(
-        transcript->begin(),
-        transcript->begin() + static_cast<std::ptrdiff_t>(drop_count));
+    while (true) {
+        const size_t payload_size = transcript->size() - start_index;
+        const bool pending_user = !transcript->empty() && transcript->back().role == "user";
+        const size_t limit = pending_user
+            ? (max_turns == 0 ? 0 : max_turns * 2 - 1)
+            : max_turns * 2;
+
+        if (payload_size <= limit || payload_size < 2) {
+            break;
+        }
+
+        transcript->erase(
+            transcript->begin() + static_cast<std::ptrdiff_t>(start_index),
+            transcript->begin() + static_cast<std::ptrdiff_t>(start_index + 2));
+    }
 }
 
 static std::string build_fallback_chat_prompt(const std::vector<chat_turn> & turns, bool add_assistant) {
@@ -318,7 +326,15 @@ static bool run_completion(
     llama_sampler_chain_params sparams = llama_sampler_chain_default_params();
     sparams.no_perf = true;
     llama_sampler * sampler = llama_sampler_chain_init(sparams);
-    llama_sampler_chain_add(sampler, llama_sampler_init_greedy());
+    if (filter_think_output) {
+        llama_sampler_chain_add(sampler, llama_sampler_init_greedy());
+    } else {
+        llama_sampler_chain_add(sampler, llama_sampler_init_penalties(64, 1.08f, 0.0f, 0.0f));
+        llama_sampler_chain_add(sampler, llama_sampler_init_top_k(32));
+        llama_sampler_chain_add(sampler, llama_sampler_init_top_p(0.90f, 1));
+        llama_sampler_chain_add(sampler, llama_sampler_init_temp(0.70f));
+        llama_sampler_chain_add(sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
+    }
     render_filter_state render_state;
 
     llama_batch batch = llama_batch_get_one(prompt_tokens.data(), n_prompt);
@@ -437,7 +453,7 @@ static int run_interactive_chat(llama_model * model, int n_predict, int n_ctx, s
 }
 
 static int run_interactive_legacy_chat(llama_model * model, int n_predict, int n_ctx, size_t max_history_turns) {
-    std::vector<chat_turn> transcript;
+    std::vector<chat_turn> transcript = { { "system", kLegacyFastSystemPrompt } };
     char line[2048];
 
     while (true) {
@@ -458,7 +474,7 @@ static int run_interactive_legacy_chat(llama_model * model, int n_predict, int n
         }
 
         transcript.push_back({ "user", user_input });
-        trim_fast_chat_turns(&transcript, max_history_turns);
+        trim_legacy_transcript(&transcript, max_history_turns);
         const std::string prompt_text = build_fallback_chat_prompt(transcript, true);
 
         std::string reply;
@@ -478,7 +494,7 @@ static int run_interactive_legacy_chat(llama_model * model, int n_predict, int n
         std::fflush(stdout);
 
         transcript.push_back({ "assistant", reply });
-        trim_fast_chat_turns(&transcript, max_history_turns);
+        trim_legacy_transcript(&transcript, max_history_turns);
     }
 }
 
@@ -544,7 +560,7 @@ int main(int argc, char ** argv) {
 
     std::string generated;
     const std::string prompt_text = legacy_prompt
-        ? ensure_chat_prompt(prompt)
+        ? build_fallback_chat_prompt({ { "system", kLegacyFastSystemPrompt }, { "user", prompt } }, true)
         : build_chat_prompt(model, { { "system", kSystemPrompt }, { "user", prompt } }, true);
 
     const bool ok = legacy_prompt
