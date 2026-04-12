@@ -92,7 +92,7 @@ Example:
 sh ./dream-mobile.sh intent "enviar email para ksgeladeira@gmail.com assunto teste texto oi, estou testando o Dream Server"
 ```
 
-You can also let the local Qwen draft the message for you:
+You can also ask Dream Server to draft the message for you from a topic:
 
 ```sh
 sh ./dream-mobile.sh intent "enviar email para ksgeladeira@gmail.com sobre confirmar a reuniao de amanha as 14h"
@@ -104,6 +104,26 @@ That should return a `compose_email` action with:
 - `subject`
 - `body`
 - `mailto_url`
+
+Today, this one-command email drafting path uses a stable local template generator so it works reliably inside the iPhone shell.
+
+If you want the Qwen model itself to write the email body, use a Shortcut with two shell steps:
+
+1. `Execute Command`:
+
+```sh
+cd /private/var/mobile/Containers/Data/Application/.../Documents/DreamServer.git
+sh ./installers/mobile/ios-ashell-cli.sh prompt "Escreva um email curto e natural sobre confirmar a reuniao de amanha as 14h"
+```
+
+2. Feed that output into:
+
+```sh
+cd /private/var/mobile/Containers/Data/Application/.../Documents/DreamServer.git
+sh ./installers/mobile/ios-ashell-cli.sh intent "enviar email para ksgeladeira@gmail.com assunto Confirmacao da reuniao texto $1"
+```
+
+That two-step Shortcut is more reliable than trying to invoke the local model from inside the `intent` router itself.
 
 ## One-tap Email Shortcut
 

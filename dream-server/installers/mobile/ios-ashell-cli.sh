@@ -168,52 +168,25 @@ extract_email_topic() {
     printf '%s\n' "$topic"
 }
 
-generate_email_draft_with_llm() {
+is_probably_portuguese() {
+    text="$1"
+    printf '%s' "$text" | grep -Eqi '(^|[[:space:]])(enviar|email|e-mail|assunto|texto|mensagem|sobre|reuniao|amanha|obrigado|oi|ola|para)($|[[:space:]])'
+}
+
+generate_email_draft_from_topic() {
     raw_request="$1"
-    email_to="$2"
-    topic_hint="$3"
+    topic_hint="$2"
 
-    local_wasm_ready || return 1
+    topic=$(trim_text "$topic_hint")
+    [ -n "$topic" ] || topic=$(trim_text "$raw_request")
 
-    prompt_request="$raw_request"
-    [ -n "$topic_hint" ] && prompt_request="$topic_hint"
-
-    llm_prompt=$(
-        cat <<EOF
-Voce escreve emails curtos, uteis e naturais no mesmo idioma do pedido.
-Responda EXATAMENTE em duas linhas e nada mais:
-SUBJECT: <assunto>
-BODY: <corpo do email em um unico paragrafo>
-
-Destinatario: $email_to
-Pedido do usuario: $prompt_request
-EOF
-    )
-
-    output=$("${DREAM_MOBILE_WASM_RUNNER}" "${DREAM_MOBILE_WASM_BINARY}" \
-        -m "${DREAM_MOBILE_MODEL_PATH}" \
-        -c "${DREAM_MOBILE_CONTEXT:-1024}" \
-        -n 96 \
-        --fast-prompt \
-        -p "$llm_prompt" 2>/dev/null || true)
-
-    output=$(printf '%s' "$output" | tr -d '\r')
-    subject=$(printf '%s\n' "$output" | sed -n 's/^SUBJECT:[[:space:]]*//p' | head -n 1)
-    body=$(printf '%s\n' "$output" | sed -n 's/^BODY:[[:space:]]*//p' | head -n 1)
-
-    subject=$(trim_text "$subject")
-    body=$(trim_text "$body")
-
-    if [ -z "$subject" ] && [ -n "$topic_hint" ]; then
-        subject="Sobre $topic_hint"
+    if is_probably_portuguese "$raw_request"; then
+        subject="Sobre $topic"
+        body="Oi! Estou entrando em contato sobre $topic. Quando puder, me avise. Obrigado!"
+    else
+        subject="About $topic"
+        body="Hi! I'm reaching out about $topic. When you have a moment, please let me know. Thanks!"
     fi
-    [ -n "$subject" ] || subject="Mensagem do Dream Server"
-
-    if [ -z "$body" ]; then
-        body=$(printf '%s\n' "$output" | sed '/^SUBJECT:/d; /^BODY:/d' | sed '/^[[:space:]]*$/d' | head -n 4 | tr '\n' ' ')
-        body=$(trim_text "$body")
-    fi
-    [ -n "$body" ] || body="Oi! Estou te enviando esta mensagem criada no Dream Server."
 
     printf '%s\t%s\n' "$subject" "$body"
 }
@@ -400,7 +373,7 @@ intent_core() {
         email_topic=$(extract_email_topic "$raw_input")
 
         if [ -z "$email_body" ] || [ -n "$email_topic" ]; then
-            generated=$(generate_email_draft_with_llm "$raw_input" "$email_to" "$email_topic" || true)
+            generated=$(generate_email_draft_from_topic "$raw_input" "$email_topic")
             if [ -n "$generated" ]; then
                 email_subject=${generated%%"$tab_char"*}
                 if [ "$email_subject" = "$generated" ]; then
