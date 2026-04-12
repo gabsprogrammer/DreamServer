@@ -44,31 +44,17 @@ if [ ! -f "$DREAM_MOBILE_MODEL_PATH" ]; then
     exit 1
 fi
 
-if [ $# -gt 0 ]; then
-    shift
-fi
-
 if [ "$CMD" = "prompt" ]; then
-    if [ $# -eq 0 ]; then
+    if [ "$#" -lt 2 ]; then
         echo "[error] provide a prompt"
         exit 1
     fi
-    exec "$DREAM_MOBILE_WASM_RUNNER" "$DREAM_MOBILE_WASM_BINARY" \
-        -m "$DREAM_MOBILE_MODEL_PATH" \
-        -c "$DREAM_MOBILE_CONTEXT" \
-        -n "$DREAM_MOBILE_REPLY_TOKENS" \
-        --fast-prompt \
-        -p "$*"
+    shift
+    exec "$DREAM_MOBILE_WASM_RUNNER" "$DREAM_MOBILE_WASM_BINARY" -m "$DREAM_MOBILE_MODEL_PATH" -c "$DREAM_MOBILE_CONTEXT" -n "$DREAM_MOBILE_REPLY_TOKENS" --fast-prompt -p "$*"
 fi
 
 if [ "$CMD" = "chat" ]; then
-    exec "$DREAM_MOBILE_WASM_RUNNER" "$DREAM_MOBILE_WASM_BINARY" \
-        -m "$DREAM_MOBILE_MODEL_PATH" \
-        -c "$DREAM_MOBILE_CONTEXT" \
-        -n "$DREAM_MOBILE_CHAT_REPLY_TOKENS" \
-        --history "$DREAM_MOBILE_HISTORY_MESSAGES" \
-        --fast-chat \
-        -i
+    exec "$DREAM_MOBILE_WASM_RUNNER" "$DREAM_MOBILE_WASM_BINARY" -m "$DREAM_MOBILE_MODEL_PATH" -c "$DREAM_MOBILE_CONTEXT" -n "$DREAM_MOBILE_CHAT_REPLY_TOKENS" --history "$DREAM_MOBILE_HISTORY_MESSAGES" --fast-chat -i
 fi
 
 echo "[error] unknown command: $CMD"
