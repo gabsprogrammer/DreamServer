@@ -73,25 +73,16 @@ trim_text() {
 }
 
 url_encode() {
-    text="$1"
+    text=$(printf '%s' "$1" | tr '\r\n' '  ')
     text=$(printf '%s' "$text" | sed \
         -e 's/%/%25/g' \
         -e 's/ /%20/g' \
-        -e 's/\r//g' \
-        -e ':a;N;$!ba;s/\n/%0A/g' \
-        -e 's/"/%22/g' \
-        -e "s/'/%27/g" \
         -e 's/#/%23/g' \
         -e 's/&/%26/g' \
         -e 's/+/%2B/g' \
         -e 's/,/%2C/g' \
-        -e 's/:/%3A/g' \
         -e 's/;/%3B/g' \
-        -e 's/</%3C/g' \
-        -e 's/=/%3D/g' \
-        -e 's/>/%3E/g' \
-        -e 's/?/%3F/g' \
-        -e 's/@/%40/g')
+        -e 's/?/%3F/g')
     printf '%s\n' "$text"
 }
 
@@ -129,7 +120,11 @@ extract_url() {
 }
 
 extract_email_address() {
-    printf '%s\n' "$1" | grep -Eio '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' | head -n 1 || true
+    printf '%s\n' "$1" \
+        | tr ' <>()[]{}"' '\n' \
+        | sed -n '/@/p' \
+        | head -n 1 \
+        | sed 's/[.,;:!?]*$//'
 }
 
 extract_email_subject() {
@@ -169,8 +164,14 @@ extract_email_topic() {
 }
 
 is_probably_portuguese() {
-    text="$1"
-    printf '%s' "$text" | grep -Eqi '(^|[[:space:]])(enviar|email|e-mail|assunto|texto|mensagem|sobre|reuniao|amanha|obrigado|oi|ola|para)($|[[:space:]])'
+    case "$(normalize_text "$1")" in
+        *enviar*|*email*|*e-mail*|*assunto*|*texto*|*mensagem*|*sobre*|*reuniao*|*amanha*|*obrigado*|*oi*|*ola*|*para*)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
 }
 
 generate_email_draft_from_topic() {
