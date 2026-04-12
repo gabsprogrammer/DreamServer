@@ -33,6 +33,7 @@ sh ./dream-mobile.sh intent "abrir calculadora"
 sh ./dream-mobile.sh intent "abrir safari no github"
 sh ./dream-mobile.sh act "enviar email para ksgeladeira@gmail.com sobre confirmar a reuniao de amanha as 14h"
 sh ./dream-mobile.sh chat
+sh ./dream-mobile.sh chat-agent
 sh ./dream-mobile.sh prompt "pesquisar clima em sao paulo"
 sh ./dream-mobile.sh apps
 ```
@@ -70,7 +71,8 @@ For `compose_email`, the payload now also includes a ready-to-open `mailto_url`.
 
 - `intent`: only returns the structured action payload
 - `act`: tries to perform the action directly inside `a-Shell`
-- `chat`: smart shell chat; action-like requests are routed automatically
+- `chat`: fastest local conversation mode
+- `chat-agent`: shell-controlled chat; action-like requests are routed automatically
 
 Today, `act` can directly handle:
 
@@ -195,7 +197,7 @@ If you want automatic sending later, swap step 5 for a Mail / `Send Email` actio
 
 ## Smart Chat
 
-`chat` now runs in a shell-controlled mode:
+`chat-agent` runs in a shell-controlled mode:
 
 - normal questions go to the local Qwen model
 - action requests like `enviar email para ...` are routed automatically
@@ -203,7 +205,7 @@ If you want automatic sending later, swap step 5 for a Mail / `Send Email` actio
 Examples:
 
 ```sh
-sh ./dream-mobile.sh chat
+sh ./dream-mobile.sh chat-agent
 ```
 
 Inside chat:
@@ -214,6 +216,12 @@ you> enviar email para ksgeladeira@gmail.com sobre confirmar a reuniao de amanha
 ```
 
 If `DREAM_MOBILE_EMAIL_SHORTCUT_NAME` is configured, the second line can trigger the configured Shortcut automatically.
+
+If you just want the fastest plain conversation, keep using:
+
+```sh
+sh ./dream-mobile.sh chat
+```
 
 ## Why app IDs instead of app names
 

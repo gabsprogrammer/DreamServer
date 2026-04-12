@@ -42,8 +42,8 @@ Commands:
   intent-text  Return pipe-delimited text for simple Shortcut parsing
   act          Perform supported actions directly in a-Shell when possible
   prompt       Legacy-fast one-shot prompt for iPhone shell use
-  chat         Smart shell chat with direct action routing
-  chat-raw     Legacy-fast interactive model chat
+  chat         Legacy-fast interactive model chat
+  chat-agent   Smart shell chat with direct action routing
   chat-safe    Slower but more structured interactive chat
 EOF
 }
@@ -631,7 +631,7 @@ status() {
     echo "Downloaded:${DREAM_MOBILE_MODEL_DOWNLOADED}"
     echo "Wasm bin:  ${DREAM_MOBILE_WASM_BINARY}"
     echo "Wasm ready:${DREAM_MOBILE_WASM_READY}"
-    echo "Profile:   legacy-fast default, chat-safe optional"
+    echo "Profile:   legacy-fast chat default, chat-agent optional"
     echo "Shortcut doc: ${DREAM_MOBILE_SHORTCUTS_DOC}"
     print_wasm_followup
     success "iOS preview config loaded"
@@ -939,11 +939,11 @@ case "$cmd" in
         ;;
     chat)
         shift
-        interactive_chat_agent "$@"
-        ;;
-    chat-raw)
-        shift
         interactive_chat_raw "$@"
+        ;;
+    chat-agent)
+        shift
+        interactive_chat_agent "$@"
         ;;
     chat-safe)
         shift
