@@ -2,9 +2,17 @@
 
 set -eu
 
-SCRIPT_DIR=$(dirname "$0")
-SCRIPT_DIR=$(cd "$SCRIPT_DIR" && pwd)
-ROOT_DIR=$(cd "$SCRIPT_DIR/../.." && pwd)
+ROOT_DIR=$(pwd)
+
+if [ ! -d "$ROOT_DIR/installers/mobile" ]; then
+    if [ -d "$ROOT_DIR/dream-server/installers/mobile" ]; then
+        ROOT_DIR="$ROOT_DIR/dream-server"
+    else
+        SCRIPT_DIR=$(dirname "$0")
+        SCRIPT_DIR=$(cd "$SCRIPT_DIR" && pwd)
+        ROOT_DIR=$(cd "$SCRIPT_DIR/../.." && pwd)
+    fi
+fi
 
 MODEL_DIR="$ROOT_DIR/data/models/mobile"
 MODEL_FILE="Qwen3-0.6B-Q4_0.gguf"
@@ -59,6 +67,7 @@ printf '%s\n' "DREAM_MOBILE_CHAT_REPLY_TOKENS=\"128\"" >> "$CONFIG_FILE"
 printf '%s\n' "DREAM_MOBILE_HISTORY_MESSAGES=\"5\"" >> "$CONFIG_FILE"
 
 echo "[ok] Rootshell preview configured"
+echo "Config:    $CONFIG_FILE"
 echo "Platform:  ios-rootshell"
 echo "Engine:    $ENGINE"
 echo "Model:     $MODEL_PATH"

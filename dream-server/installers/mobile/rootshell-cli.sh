@@ -2,10 +2,27 @@
 
 set -eu
 
-SCRIPT_DIR=$(dirname "$0")
-SCRIPT_DIR=$(cd "$SCRIPT_DIR" && pwd)
-ROOT_DIR=$(cd "$SCRIPT_DIR/../.." && pwd)
+ROOT_DIR=$(pwd)
+
+if [ ! -d "$ROOT_DIR/installers/mobile" ]; then
+    if [ -d "$ROOT_DIR/dream-server/installers/mobile" ]; then
+        ROOT_DIR="$ROOT_DIR/dream-server"
+    else
+        SCRIPT_DIR=$(dirname "$0")
+        SCRIPT_DIR=$(cd "$SCRIPT_DIR" && pwd)
+        ROOT_DIR=$(cd "$SCRIPT_DIR/../.." && pwd)
+    fi
+fi
+
 CONFIG_FILE="$ROOT_DIR/.dream-mobile.env"
+
+if [ ! -f "$CONFIG_FILE" ]; then
+    if [ -f "$(pwd)/.dream-mobile.env" ]; then
+        CONFIG_FILE="$(pwd)/.dream-mobile.env"
+    elif [ -f "$(pwd)/dream-server/.dream-mobile.env" ]; then
+        CONFIG_FILE="$(pwd)/dream-server/.dream-mobile.env"
+    fi
+fi
 
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "[error] Rootshell preview not installed yet."
@@ -18,6 +35,7 @@ fi
 CMD="${1:-status}"
 
 if [ "$CMD" = "status" ]; then
+    echo "Config:    $CONFIG_FILE"
     echo "Platform:  $DREAM_MOBILE_PLATFORM"
     echo "Mode:      $DREAM_MOBILE_MODE"
     echo "Engine:    $DREAM_MOBILE_ENGINE"
