@@ -43,7 +43,9 @@ if [ ! -f "$DREAM_MOBILE_MODEL_PATH" ]; then
     exit 1
 fi
 
-shift || true
+if [ $# -gt 0 ]; then
+    shift
+fi
 
 if [ "$CMD" = "prompt" ]; then
     if [ $# -eq 0 ]; then
