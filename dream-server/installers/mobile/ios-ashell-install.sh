@@ -22,10 +22,10 @@ DRY_RUN=false
 FORCE=false
 DOWNLOAD_MODEL=true
 MODEL_ID="qwen3-0.6b"
-MOBILE_CONTEXT=1024
+MOBILE_CONTEXT=2048
 MOBILE_REPLY_TOKENS=64
-MOBILE_CHAT_REPLY_TOKENS=128
-MOBILE_HISTORY_MESSAGES=5
+MOBILE_CHAT_REPLY_TOKENS=96
+MOBILE_HISTORY_MESSAGES=3
 IGNORED_FLAGS=""
 
 IOS_RUNTIME_DIR="$ROOT_DIR/mobile-runtime/ios-ashell"
@@ -68,7 +68,7 @@ Options:
   --context N            Context size to use when a wasm runtime is available
   --reply-tokens N       Default max reply tokens for prompt/chat on iOS
   --chat-reply-tokens N  Default max reply tokens for interactive chat on iOS
-  --history-messages N   Max recent chat messages to keep in the fast iOS profile
+  --history-messages N   Max recent chat turns to keep in the legacy-fast iOS chat
   --download-model       Download the GGUF during install (default)
   --no-model-download    Skip the default GGUF download for now
   --force                Re-write config and re-download the model if requested
@@ -80,7 +80,7 @@ Notes:
   - The install step downloads Qwen3-0.6B by default.
   - It can return JSON intents today for Apple Shortcuts.
   - If a local wasm llama runtime is added later, the same commands can use it.
-  - The default iOS profile is speed-oriented: shorter context, shorter replies, shorter chat memory.
+  - The default iOS profile is legacy-fast: rawer prompting, fast streaming, short chat memory.
 EOF
 }
 
@@ -292,7 +292,7 @@ print_summary() {
     echo "Context:    $MOBILE_CONTEXT"
     echo "Prompt tok: $MOBILE_REPLY_TOKENS"
     echo "Chat tok:   $MOBILE_CHAT_REPLY_TOKENS"
-    echo "History:    $MOBILE_HISTORY_MESSAGES messages"
+    echo "History:    $MOBILE_HISTORY_MESSAGES turns"
     echo "Wasm path:  $WASM_RUNTIME_PATH"
     echo "Host build: $WASM_BUILD_HELPER"
     echo ""

@@ -20,7 +20,7 @@ static constexpr const char * kSystemPrompt =
 static constexpr size_t kDefaultMaxHistoryMessages = 5;
 
 static void usage(const char * argv0) {
-    std::fprintf(stderr, "usage: %s -m model.gguf [-p prompt] [-n n_predict] [-c ctx] [--history n_messages] [--fast-prompt] [--fast-chat] [-i]\n", argv0);
+    std::fprintf(stderr, "usage: %s -m model.gguf [-p prompt] [-n n_predict] [-c ctx] [--history n_turns] [--legacy-prompt] [--legacy-chat] [-i]\n", argv0);
 }
 
 static void quiet_log_callback(enum ggml_log_level level, const char * text, void * /*user_data*/) {
@@ -34,6 +34,14 @@ static std::string trim_newlines(std::string text) {
         text.pop_back();
     }
     return text;
+}
+
+static std::string ensure_chat_prompt(const std::string & raw_input) {
+    if (raw_input.find("Assistant:") != std::string::npos || raw_input.find("User:") != std::string::npos) {
+        return raw_input;
+    }
+
+    return "User: " + raw_input + "\nAssistant:";
 }
 
 static std::string trim_space(std::string text) {
@@ -174,19 +182,36 @@ static void flush_filtered_output(
 }
 
 static void trim_transcript_for_speed(std::vector<chat_turn> * transcript, size_t max_history_messages) {
-    if (transcript->size() <= 1) {
+    if (transcript->empty()) {
         return;
     }
 
-    const size_t non_system_messages = transcript->size() - 1;
+    const size_t start_index = transcript->front().role == "system" ? 1 : 0;
+    const size_t non_system_messages = transcript->size() > start_index ? transcript->size() - start_index : 0;
     if (non_system_messages <= max_history_messages) {
         return;
     }
 
     const size_t drop_count = non_system_messages - max_history_messages;
     transcript->erase(
-        transcript->begin() + 1,
-        transcript->begin() + 1 + static_cast<std::ptrdiff_t>(drop_count));
+        transcript->begin() + static_cast<std::ptrdiff_t>(start_index),
+        transcript->begin() + static_cast<std::ptrdiff_t>(start_index + drop_count));
+}
+
+static void trim_fast_chat_turns(std::vector<chat_turn> * transcript, size_t max_turns) {
+    if (transcript->empty()) {
+        return;
+    }
+
+    const size_t max_messages = max_turns * 2;
+    if (transcript->size() <= max_messages) {
+        return;
+    }
+
+    const size_t drop_count = transcript->size() - max_messages;
+    transcript->erase(
+        transcript->begin(),
+        transcript->begin() + static_cast<std::ptrdiff_t>(drop_count));
 }
 
 static std::string build_fallback_chat_prompt(const std::vector<chat_turn> & turns, bool add_assistant) {
@@ -260,7 +285,8 @@ static bool run_completion(
         int n_predict,
         int n_ctx,
         std::string * generated_text,
-        bool stream_output) {
+        bool stream_output,
+        bool filter_think_output) {
     const llama_vocab * vocab = llama_model_get_vocab(model);
     const int prompt_bytes = static_cast<int>(prompt_text.size());
     const int n_prompt = -llama_tokenize(vocab, prompt_text.c_str(), prompt_bytes, nullptr, 0, true, true);
@@ -322,15 +348,21 @@ static bool run_completion(
             return false;
         }
 
-        consume_filtered_piece(
-            &render_state,
-            std::string(piece, static_cast<size_t>(n_piece)),
-            generated_text,
-            stream_output);
+        if (filter_think_output) {
+            consume_filtered_piece(
+                &render_state,
+                std::string(piece, static_cast<size_t>(n_piece)),
+                generated_text,
+                stream_output);
+        } else {
+            emit_visible_text(std::string(piece, static_cast<size_t>(n_piece)), generated_text, stream_output);
+        }
         batch = llama_batch_get_one(const_cast<llama_token *>(&token), 1);
     }
 
-    flush_filtered_output(&render_state, generated_text, stream_output);
+    if (filter_think_output) {
+        flush_filtered_output(&render_state, generated_text, stream_output);
+    }
     llama_sampler_free(sampler);
     llama_free(ctx);
     return true;
@@ -343,10 +375,11 @@ static bool run_completion_with_retry(
         int retry_n_predict,
         int n_ctx,
         std::string * generated_text,
-        bool stream_output) {
+        bool stream_output,
+        bool filter_think_output) {
     generated_text->clear();
 
-    if (!run_completion(model, prompt_text, n_predict, n_ctx, generated_text, stream_output)) {
+    if (!run_completion(model, prompt_text, n_predict, n_ctx, generated_text, stream_output, filter_think_output)) {
         return false;
     }
 
@@ -354,7 +387,7 @@ static bool run_completion_with_retry(
         return true;
     }
 
-    return run_completion(model, prompt_text, retry_n_predict, n_ctx, generated_text, stream_output);
+    return run_completion(model, prompt_text, retry_n_predict, n_ctx, generated_text, stream_output, filter_think_output);
 }
 
 static int run_interactive_chat(llama_model * model, int n_predict, int n_ctx, size_t max_history_messages) {
@@ -387,7 +420,7 @@ static int run_interactive_chat(llama_model * model, int n_predict, int n_ctx, s
         std::fflush(stdout);
 
         const int retry_n_predict = std::max(n_predict * 2, 128);
-        if (!run_completion_with_retry(model, prompt_text, n_predict, retry_n_predict, n_ctx, &reply, true)) {
+        if (!run_completion_with_retry(model, prompt_text, n_predict, retry_n_predict, n_ctx, &reply, true, true)) {
             return 1;
         }
 
@@ -403,7 +436,7 @@ static int run_interactive_chat(llama_model * model, int n_predict, int n_ctx, s
     }
 }
 
-static int run_interactive_fast_chat(llama_model * model, int n_predict, int n_ctx, size_t max_history_messages) {
+static int run_interactive_legacy_chat(llama_model * model, int n_predict, int n_ctx, size_t max_history_turns) {
     std::vector<chat_turn> transcript;
     char line[2048];
 
@@ -424,23 +457,28 @@ static int run_interactive_fast_chat(llama_model * model, int n_predict, int n_c
             return 0;
         }
 
-        transcript.push_back({ "user", "/no_think " + user_input });
-        trim_transcript_for_speed(&transcript, max_history_messages);
+        transcript.push_back({ "user", user_input });
+        trim_fast_chat_turns(&transcript, max_history_turns);
         const std::string prompt_text = build_fallback_chat_prompt(transcript, true);
 
         std::string reply;
         std::fputs("assistant> ", stdout);
         std::fflush(stdout);
 
-        if (!run_completion(model, prompt_text, n_predict, n_ctx, &reply, true)) {
+        if (!run_completion(model, prompt_text, n_predict, n_ctx, &reply, true, false)) {
             return 1;
         }
 
         reply = strip_assistant_prefix(trim_newlines(reply));
+        if (reply.empty()) {
+            reply = "Desculpe, fiquei sem resposta visivel. Tente de novo.";
+            std::fputs(reply.c_str(), stdout);
+        }
         std::fputc('\n', stdout);
         std::fflush(stdout);
 
         transcript.push_back({ "assistant", reply });
+        trim_fast_chat_turns(&transcript, max_history_turns);
     }
 }
 
@@ -451,8 +489,8 @@ int main(int argc, char ** argv) {
     int n_ctx = 2048;
     size_t max_history_messages = kDefaultMaxHistoryMessages;
     bool interactive = false;
-    bool fast_prompt = false;
-    bool fast_chat = false;
+    bool legacy_prompt = false;
+    bool legacy_chat = false;
 
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "-m") == 0 && i + 1 < argc) {
@@ -465,10 +503,10 @@ int main(int argc, char ** argv) {
             n_ctx = std::atoi(argv[++i]);
         } else if ((std::strcmp(argv[i], "--history") == 0 || std::strcmp(argv[i], "--history-messages") == 0) && i + 1 < argc) {
             max_history_messages = static_cast<size_t>(std::max(0, std::atoi(argv[++i])));
-        } else if (std::strcmp(argv[i], "--fast-prompt") == 0) {
-            fast_prompt = true;
-        } else if (std::strcmp(argv[i], "--fast-chat") == 0) {
-            fast_chat = true;
+        } else if (std::strcmp(argv[i], "--fast-prompt") == 0 || std::strcmp(argv[i], "--legacy-prompt") == 0) {
+            legacy_prompt = true;
+        } else if (std::strcmp(argv[i], "--fast-chat") == 0 || std::strcmp(argv[i], "--legacy-chat") == 0) {
+            legacy_chat = true;
         } else if (std::strcmp(argv[i], "-i") == 0) {
             interactive = true;
         } else {
@@ -497,21 +535,21 @@ int main(int argc, char ** argv) {
     }
 
     if (interactive) {
-        const int rc = fast_chat
-            ? run_interactive_fast_chat(model, n_predict, n_ctx, max_history_messages)
+        const int rc = legacy_chat
+            ? run_interactive_legacy_chat(model, n_predict, n_ctx, max_history_messages)
             : run_interactive_chat(model, n_predict, n_ctx, max_history_messages);
         llama_model_free(model);
         return rc;
     }
 
     std::string generated;
-    const std::string prompt_text = fast_prompt
-        ? build_fallback_chat_prompt({ { "user", "/no_think " + std::string(prompt) } }, true)
+    const std::string prompt_text = legacy_prompt
+        ? ensure_chat_prompt(prompt)
         : build_chat_prompt(model, { { "system", kSystemPrompt }, { "user", prompt } }, true);
 
-    const bool ok = fast_prompt
-        ? run_completion(model, prompt_text, n_predict, n_ctx, &generated, true)
-        : run_completion_with_retry(model, prompt_text, n_predict, std::max(n_predict * 2, 96), n_ctx, &generated, true);
+    const bool ok = legacy_prompt
+        ? run_completion(model, prompt_text, n_predict, n_ctx, &generated, true, false)
+        : run_completion_with_retry(model, prompt_text, n_predict, std::max(n_predict * 2, 96), n_ctx, &generated, true, true);
     if (!ok) {
         llama_model_free(model);
         return 1;

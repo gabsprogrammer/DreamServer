@@ -39,8 +39,8 @@ Commands:
   apps         List the stable app IDs exposed for Shortcuts
   intent       Return JSON for Apple Shortcuts
   intent-text  Return pipe-delimited text for simple Shortcut parsing
-  prompt       Fast one-shot prompt for iPhone shell use
-  chat         Fast interactive chat for iPhone shell use
+  prompt       Legacy-fast one-shot prompt for iPhone shell use
+  chat         Legacy-fast interactive chat for iPhone shell use
   chat-safe    Slower but more structured interactive chat
 EOF
 }
@@ -311,11 +311,12 @@ status() {
     echo "Model file:${DREAM_MOBILE_MODEL_PATH}"
     echo "Context:   ${DREAM_MOBILE_CONTEXT}"
     echo "Prompt tok:${DREAM_MOBILE_REPLY_TOKENS:-64}"
-    echo "Chat tok:  ${DREAM_MOBILE_CHAT_REPLY_TOKENS:-128}"
-    echo "History:   ${DREAM_MOBILE_HISTORY_MESSAGES:-5} messages"
+    echo "Chat tok:  ${DREAM_MOBILE_CHAT_REPLY_TOKENS:-96}"
+    echo "History:   ${DREAM_MOBILE_HISTORY_MESSAGES:-3} turns"
     echo "Downloaded:${DREAM_MOBILE_MODEL_DOWNLOADED}"
     echo "Wasm bin:  ${DREAM_MOBILE_WASM_BINARY}"
     echo "Wasm ready:${DREAM_MOBILE_WASM_READY}"
+    echo "Profile:   legacy-fast default, chat-safe optional"
     echo "Shortcut doc: ${DREAM_MOBILE_SHORTCUTS_DOC}"
     print_wasm_followup
     success "iOS preview config loaded"
@@ -361,7 +362,7 @@ prompt_once() {
             -m "${DREAM_MOBILE_MODEL_PATH}" \
             -c "${DREAM_MOBILE_CONTEXT:-2048}" \
             -n "${DREAM_MOBILE_REPLY_TOKENS:-64}" \
-            --fast-prompt \
+            --legacy-prompt \
             -p "$*"
         return 0
     fi
@@ -379,9 +380,9 @@ interactive_chat() {
     exec "${DREAM_MOBILE_WASM_RUNNER}" "${DREAM_MOBILE_WASM_BINARY}" \
         -m "${DREAM_MOBILE_MODEL_PATH}" \
         -c "${DREAM_MOBILE_CONTEXT:-2048}" \
-        -n "${DREAM_MOBILE_CHAT_REPLY_TOKENS:-128}" \
-        --history "${DREAM_MOBILE_HISTORY_MESSAGES:-5}" \
-        --fast-chat \
+        -n "${DREAM_MOBILE_CHAT_REPLY_TOKENS:-96}" \
+        --history "${DREAM_MOBILE_HISTORY_MESSAGES:-3}" \
+        --legacy-chat \
         -i
 }
 
@@ -394,8 +395,8 @@ interactive_chat_safe() {
     exec "${DREAM_MOBILE_WASM_RUNNER}" "${DREAM_MOBILE_WASM_BINARY}" \
         -m "${DREAM_MOBILE_MODEL_PATH}" \
         -c "${DREAM_MOBILE_CONTEXT:-2048}" \
-        -n "${DREAM_MOBILE_CHAT_REPLY_TOKENS:-128}" \
-        --history "${DREAM_MOBILE_HISTORY_MESSAGES:-5}" \
+        -n "${DREAM_MOBILE_CHAT_REPLY_TOKENS:-96}" \
+        --history "${DREAM_MOBILE_HISTORY_MESSAGES:-3}" \
         -i
 }
 
