@@ -72,6 +72,40 @@ trim_text() {
     printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
 }
 
+url_encode() {
+    text="$1"
+    text=$(printf '%s' "$text" | sed \
+        -e 's/%/%25/g' \
+        -e 's/ /%20/g' \
+        -e 's/\r//g' \
+        -e ':a;N;$!ba;s/\n/%0A/g' \
+        -e 's/"/%22/g' \
+        -e "s/'/%27/g" \
+        -e 's/#/%23/g' \
+        -e 's/&/%26/g' \
+        -e 's/+/%2B/g' \
+        -e 's/,/%2C/g' \
+        -e 's/:/%3A/g' \
+        -e 's/;/%3B/g' \
+        -e 's/</%3C/g' \
+        -e 's/=/%3D/g' \
+        -e 's/>/%3E/g' \
+        -e 's/?/%3F/g' \
+        -e 's/@/%40/g')
+    printf '%s\n' "$text"
+}
+
+build_mailto_url() {
+    email_to="$1"
+    email_subject="$2"
+    email_body="$3"
+
+    encoded_to=$(url_encode "$email_to")
+    encoded_subject=$(url_encode "$email_subject")
+    encoded_body=$(url_encode "$email_body")
+    printf 'mailto:%s?subject=%s&body=%s\n' "$encoded_to" "$encoded_subject" "$encoded_body"
+}
+
 extract_url() {
     text="$1"
     first=""
@@ -114,8 +148,7 @@ extract_email_body() {
         '.*[Cc]orpo[[:space:]:-]*' \
         '.*[Tt]exto[[:space:]:-]*' \
         '.*[Mm]ensagem[[:space:]:-]*' \
-        '.*[Dd]izendo[[:space:]:-]*' \
-        '.*[Ss]obre[[:space:]:-]*'
+        '.*[Dd]izendo[[:space:]:-]*'
     do
         body=$(printf '%s' "$raw" | sed -n "s/$pattern//p" | head -n 1)
         body=$(trim_text "$body")
@@ -126,6 +159,63 @@ extract_email_body() {
     done
 
     printf '%s\n' ""
+}
+
+extract_email_topic() {
+    raw="$1"
+    topic=$(printf '%s' "$raw" | sed -n 's/.*[Ss]obre[[:space:]:-]*//p' | head -n 1)
+    topic=$(trim_text "$topic")
+    printf '%s\n' "$topic"
+}
+
+generate_email_draft_with_llm() {
+    raw_request="$1"
+    email_to="$2"
+    topic_hint="$3"
+
+    local_wasm_ready || return 1
+
+    prompt_request="$raw_request"
+    [ -n "$topic_hint" ] && prompt_request="$topic_hint"
+
+    llm_prompt=$(
+        cat <<EOF
+Voce escreve emails curtos, uteis e naturais no mesmo idioma do pedido.
+Responda EXATAMENTE em duas linhas e nada mais:
+SUBJECT: <assunto>
+BODY: <corpo do email em um unico paragrafo>
+
+Destinatario: $email_to
+Pedido do usuario: $prompt_request
+EOF
+    )
+
+    output=$("${DREAM_MOBILE_WASM_RUNNER}" "${DREAM_MOBILE_WASM_BINARY}" \
+        -m "${DREAM_MOBILE_MODEL_PATH}" \
+        -c "${DREAM_MOBILE_CONTEXT:-1024}" \
+        -n 96 \
+        --fast-prompt \
+        -p "$llm_prompt" 2>/dev/null || true)
+
+    output=$(printf '%s' "$output" | tr -d '\r')
+    subject=$(printf '%s\n' "$output" | sed -n 's/^SUBJECT:[[:space:]]*//p' | head -n 1)
+    body=$(printf '%s\n' "$output" | sed -n 's/^BODY:[[:space:]]*//p' | head -n 1)
+
+    subject=$(trim_text "$subject")
+    body=$(trim_text "$body")
+
+    if [ -z "$subject" ] && [ -n "$topic_hint" ]; then
+        subject="Sobre $topic_hint"
+    fi
+    [ -n "$subject" ] || subject="Mensagem do Dream Server"
+
+    if [ -z "$body" ]; then
+        body=$(printf '%s\n' "$output" | sed '/^SUBJECT:/d; /^BODY:/d' | sed '/^[[:space:]]*$/d' | head -n 4 | tr '\n' ' ')
+        body=$(trim_text "$body")
+    fi
+    [ -n "$body" ] || body="Oi! Estou te enviando esta mensagem criada no Dream Server."
+
+    printf '%s\t%s\n' "$subject" "$body"
 }
 
 app_label() {
@@ -265,12 +355,13 @@ print_json_reply() {
                 email_body=${remainder#*"$tab_char"}
             fi
         fi
+        mailto_url=$(build_mailto_url "$email_to" "$email_subject" "$email_body")
         printf '{'
         printf '"ok":true,'
         printf '"engine":"%s",' "$(json_escape "${DREAM_MOBILE_ENGINE:-rules}")"
         printf '"mode":"ios-shortcuts-preview",'
-        printf '"action":{"type":"compose_email","to":"%s","subject":"%s","body":"%s"},' \
-            "$(json_escape "$email_to")" "$(json_escape "$email_subject")" "$(json_escape "$email_body")"
+        printf '"action":{"type":"compose_email","to":"%s","subject":"%s","body":"%s","mailto_url":"%s"},' \
+            "$(json_escape "$email_to")" "$(json_escape "$email_subject")" "$(json_escape "$email_body")" "$(json_escape "$mailto_url")"
         printf '"spoken_response":"%s",' "$(json_escape "$spoken")"
         printf '"confidence":%s' "$confidence"
         printf '}\n'
@@ -297,6 +388,7 @@ print_text_reply() {
 
 intent_core() {
     raw_input="$1"
+    tab_char=$(printf '\t')
     normalized=$(normalize_text "$raw_input")
     app_id=$(match_app_id "$normalized")
     url=$(extract_url "$normalized")
@@ -305,6 +397,19 @@ intent_core() {
     if [ -n "$email_to" ] && printf '%s' "$normalized" | grep -Eq 'email|e-mail|mail|gmail|enviar'; then
         email_subject=$(extract_email_subject "$raw_input")
         email_body=$(extract_email_body "$raw_input")
+        email_topic=$(extract_email_topic "$raw_input")
+
+        if [ -z "$email_body" ] || [ -n "$email_topic" ]; then
+            generated=$(generate_email_draft_with_llm "$raw_input" "$email_to" "$email_topic" || true)
+            if [ -n "$generated" ]; then
+                email_subject=${generated%%"$tab_char"*}
+                if [ "$email_subject" = "$generated" ]; then
+                    email_body=""
+                else
+                    email_body=${generated#*"$tab_char"}
+                fi
+            fi
+        fi
 
         [ -n "$email_subject" ] || email_subject="Mensagem do Dream Server"
         [ -n "$email_body" ] || email_body="Oi! Estou te enviando esta mensagem criada no Dream Server."

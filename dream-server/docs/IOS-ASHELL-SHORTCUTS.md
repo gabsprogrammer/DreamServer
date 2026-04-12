@@ -62,6 +62,8 @@ The stable action types today are:
 - `compose_email`
 - `reply`
 
+For `compose_email`, the payload now also includes a ready-to-open `mailto_url`.
+
 ## Recommended Shortcut shape
 
 Build the Shortcut around these steps:
@@ -81,7 +83,7 @@ Suggested routing:
 - `open_app`: use `action.app_id` to choose a fixed `Open App` action inside the Shortcut
 - `open_url`: pass `action.url` into `Open URLs`
 - `run_shortcut`: pass `action.shortcut_name` into `Run Shortcut`
-- `compose_email`: use `action.to`, `action.subject`, and `action.body` to fill a Mail draft or a `Send Email` step
+- `compose_email`: the easiest route is `Open URLs` with `action.mailto_url`; that opens a ready draft without copy/paste. If you prefer, you can also use `action.to`, `action.subject`, and `action.body` in a Mail or `Send Email` action.
 - `reply`: speak or display `spoken_response`
 
 Example:
@@ -89,6 +91,46 @@ Example:
 ```sh
 sh ./dream-mobile.sh intent "enviar email para ksgeladeira@gmail.com assunto teste texto oi, estou testando o Dream Server"
 ```
+
+You can also let the local Qwen draft the message for you:
+
+```sh
+sh ./dream-mobile.sh intent "enviar email para ksgeladeira@gmail.com sobre confirmar a reuniao de amanha as 14h"
+```
+
+That should return a `compose_email` action with:
+
+- `to`
+- `subject`
+- `body`
+- `mailto_url`
+
+## One-tap Email Shortcut
+
+If you do not want any manual copy/paste, build one Shortcut like this:
+
+1. `Ask for Input`
+   Voice or text. Example: `enviar email para ksgeladeira@gmail.com sobre confirmar a reuniao de amanha`
+2. `Execute Command` in `a-Shell`
+   Use:
+
+```sh
+cd /private/var/mobile/Containers/Data/Application/.../Documents/DreamServer.git
+sh ./installers/mobile/ios-ashell-cli.sh intent "$1"
+```
+
+Pass the Shortcut input as the first argument.
+3. `Get Dictionary from Input`
+4. `If` `action.type` is `compose_email`
+5. `Open URLs` with `action.mailto_url`
+
+That flow is still a single tap for the user:
+
+- speak or type the request
+- Dream Server decides the action
+- the Shortcut opens the ready email draft automatically
+
+If you want automatic sending later, swap step 5 for a Mail / `Send Email` action that uses `action.to`, `action.subject`, and `action.body`.
 
 ## Why app IDs instead of app names
 

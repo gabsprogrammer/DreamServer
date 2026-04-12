@@ -14,5 +14,7 @@ grep -q "IOS-ASHELL-SHORTCUTS.md" docs/MOBILE-SHELL-QUICKSTART.md
 grep -q "ios-ashell-install.sh" installers/mobile/install-mobile.sh
 grep -q "intent" installers/mobile/ios-ashell-cli.sh
 grep -q "open_app" installers/mobile/ios-ashell-cli.sh
+grep -q "mailto_url" installers/mobile/ios-ashell-cli.sh
+grep -q "One-tap Email Shortcut" docs/IOS-ASHELL-SHORTCUTS.md
 
 echo "[smoke] PASS mobile-dispatch"
