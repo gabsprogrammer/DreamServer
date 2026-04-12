@@ -31,6 +31,7 @@ sh ./install.sh --no-model-download
 ```sh
 sh ./dream-mobile.sh intent "abrir calculadora"
 sh ./dream-mobile.sh intent "abrir safari no github"
+sh ./dream-mobile.sh act "enviar email para ksgeladeira@gmail.com sobre confirmar a reuniao de amanha as 14h"
 sh ./dream-mobile.sh prompt "pesquisar clima em sao paulo"
 sh ./dream-mobile.sh apps
 ```
@@ -63,6 +64,25 @@ The stable action types today are:
 - `reply`
 
 For `compose_email`, the payload now also includes a ready-to-open `mailto_url`.
+
+## `intent` vs `act`
+
+- `intent`: only returns the structured action payload
+- `act`: tries to perform the action directly inside `a-Shell`
+
+Today, `act` can directly handle:
+
+- `compose_email` by opening a ready draft with `mailto:`
+- `open_url` by opening the URL
+- `run_shortcut` by opening the Shortcut URL scheme
+
+Example:
+
+```sh
+sh ./dream-mobile.sh act "enviar email para ksgeladeira@gmail.com sobre confirmar a reuniao de amanha as 14h"
+```
+
+That should open a draft in the current default email app on iPhone.
 
 ## Recommended Shortcut shape
 

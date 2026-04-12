@@ -30,6 +30,7 @@ Usage:
   sh ./dream-mobile.sh doctor
   sh ./dream-mobile.sh apps
   sh ./dream-mobile.sh intent "abrir calculadora"
+  sh ./dream-mobile.sh act "enviar email para alguem sobre algo"
   sh ./dream-mobile.sh prompt "abrir safari no github"
 
 Commands:
@@ -39,6 +40,7 @@ Commands:
   apps         List the stable app IDs exposed for Shortcuts
   intent       Return JSON for Apple Shortcuts
   intent-text  Return pipe-delimited text for simple Shortcut parsing
+  act          Perform supported actions directly in a-Shell when possible
   prompt       Legacy-fast one-shot prompt for iPhone shell use
   chat         Legacy-fast interactive chat for iPhone shell use
   chat-safe    Slower but more structured interactive chat
@@ -360,6 +362,53 @@ print_text_reply() {
     printf '%s|%s|%s|%s\n' "$action_type" "$action_value" "$spoken" "$confidence"
 }
 
+open_url_direct() {
+    target_url="$1"
+    command -v open >/dev/null 2>&1 || fail "The 'open' command is not available in this shell."
+    open "$target_url"
+}
+
+run_shortcut_direct() {
+    shortcut_name="$1"
+    encoded_name=$(url_encode "$shortcut_name")
+    open_url_direct "shortcuts://x-callback-url/run-shortcut?name=$encoded_name"
+}
+
+perform_action() {
+    action_type="$1"
+    action_value="$2"
+    spoken="$3"
+    tab_char=$(printf '\t')
+
+    case "$action_type" in
+        compose_email)
+            email_to=${action_value%%"$tab_char"*}
+            remainder=${action_value#*"$tab_char"}
+            email_subject=${remainder%%"$tab_char"*}
+            email_body=${remainder#*"$tab_char"}
+            open_url_direct "$(build_mailto_url "$email_to" "$email_subject" "$email_body")"
+            success "$spoken"
+            ;;
+        open_url)
+            open_url_direct "$action_value"
+            success "$spoken"
+            ;;
+        run_shortcut)
+            run_shortcut_direct "$action_value"
+            success "$spoken"
+            ;;
+        reply)
+            printf '%s\n' "$spoken"
+            ;;
+        open_app)
+            fail "Direct app opening still needs Apple Shortcuts for action type open_app."
+            ;;
+        *)
+            fail "Unsupported action type: $action_type"
+            ;;
+    esac
+}
+
 intent_core() {
     raw_input="$1"
     tab_char=$(printf '\t')
@@ -508,6 +557,13 @@ intent_text() {
     print_text_reply "$ACTION_TYPE" "$ACTION_VALUE" "$SPOKEN" "$CONFIDENCE"
 }
 
+act_once() {
+    load_config
+    [ $# -gt 0 ] || fail "Provide a prompt after 'act'."
+    intent_core "$*"
+    perform_action "$ACTION_TYPE" "$ACTION_VALUE" "$SPOKEN"
+}
+
 prompt_once() {
     load_config
     [ $# -gt 0 ] || fail "Provide a prompt after 'prompt'."
@@ -580,6 +636,10 @@ case "$cmd" in
     intent-text)
         shift
         intent_text "$@"
+        ;;
+    act)
+        shift
+        act_once "$@"
         ;;
     prompt)
         shift
