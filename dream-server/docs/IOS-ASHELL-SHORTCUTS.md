@@ -31,9 +31,6 @@ sh ./install.sh --no-model-download
 ```sh
 sh ./dream-mobile.sh intent "abrir calculadora"
 sh ./dream-mobile.sh intent "abrir safari no github"
-sh ./dream-mobile.sh act "enviar email para ksgeladeira@gmail.com sobre confirmar a reuniao de amanha as 14h"
-sh ./dream-mobile.sh chat
-sh ./dream-mobile.sh chat-agent
 sh ./dream-mobile.sh prompt "pesquisar clima em sao paulo"
 sh ./dream-mobile.sh apps
 ```
@@ -65,48 +62,6 @@ The stable action types today are:
 - `compose_email`
 - `reply`
 
-For `compose_email`, the payload now also includes a ready-to-open `mailto_url`.
-
-## `intent` vs `act`
-
-- `intent`: only returns the structured action payload
-- `act`: tries to perform the action directly inside `a-Shell`
-- `chat`: fastest local conversation mode
-- `chat-agent`: shell-controlled chat; action-like requests are routed automatically
-
-Today, `act` can directly handle:
-
-- `compose_email` by opening a ready draft with `mailto:`
-- `open_url` by opening the URL
-- `run_shortcut` by opening the Shortcut URL scheme
-
-Example:
-
-```sh
-sh ./dream-mobile.sh act "enviar email para ksgeladeira@gmail.com sobre confirmar a reuniao de amanha as 14h"
-```
-
-That should open a draft in the current default email app on iPhone.
-
-## Direct Email Sending
-
-Direct invisible sending is not something `a-Shell` can force into Mail or Gmail by itself.
-
-The practical automatic route on iPhone is:
-
-1. create one Shortcut once, for example `Dream Server Send Email`
-2. make that Shortcut accept text input
-3. parse the JSON input into `to`, `subject`, and `body`
-4. use a Mail / `Send Email` action inside the Shortcut
-
-Then install Dream Server with:
-
-```sh
-sh ./install.sh --email-shortcut "Dream Server Send Email"
-```
-
-After that, `act` and `chat` can route email sends into that Shortcut automatically instead of opening a draft.
-
 ## Recommended Shortcut shape
 
 Build the Shortcut around these steps:
@@ -126,101 +81,13 @@ Suggested routing:
 - `open_app`: use `action.app_id` to choose a fixed `Open App` action inside the Shortcut
 - `open_url`: pass `action.url` into `Open URLs`
 - `run_shortcut`: pass `action.shortcut_name` into `Run Shortcut`
-- `compose_email`: the easiest route is `Open URLs` with `action.mailto_url`; that opens a ready draft without copy/paste. If you prefer, you can also use `action.to`, `action.subject`, and `action.body` in a Mail or `Send Email` action.
+- `compose_email`: use `action.to`, `action.subject`, and `action.body` to fill a Mail draft or a `Send Email` step
 - `reply`: speak or display `spoken_response`
 
 Example:
 
 ```sh
 sh ./dream-mobile.sh intent "enviar email para ksgeladeira@gmail.com assunto teste texto oi, estou testando o Dream Server"
-```
-
-You can also ask Dream Server to draft the message for you from a topic:
-
-```sh
-sh ./dream-mobile.sh intent "enviar email para ksgeladeira@gmail.com sobre confirmar a reuniao de amanha as 14h"
-```
-
-That should return a `compose_email` action with:
-
-- `to`
-- `subject`
-- `body`
-- `mailto_url`
-
-Today, this one-command email drafting path uses a stable local template generator so it works reliably inside the iPhone shell.
-
-If you want the Qwen model itself to write the email body, use a Shortcut with two shell steps:
-
-1. `Execute Command`:
-
-```sh
-cd /private/var/mobile/Containers/Data/Application/.../Documents/DreamServer.git
-sh ./installers/mobile/ios-ashell-cli.sh prompt "Escreva um email curto e natural sobre confirmar a reuniao de amanha as 14h"
-```
-
-2. Feed that output into:
-
-```sh
-cd /private/var/mobile/Containers/Data/Application/.../Documents/DreamServer.git
-sh ./installers/mobile/ios-ashell-cli.sh intent "enviar email para ksgeladeira@gmail.com assunto Confirmacao da reuniao texto $1"
-```
-
-That two-step Shortcut is more reliable than trying to invoke the local model from inside the `intent` router itself.
-
-## One-tap Email Shortcut
-
-If you do not want any manual copy/paste, build one Shortcut like this:
-
-1. `Ask for Input`
-   Voice or text. Example: `enviar email para ksgeladeira@gmail.com sobre confirmar a reuniao de amanha`
-2. `Execute Command` in `a-Shell`
-   Use:
-
-```sh
-cd /private/var/mobile/Containers/Data/Application/.../Documents/DreamServer.git
-sh ./installers/mobile/ios-ashell-cli.sh intent "$1"
-```
-
-Pass the Shortcut input as the first argument.
-3. `Get Dictionary from Input`
-4. `If` `action.type` is `compose_email`
-5. `Open URLs` with `action.mailto_url`
-
-That flow is still a single tap for the user:
-
-- speak or type the request
-- Dream Server decides the action
-- the Shortcut opens the ready email draft automatically
-
-If you want automatic sending later, swap step 5 for a Mail / `Send Email` action that uses `action.to`, `action.subject`, and `action.body`.
-
-## Smart Chat
-
-`chat-agent` runs in a shell-controlled mode:
-
-- normal questions go to the local Qwen model
-- action requests like `enviar email para ...` are routed automatically
-
-Examples:
-
-```sh
-sh ./dream-mobile.sh chat-agent
-```
-
-Inside chat:
-
-```text
-you> quem foi alan turing
-you> enviar email para ksgeladeira@gmail.com sobre confirmar a reuniao de amanha as 14h
-```
-
-If `DREAM_MOBILE_EMAIL_SHORTCUT_NAME` is configured, the second line can trigger the configured Shortcut automatically.
-
-If you just want the fastest plain conversation, keep using:
-
-```sh
-sh ./dream-mobile.sh chat
 ```
 
 ## Why app IDs instead of app names
