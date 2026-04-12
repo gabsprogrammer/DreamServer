@@ -14,12 +14,16 @@ if [ ! -d "$ROOT_DIR/installers/mobile" ]; then
     fi
 fi
 
+SCRIPT_DIR=$(dirname "$0")
+SCRIPT_DIR=$(cd "$SCRIPT_DIR" && pwd)
+
 MODEL_DIR="$ROOT_DIR/data/models/mobile"
 MODEL_FILE="Qwen3-0.6B-Q4_0.gguf"
 MODEL_URL="https://huggingface.co/ggml-org/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_0.gguf"
 MODEL_PATH="$MODEL_DIR/$MODEL_FILE"
 WASM_BIN="$ROOT_DIR/mobile-runtime/ios-ashell/bin/llama-cli.wasm"
-CONFIG_FILE="$ROOT_DIR/.dream-mobile.env"
+CONFIG_FILE="$SCRIPT_DIR/rootshell.env"
+LEGACY_CONFIG_FILE="$ROOT_DIR/.dream-mobile.env"
 
 DOWNLOAD_MODEL=true
 MODEL_DOWNLOADED=false
@@ -50,7 +54,7 @@ if command -v wasm >/dev/null 2>&1; then
     fi
 fi
 
-rm -f "$CONFIG_FILE"
+rm -f "$CONFIG_FILE" "$LEGACY_CONFIG_FILE"
 printf '%s\n' "DREAM_MOBILE_PLATFORM=\"ios-rootshell\"" > "$CONFIG_FILE"
 printf '%s\n' "DREAM_MOBILE_MODE=\"ios-rootshell-preview\"" >> "$CONFIG_FILE"
 printf '%s\n' "DREAM_MOBILE_ENGINE=\"$ENGINE\"" >> "$CONFIG_FILE"
@@ -65,6 +69,8 @@ printf '%s\n' "DREAM_MOBILE_CONTEXT=\"1024\"" >> "$CONFIG_FILE"
 printf '%s\n' "DREAM_MOBILE_REPLY_TOKENS=\"64\"" >> "$CONFIG_FILE"
 printf '%s\n' "DREAM_MOBILE_CHAT_REPLY_TOKENS=\"128\"" >> "$CONFIG_FILE"
 printf '%s\n' "DREAM_MOBILE_HISTORY_MESSAGES=\"5\"" >> "$CONFIG_FILE"
+
+cp "$CONFIG_FILE" "$LEGACY_CONFIG_FILE"
 
 echo "[ok] Rootshell preview configured"
 echo "Config:    $CONFIG_FILE"

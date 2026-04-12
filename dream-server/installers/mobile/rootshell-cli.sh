@@ -2,25 +2,14 @@
 
 set -eu
 
-ROOT_DIR=$(pwd)
-
-if [ ! -d "$ROOT_DIR/installers/mobile" ]; then
-    if [ -d "$ROOT_DIR/dream-server/installers/mobile" ]; then
-        ROOT_DIR="$ROOT_DIR/dream-server"
-    else
-        SCRIPT_DIR=$(dirname "$0")
-        SCRIPT_DIR=$(cd "$SCRIPT_DIR" && pwd)
-        ROOT_DIR=$(cd "$SCRIPT_DIR/../.." && pwd)
-    fi
-fi
-
-CONFIG_FILE="$ROOT_DIR/.dream-mobile.env"
+SCRIPT_DIR=$(dirname "$0")
+SCRIPT_DIR=$(cd "$SCRIPT_DIR" && pwd)
+CONFIG_FILE="$SCRIPT_DIR/rootshell.env"
+LEGACY_CONFIG_FILE="$(pwd)/.dream-mobile.env"
 
 if [ ! -f "$CONFIG_FILE" ]; then
-    if [ -f "$(pwd)/.dream-mobile.env" ]; then
-        CONFIG_FILE="$(pwd)/.dream-mobile.env"
-    elif [ -f "$(pwd)/dream-server/.dream-mobile.env" ]; then
-        CONFIG_FILE="$(pwd)/dream-server/.dream-mobile.env"
+    if [ -f "$LEGACY_CONFIG_FILE" ]; then
+        CONFIG_FILE="$LEGACY_CONFIG_FILE"
     fi
 fi
 
