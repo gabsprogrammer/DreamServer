@@ -394,6 +394,18 @@ LITELLM_UPGRADE_EOF
             log "Restarting DreamForge to pick up model change..."
             docker restart dream-dreamforge 2>&1 || log "WARNING: DreamForge restart failed (non-fatal)"
         fi
+        # Recreate OpenClaw so inject-token.js picks up the new GGUF_FILE/LLM_MODEL
+        # from .env. A restart alone won't work — env vars are baked in at container
+        # creation time, and inject-token.js builds the Lemonade model name from them.
+        if docker ps --filter name=dream-openclaw --format '{{.Names}}' 2>/dev/null | grep -q dream-openclaw; then
+            log "Recreating OpenClaw to pick up model change..."
+            if [[ ${#COMPOSE_ARGS[@]} -gt 0 ]]; then
+                docker compose "${COMPOSE_ARGS[@]}" up -d --force-recreate openclaw 2>&1 || \
+                    log "WARNING: OpenClaw recreate failed (non-fatal)"
+            else
+                log "WARNING: No compose args — cannot recreate OpenClaw. Restart manually."
+            fi
+        fi
     else
         log "WARNING: llama-server health check timed out. The model may still be loading."
         log "Check: docker logs dream-llama-server"
