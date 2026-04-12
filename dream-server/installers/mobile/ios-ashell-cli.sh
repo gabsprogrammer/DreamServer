@@ -195,6 +195,89 @@ generate_email_draft_from_topic() {
     printf '%s\t%s\n' "$subject" "$body"
 }
 
+looks_like_email_request() {
+    case "$(normalize_text "$1")" in
+        *email*|*e-mail*|*mail*|*gmail*|*envia*|*enviar*|*manda*|*mandar*|*escreve\ um\ email*|*redige\ um\ email*|*responde\ por\ email*)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+remove_email_address_from_text() {
+    raw="$1"
+    email_to="$2"
+    if [ -n "$email_to" ]; then
+        printf '%s' "$raw" | sed "s/$email_to//g"
+    else
+        printf '%s' "$raw"
+    fi
+}
+
+clean_email_request_topic() {
+    raw="$1"
+    email_to="$2"
+    cleaned=$(remove_email_address_from_text "$raw" "$email_to")
+    cleaned=$(printf '%s' "$cleaned" | sed \
+        -e 's/[Pp]ara[[:space:]]\+/ /g' \
+        -e 's/[Ee]nviar[[:space:]]\+[Ee]mail/ /g' \
+        -e 's/[Ee]nviar[[:space:]]\+[Uu]m[[:space:]]\+[Ee]mail/ /g' \
+        -e 's/[Mm]andar[[:space:]]\+[Ee]mail/ /g' \
+        -e 's/[Mm]anda[[:space:]]\+[Uu]m[[:space:]]\+[Ee]mail/ /g' \
+        -e 's/[Ee]screve[[:space:]]\+[Uu]m[[:space:]]\+[Ee]mail/ /g' \
+        -e 's/[Rr]edige[[:space:]]\+[Uu]m[[:space:]]\+[Ee]mail/ /g' \
+        -e 's/[Pp]or[[:space:]]\+[Ee]mail/ /g' \
+        -e 's/[Gg]mail/ /g' \
+        -e 's/[Mm]ail/ /g' \
+        -e 's/[Ee]-[Mm]ail/ /g' \
+        -e 's/[Ee]mail/ /g')
+    cleaned=$(trim_text "$cleaned")
+    printf '%s\n' "$cleaned"
+}
+
+generate_email_draft_with_model() {
+    raw_request="$1"
+    email_to="$2"
+    topic_hint="$3"
+
+    if ! local_wasm_ready; then
+        generate_email_draft_from_topic "$raw_request" "$topic_hint"
+        return 0
+    fi
+
+    prompt_request="$topic_hint"
+    [ -n "$prompt_request" ] || prompt_request=$(clean_email_request_topic "$raw_request" "$email_to")
+    prompt_request=$(trim_text "$prompt_request")
+    [ -n "$prompt_request" ] || prompt_request="$raw_request"
+
+    draft_prompt=$(cat <<EOF
+Escreva um email curto, natural e util no mesmo idioma do pedido.
+Responda com exatamente duas linhas:
+SUBJECT: <assunto curto>
+BODY: <corpo do email em um unico paragrafo>
+
+Destinatario: $email_to
+Pedido: $prompt_request
+EOF
+)
+
+    output=$(generate_model_text "$draft_prompt" 2>/dev/null || true)
+    output=$(printf '%s' "$output" | tr -d '\r')
+    subject=$(printf '%s\n' "$output" | sed -n 's/^SUBJECT:[[:space:]]*//p' | head -n 1)
+    body=$(printf '%s\n' "$output" | sed -n 's/^BODY:[[:space:]]*//p' | head -n 1)
+    subject=$(trim_text "$subject")
+    body=$(trim_text "$body")
+
+    if [ -n "$subject" ] && [ -n "$body" ]; then
+        printf '%s\t%s\n' "$subject" "$body"
+        return 0
+    fi
+
+    generate_email_draft_from_topic "$raw_request" "$topic_hint"
+}
+
 app_label() {
     case "$1" in
         calculator) printf '%s\n' "Calculadora" ;;
@@ -447,6 +530,7 @@ intent_core() {
         email_subject=$(extract_email_subject "$raw_input")
         email_body=$(extract_email_body "$raw_input")
         email_topic=$(extract_email_topic "$raw_input")
+        [ -n "$email_topic" ] || email_topic=$(clean_email_request_topic "$raw_input" "$email_to")
 
         if [ -z "$email_body" ] || [ -n "$email_topic" ]; then
             generated=$(generate_email_draft_from_topic "$raw_input" "$email_topic")
@@ -644,6 +728,76 @@ Assistant:
 EOF
 }
 
+handle_chat_email_turn() {
+    user_input="$1"
+    tab_char=$(printf '\t')
+
+    if [ -n "${CHAT_PENDING_EMAIL_TO:-}" ]; then
+        topic_hint="$user_input"
+        generated=$(generate_email_draft_with_model "$user_input" "$CHAT_PENDING_EMAIL_TO" "$topic_hint")
+        email_subject=${generated%%"$tab_char"*}
+        if [ "$email_subject" = "$generated" ]; then
+            email_body=""
+        else
+            email_body=${generated#*"$tab_char"}
+        fi
+        [ -n "$email_subject" ] || email_subject="Mensagem do Dream Server"
+        [ -n "$email_body" ] || email_body="Oi! Estou te enviando esta mensagem criada no Dream Server."
+
+        ACTION_TYPE="compose_email"
+        ACTION_VALUE=$(printf '%s\t%s\t%s' "$CHAT_PENDING_EMAIL_TO" "$email_subject" "$email_body")
+        SPOKEN="Preparei um rascunho de email para $CHAT_PENDING_EMAIL_TO."
+        CHAT_PENDING_EMAIL_TO=""
+        CHAT_PENDING_MODE=""
+        return 0
+    fi
+
+    if ! looks_like_email_request "$user_input"; then
+        return 1
+    fi
+
+    email_to=$(extract_email_address "$user_input")
+    if [ -z "$email_to" ]; then
+        CHAT_PENDING_MODE="email_to"
+        CHAT_PENDING_EMAIL_TO=""
+        ACTION_TYPE="reply"
+        ACTION_VALUE="Qual email do destinatario?"
+        SPOKEN="$ACTION_VALUE"
+        return 0
+    fi
+
+    email_subject=$(extract_email_subject "$user_input")
+    email_body=$(extract_email_body "$user_input")
+    email_topic=$(extract_email_topic "$user_input")
+
+    if [ -z "$email_body" ] && [ -z "$email_topic" ]; then
+        CHAT_PENDING_MODE="email_body"
+        CHAT_PENDING_EMAIL_TO="$email_to"
+        ACTION_TYPE="reply"
+        ACTION_VALUE="O que voce quer que eu escreva no email para $email_to?"
+        SPOKEN="$ACTION_VALUE"
+        return 0
+    fi
+
+    generated=$(generate_email_draft_with_model "$user_input" "$email_to" "$email_topic")
+    if [ -n "$generated" ]; then
+        email_subject=${generated%%"$tab_char"*}
+        if [ "$email_subject" = "$generated" ]; then
+            email_body=""
+        else
+            email_body=${generated#*"$tab_char"}
+        fi
+    fi
+
+    [ -n "$email_subject" ] || email_subject="Mensagem do Dream Server"
+    [ -n "$email_body" ] || email_body="Oi! Estou te enviando esta mensagem criada no Dream Server."
+
+    ACTION_TYPE="compose_email"
+    ACTION_VALUE=$(printf '%s\t%s\t%s' "$email_to" "$email_subject" "$email_body")
+    SPOKEN="Preparei um rascunho de email para $email_to."
+    return 0
+}
+
 interactive_chat_agent() {
     load_config
     if ! local_wasm_ready; then
@@ -652,9 +806,11 @@ interactive_chat_agent() {
 
     last_user=""
     last_assistant=""
+    CHAT_PENDING_MODE=""
+    CHAT_PENDING_EMAIL_TO=""
 
     printf '%s\n' "Dream Server smart chat. Type /exit to leave."
-    printf '%s\n' "Action requests like 'enviar email ...' will be routed automatically."
+    printf '%s\n' "Action requests like 'manda um email...' will be routed automatically."
 
     while true; do
         printf 'you> '
@@ -667,6 +823,34 @@ interactive_chat_agent() {
                 break
                 ;;
         esac
+
+        if [ "${CHAT_PENDING_MODE:-}" = "email_to" ]; then
+            maybe_email=$(extract_email_address "$user_input")
+            if [ -z "$maybe_email" ]; then
+                printf 'assistant> %s\n' "Ainda preciso do email do destinatario."
+                continue
+            fi
+            CHAT_PENDING_MODE="email_body"
+            CHAT_PENDING_EMAIL_TO="$maybe_email"
+            printf 'assistant> %s\n' "Certo. O que voce quer que eu escreva para $maybe_email?"
+            continue
+        fi
+
+        if handle_chat_email_turn "$user_input"; then
+            case "$ACTION_TYPE" in
+                compose_email|open_url|run_shortcut)
+                    perform_action "$ACTION_TYPE" "$ACTION_VALUE" "$SPOKEN"
+                    last_user="$user_input"
+                    last_assistant="$SPOKEN"
+                    ;;
+                reply)
+                    printf 'assistant> %s\n' "$SPOKEN"
+                    last_user="$user_input"
+                    last_assistant="$SPOKEN"
+                    ;;
+            esac
+            continue
+        fi
 
         intent_core "$user_input"
         case "$ACTION_TYPE" in
