@@ -6,6 +6,15 @@ SCRIPT_DIR=$(dirname "$0")
 SCRIPT_DIR=$(cd "$SCRIPT_DIR" && pwd)
 CONFIG_FILE="$SCRIPT_DIR/rootshell.env"
 LEGACY_CONFIG_FILE="$(pwd)/.dream-mobile.env"
+ROOT_DIR=$(pwd)
+
+if [ ! -d "$ROOT_DIR/installers/mobile" ]; then
+    if [ -d "$ROOT_DIR/dream-server/installers/mobile" ]; then
+        ROOT_DIR="$ROOT_DIR/dream-server"
+    else
+        ROOT_DIR=$(cd "$SCRIPT_DIR/../.." && pwd)
+    fi
+fi
 
 if [ ! -f "$CONFIG_FILE" ]; then
     if [ -f "$LEGACY_CONFIG_FILE" ]; then
@@ -13,13 +22,38 @@ if [ ! -f "$CONFIG_FILE" ]; then
     fi
 fi
 
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo "[error] Rootshell preview not installed yet."
-    echo "Run: sh ./installers/mobile/rootshell-install.sh"
-    exit 1
+MODEL_PATH="$ROOT_DIR/data/models/mobile/Qwen3-0.6B-Q4_0.gguf"
+WASM_BIN="$ROOT_DIR/mobile-runtime/ios-ashell/bin/llama-cli.wasm"
+WASM_READY="false"
+ENGINE="rules"
+if command -v wasm >/dev/null 2>&1; then
+    if [ -f "$WASM_BIN" ]; then
+        WASM_READY="true"
+        ENGINE="wasm"
+    fi
 fi
 
-. "$CONFIG_FILE"
+DREAM_MOBILE_PLATFORM="ios-rootshell"
+DREAM_MOBILE_MODE="ios-rootshell-preview"
+DREAM_MOBILE_ENGINE="$ENGINE"
+DREAM_MOBILE_MODEL_NAME="Qwen3-0.6B"
+DREAM_MOBILE_MODEL_PATH="$MODEL_PATH"
+DREAM_MOBILE_MODEL_DOWNLOADED="false"
+DREAM_MOBILE_WASM_RUNNER="wasm"
+DREAM_MOBILE_WASM_BINARY="$WASM_BIN"
+DREAM_MOBILE_WASM_READY="$WASM_READY"
+DREAM_MOBILE_CONTEXT="1024"
+DREAM_MOBILE_REPLY_TOKENS="64"
+DREAM_MOBILE_CHAT_REPLY_TOKENS="128"
+DREAM_MOBILE_HISTORY_MESSAGES="5"
+
+if [ -f "$CONFIG_FILE" ]; then
+    . "$CONFIG_FILE"
+fi
+
+if [ -f "$DREAM_MOBILE_MODEL_PATH" ]; then
+    DREAM_MOBILE_MODEL_DOWNLOADED="true"
+fi
 
 CMD="${1:-status}"
 
