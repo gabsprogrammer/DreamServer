@@ -21,8 +21,10 @@ static constexpr const char * kLegacyFastSystemPrompt =
     "Reply in the user's language. "
     "Answer only the latest user message. "
     "Avoid repeating old answers. "
+    "Never narrate your reasoning. "
+    "Do not write stage directions or parentheses. "
     "Keep replies short and direct.";
-static constexpr size_t kDefaultMaxHistoryMessages = 2;
+static constexpr size_t kDefaultMaxHistoryMessages = 1;
 
 static void usage(const char * argv0) {
     std::fprintf(stderr, "usage: %s -m model.gguf [-p prompt] [-n n_predict] [-c ctx] [--history n_turns] [--legacy-prompt] [--legacy-chat] [-i]\n", argv0);
@@ -329,10 +331,10 @@ static bool run_completion(
     if (filter_think_output) {
         llama_sampler_chain_add(sampler, llama_sampler_init_greedy());
     } else {
-        llama_sampler_chain_add(sampler, llama_sampler_init_penalties(64, 1.08f, 0.0f, 0.0f));
-        llama_sampler_chain_add(sampler, llama_sampler_init_top_k(32));
-        llama_sampler_chain_add(sampler, llama_sampler_init_top_p(0.90f, 1));
-        llama_sampler_chain_add(sampler, llama_sampler_init_temp(0.70f));
+        llama_sampler_chain_add(sampler, llama_sampler_init_penalties(64, 1.12f, 0.0f, 0.0f));
+        llama_sampler_chain_add(sampler, llama_sampler_init_top_k(24));
+        llama_sampler_chain_add(sampler, llama_sampler_init_top_p(0.88f, 1));
+        llama_sampler_chain_add(sampler, llama_sampler_init_temp(0.55f));
         llama_sampler_chain_add(sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
     }
     render_filter_state render_state;
@@ -502,7 +504,7 @@ int main(int argc, char ** argv) {
     const char * model_path = nullptr;
     const char * prompt = "oi";
     int n_predict = 48;
-    int n_ctx = 2048;
+    int n_ctx = 1024;
     size_t max_history_messages = kDefaultMaxHistoryMessages;
     bool interactive = false;
     bool legacy_prompt = false;

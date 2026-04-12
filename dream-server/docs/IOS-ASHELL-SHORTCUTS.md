@@ -59,6 +59,7 @@ The stable action types today are:
 - `open_app`
 - `open_url`
 - `run_shortcut`
+- `compose_email`
 - `reply`
 
 ## Recommended Shortcut shape
@@ -80,7 +81,14 @@ Suggested routing:
 - `open_app`: use `action.app_id` to choose a fixed `Open App` action inside the Shortcut
 - `open_url`: pass `action.url` into `Open URLs`
 - `run_shortcut`: pass `action.shortcut_name` into `Run Shortcut`
+- `compose_email`: use `action.to`, `action.subject`, and `action.body` to fill a Mail draft or a `Send Email` step
 - `reply`: speak or display `spoken_response`
+
+Example:
+
+```sh
+sh ./dream-mobile.sh intent "enviar email para ksgeladeira@gmail.com assunto teste texto oi, estou testando o Dream Server"
+```
 
 ## Why app IDs instead of app names
 

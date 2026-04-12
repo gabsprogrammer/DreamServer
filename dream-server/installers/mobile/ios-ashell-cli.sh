@@ -94,6 +94,40 @@ extract_url() {
     esac
 }
 
+extract_email_address() {
+    printf '%s\n' "$1" | grep -Eio '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' | head -n 1 || true
+}
+
+extract_email_subject() {
+    raw="$1"
+    subject=$(printf '%s' "$raw" | sed -n 's/.*[Aa]ssunto[[:space:]:-]*//p' | head -n 1)
+    subject=$(printf '%s' "$subject" | sed 's/[[:space:]]\{1,\}\([Tt]exto\|[Mm]ensagem\|[Cc]orpo\|[Dd]izendo\|[Ss]obre\)[[:space:]:-].*$//')
+    subject=$(trim_text "$subject")
+    printf '%s\n' "$subject"
+}
+
+extract_email_body() {
+    raw="$1"
+    body=""
+
+    for pattern in \
+        '.*[Cc]orpo[[:space:]:-]*' \
+        '.*[Tt]exto[[:space:]:-]*' \
+        '.*[Mm]ensagem[[:space:]:-]*' \
+        '.*[Dd]izendo[[:space:]:-]*' \
+        '.*[Ss]obre[[:space:]:-]*'
+    do
+        body=$(printf '%s' "$raw" | sed -n "s/$pattern//p" | head -n 1)
+        body=$(trim_text "$body")
+        if [ -n "$body" ]; then
+            printf '%s\n' "$body"
+            return 0
+        fi
+    done
+
+    printf '%s\n' ""
+}
+
 app_label() {
     case "$1" in
         calculator) printf '%s\n' "Calculadora" ;;
@@ -216,6 +250,22 @@ print_json_reply() {
         return 0
     fi
 
+    if [ "$action_type" = "compose_email" ]; then
+        email_to=$(printf '%s' "$action_value" | cut -f1)
+        email_subject=$(printf '%s' "$action_value" | cut -f2)
+        email_body=$(printf '%s' "$action_value" | cut -f3-)
+        printf '{'
+        printf '"ok":true,'
+        printf '"engine":"%s",' "$(json_escape "${DREAM_MOBILE_ENGINE:-rules}")"
+        printf '"mode":"ios-shortcuts-preview",'
+        printf '"action":{"type":"compose_email","to":"%s","subject":"%s","body":"%s"},' \
+            "$(json_escape "$email_to")" "$(json_escape "$email_subject")" "$(json_escape "$email_body")"
+        printf '"spoken_response":"%s",' "$(json_escape "$spoken")"
+        printf '"confidence":%s' "$confidence"
+        printf '}\n'
+        return 0
+    fi
+
     printf '{'
     printf '"ok":true,'
     printf '"engine":"%s",' "$(json_escape "${DREAM_MOBILE_ENGINE:-rules}")"
@@ -239,6 +289,21 @@ intent_core() {
     normalized=$(normalize_text "$raw_input")
     app_id=$(match_app_id "$normalized")
     url=$(extract_url "$normalized")
+    email_to=$(extract_email_address "$raw_input")
+
+    if [ -n "$email_to" ] && printf '%s' "$normalized" | grep -Eq 'email|e-mail|mail|gmail|enviar'; then
+        email_subject=$(extract_email_subject "$raw_input")
+        email_body=$(extract_email_body "$raw_input")
+
+        [ -n "$email_subject" ] || email_subject="Mensagem do Dream Server"
+        [ -n "$email_body" ] || email_body="Oi! Estou te enviando esta mensagem criada no Dream Server."
+
+        ACTION_TYPE="compose_email"
+        ACTION_VALUE=$(printf '%s\t%s\t%s' "$email_to" "$email_subject" "$email_body")
+        SPOKEN="Preparei um rascunho de email para $email_to."
+        CONFIDENCE="0.86"
+        return 0
+    fi
 
     if [ -n "$app_id" ] && printf '%s' "$normalized" | grep -Eq 'abrir|open|launch|mostrar|ir para'; then
         label=$(app_label "$app_id")
@@ -277,7 +342,7 @@ intent_core() {
     fi
 
     ACTION_TYPE="reply"
-    ACTION_VALUE="Ainda nao consegui mapear essa intencao com confianca. Tente comandos como abrir calculadora, abrir safari no github, ou pesquisar algo."
+    ACTION_VALUE="Ainda nao consegui mapear essa intencao com confianca. Tente comandos como abrir calculadora, abrir safari no github, enviar email para alguem, ou pesquisar algo."
     SPOKEN="$ACTION_VALUE"
     CONFIDENCE="0.35"
 }
@@ -311,8 +376,8 @@ status() {
     echo "Model file:${DREAM_MOBILE_MODEL_PATH}"
     echo "Context:   ${DREAM_MOBILE_CONTEXT}"
     echo "Prompt tok:${DREAM_MOBILE_REPLY_TOKENS:-48}"
-    echo "Chat tok:  ${DREAM_MOBILE_CHAT_REPLY_TOKENS:-80}"
-    echo "History:   ${DREAM_MOBILE_HISTORY_MESSAGES:-2} turns"
+    echo "Chat tok:  ${DREAM_MOBILE_CHAT_REPLY_TOKENS:-64}"
+    echo "History:   ${DREAM_MOBILE_HISTORY_MESSAGES:-1} turns"
     echo "Downloaded:${DREAM_MOBILE_MODEL_DOWNLOADED}"
     echo "Wasm bin:  ${DREAM_MOBILE_WASM_BINARY}"
     echo "Wasm ready:${DREAM_MOBILE_WASM_READY}"
@@ -380,8 +445,8 @@ interactive_chat() {
     exec "${DREAM_MOBILE_WASM_RUNNER}" "${DREAM_MOBILE_WASM_BINARY}" \
         -m "${DREAM_MOBILE_MODEL_PATH}" \
         -c "${DREAM_MOBILE_CONTEXT:-2048}" \
-        -n "${DREAM_MOBILE_CHAT_REPLY_TOKENS:-80}" \
-        --history "${DREAM_MOBILE_HISTORY_MESSAGES:-2}" \
+        -n "${DREAM_MOBILE_CHAT_REPLY_TOKENS:-64}" \
+        --history "${DREAM_MOBILE_HISTORY_MESSAGES:-1}" \
         --fast-chat \
         -i
 }
@@ -395,8 +460,8 @@ interactive_chat_safe() {
     exec "${DREAM_MOBILE_WASM_RUNNER}" "${DREAM_MOBILE_WASM_BINARY}" \
         -m "${DREAM_MOBILE_MODEL_PATH}" \
         -c "${DREAM_MOBILE_CONTEXT:-2048}" \
-        -n "${DREAM_MOBILE_CHAT_REPLY_TOKENS:-80}" \
-        --history "${DREAM_MOBILE_HISTORY_MESSAGES:-2}" \
+        -n "${DREAM_MOBILE_CHAT_REPLY_TOKENS:-64}" \
+        --history "${DREAM_MOBILE_HISTORY_MESSAGES:-1}" \
         -i
 }
 
