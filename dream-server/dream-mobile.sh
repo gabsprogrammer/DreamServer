@@ -5,6 +5,9 @@ if [ -z "${BASH_VERSION:-}" ]; then
     SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
     CONFIG_FILE="$SCRIPT_DIR/.dream-mobile.env"
     IOS_CONTAINER_PATTERN='^(/private)?/var/mobile/Containers/Data/Application/'
+    if [ -f "$CONFIG_FILE" ]; then
+        exec sh "$SCRIPT_DIR/installers/mobile/ios-ashell-cli.sh" "$@"
+    fi
     if [ -f "$CONFIG_FILE" ] && grep -q 'DREAM_MOBILE_PLATFORM="ios-ashell"' "$CONFIG_FILE" 2>/dev/null; then
         exec sh "$SCRIPT_DIR/installers/mobile/ios-ashell-cli.sh" "$@"
     fi

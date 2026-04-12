@@ -211,6 +211,7 @@ print_json_reply() {
     action_value="$2"
     spoken="$3"
     confidence="$4"
+    tab_char=$(printf '\t')
 
     if [ "$action_type" = "open_app" ]; then
         label=$(app_label "$action_value")
@@ -251,9 +252,19 @@ print_json_reply() {
     fi
 
     if [ "$action_type" = "compose_email" ]; then
-        email_to=$(printf '%s' "$action_value" | cut -f1)
-        email_subject=$(printf '%s' "$action_value" | cut -f2)
-        email_body=$(printf '%s' "$action_value" | cut -f3-)
+        email_to=${action_value%%"$tab_char"*}
+        if [ "$email_to" = "$action_value" ]; then
+            email_subject=""
+            email_body=""
+        else
+            remainder=${action_value#*"$tab_char"}
+            email_subject=${remainder%%"$tab_char"*}
+            if [ "$email_subject" = "$remainder" ]; then
+                email_body=""
+            else
+                email_body=${remainder#*"$tab_char"}
+            fi
+        fi
         printf '{'
         printf '"ok":true,'
         printf '"engine":"%s",' "$(json_escape "${DREAM_MOBILE_ENGINE:-rules}")"

@@ -374,6 +374,9 @@ static bool run_completion(
                 stream_output);
         } else {
             emit_visible_text(std::string(piece, static_cast<size_t>(n_piece)), generated_text, stream_output);
+            if (generated_text->find("\n\n") != std::string::npos) {
+                break;
+            }
         }
         batch = llama_batch_get_one(const_cast<llama_token *>(&token), 1);
     }
