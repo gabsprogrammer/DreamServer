@@ -2,8 +2,9 @@
 
 set -eu
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-ROOT_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
+SCRIPT_DIR=$(dirname "$0")
+SCRIPT_DIR=$(cd "$SCRIPT_DIR" && pwd)
+ROOT_DIR=$(cd "$SCRIPT_DIR/../.." && pwd)
 CONFIG_FILE="$ROOT_DIR/.dream-mobile.env"
 
 if [ ! -f "$CONFIG_FILE" ]; then
