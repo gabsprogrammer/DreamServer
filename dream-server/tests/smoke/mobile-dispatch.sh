@@ -12,7 +12,7 @@ grep -q "Android / Termux" docs/MOBILE-SHELL-QUICKSTART.md
 grep -q "iOS / a-Shell" docs/MOBILE-SHELL-QUICKSTART.md
 grep -q "IOS-ASHELL-SHORTCUTS.md" docs/MOBILE-SHELL-QUICKSTART.md
 grep -q "ios-ashell-install.sh" installers/mobile/install-mobile.sh
-grep -q "intent" installers/mobile/ios-ashell-cli.sh
-grep -q "open_app" installers/mobile/ios-ashell-cli.sh
+grep -q "chat" installers/mobile/ios-ashell-cli.sh
+grep -q "status" installers/mobile/ios-ashell-cli.sh
 
 echo "[smoke] PASS mobile-dispatch"

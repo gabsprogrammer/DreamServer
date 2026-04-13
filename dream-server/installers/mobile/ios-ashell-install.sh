@@ -26,7 +26,6 @@ MOBILE_CONTEXT=1024
 MOBILE_REPLY_TOKENS=48
 MOBILE_CHAT_REPLY_TOKENS=64
 MOBILE_HISTORY_MESSAGES=1
-EMAIL_SHORTCUT_NAME=""
 IGNORED_FLAGS=""
 
 IOS_RUNTIME_DIR="$ROOT_DIR/mobile-runtime/ios-ashell"
@@ -70,7 +69,6 @@ Options:
   --reply-tokens N       Default max reply tokens for prompt/chat on iOS
   --chat-reply-tokens N  Default max reply tokens for interactive chat on iOS
   --history-messages N   Max recent chat turns to keep in the legacy-fast iOS chat
-  --email-shortcut NAME  Shortcut name to use for direct email sending
   --download-model       Download the GGUF during install (default)
   --no-model-download    Skip the default GGUF download for now
   --force                Re-write config and re-download the model if requested
@@ -149,10 +147,6 @@ parse_args() {
                 ;;
             --history-messages|--history)
                 MOBILE_HISTORY_MESSAGES="${2:-}"
-                shift 2
-                ;;
-            --email-shortcut)
-                EMAIL_SHORTCUT_NAME="${2:-}"
                 shift 2
                 ;;
             --download-model)
@@ -262,7 +256,6 @@ write_config() {
         "DREAM_MOBILE_REPLY_TOKENS=\"$MOBILE_REPLY_TOKENS\"" \
         "DREAM_MOBILE_CHAT_REPLY_TOKENS=\"$MOBILE_CHAT_REPLY_TOKENS\"" \
         "DREAM_MOBILE_HISTORY_MESSAGES=\"$MOBILE_HISTORY_MESSAGES\"" \
-        "DREAM_MOBILE_EMAIL_SHORTCUT_NAME=\"$EMAIL_SHORTCUT_NAME\"" \
         "DREAM_MOBILE_SHORTCUTS_DOC=\"$SHORTCUTS_DOC\"" \
         "DREAM_MOBILE_SHORTCUTS_SAMPLE=\"$SAMPLE_JSON\""
 
@@ -305,9 +298,7 @@ print_summary() {
     echo ""
     echo "Use now:"
     echo "  sh ./dream-mobile.sh status"
-    echo "  sh ./dream-mobile.sh doctor"
-    echo "  sh ./dream-mobile.sh intent \"abrir calculadora\""
-    echo "  sh ./dream-mobile.sh prompt \"abrir safari no github\""
+    echo "  sh ./dream-mobile.sh chat"
     echo ""
     echo "Shortcut guide:"
     echo "  $SHORTCUTS_DOC"
