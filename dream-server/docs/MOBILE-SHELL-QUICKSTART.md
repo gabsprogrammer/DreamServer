@@ -15,7 +15,7 @@ This path is intentionally small:
 - it does **not** enable dashboard, voice, workflows, agents, or RAG
 - it **does** keep the interface shell-first
 - it **does** provide a stable CLI contract for future local runtimes
-- it **does** expose an intent-style bridge for Apple Shortcuts on iOS
+- it **does** let Android export generated files into shared storage when available
 
 ## Current mobile target
 
@@ -26,6 +26,7 @@ Supported preview flow:
 ```bash
 git clone https://github.com/gabsprogrammer/DreamServer.git
 cd DreamServer
+termux-setup-storage
 ./install.sh
 ./dream-mobile.sh chat
 ```
@@ -36,7 +37,8 @@ What the installer does on Termux:
 2. Installs build dependencies with `pkg`.
 3. Clones and builds `llama.cpp`.
 4. Downloads the official GGUF build of `Qwen3-0.6B`.
-5. Writes `.dream-mobile.env` so `./dream-mobile.sh` can run the model later.
+5. Detects whether shared Android storage is available through `~/storage/downloads`.
+6. Writes `.dream-mobile.env` so `./dream-mobile.sh` can run the model later.
 
 Current default model:
 
@@ -49,47 +51,52 @@ Useful commands:
 ./dream-mobile.sh status
 ./dream-mobile.sh chat
 ./dream-mobile.sh prompt "me resume este projeto"
+./dream-mobile.sh export notes/brief.txt "gere um resumo claro deste repo"
 ```
+
+Android export behavior:
+
+- if `termux-setup-storage` has already been granted, `export` writes into shared Downloads
+- if shared storage is not configured yet, Dream Server falls back to `data/exports/mobile/` inside the repo
+- rerun `./install.sh` after granting storage permission so the mobile config points at Downloads
+
+If the install fails with `curl`, `git`, or `libnghttp2` symbol errors:
+
+```bash
+apt update && apt full-upgrade
+termux-change-repo
+./install.sh
+```
+
+That usually means the Termux userland is in a partial-upgrade state, not that the Dream Server installer itself is broken.
 
 ## iOS / a-Shell
 
-a-Shell now has a **CLI + Shortcuts preview path**.
+iOS is now a **lite beta** focused on local shell chat only.
 
 What works today:
 
 - `sh ./install.sh` sets up the iOS preview files and downloads `Qwen3-0.6B` by default
 - `sh ./dream-mobile.sh status` shows whether the model and wasm runtime slot are ready
-- `sh ./dream-mobile.sh doctor` explains why local Qwen chat is or is not ready
-- `sh ./dream-mobile.sh intent "abrir calculadora"` returns JSON for Apple Shortcuts
-- `sh ./dream-mobile.sh prompt "abrir safari no github"` uses the same routing contract
-- `sh ./dream-mobile.sh apps` lists the stable `app_id` values to route inside Shortcuts
-
-Current engine behavior:
-
-- default engine: local rule-based intent router
-- model file: downloaded locally on iOS
-- optional future engine: local `wasm` llama runtime if you drop it into the expected path
-- host-side experimental builder: `bash dream-server/installers/mobile/build-ios-ashell-wasm-runtime.sh`
-- current blocker: the published `wasi-sdk` image still lacks the exception runtime symbols needed to link current `llama.cpp` for `wasm32-wasi-threads`
-- full Dream Server service graph: still out of scope for iOS shell mode
+- `sh ./dream-mobile.sh chat` starts the local interactive chat loop
 
 Example flow:
 
 ```bash
+lg2 clone https://github.com/gabsprogrammer/DreamServer.git
+cd DreamServer
 sh ./install.sh
 sh ./dream-mobile.sh status
-sh ./dream-mobile.sh doctor
-sh ./dream-mobile.sh intent "abrir calculadora"
-sh ./dream-mobile.sh prompt "abrir safari no github"
+sh ./dream-mobile.sh chat
 ```
 
-The `prompt` and `intent` commands are intentionally compatible with a future local runtime:
+The iPhone path is intentionally narrow:
 
-- if a local wasm backend is present, `prompt` can use it
-- if not, `prompt` falls back to the local intent router so the Shortcut loop still works
+- no full Docker stack
+- no dashboard, workflows, or agents
+- no desktop feature parity yet
 
-Shortcut setup guidance lives in [IOS-ASHELL-SHORTCUTS.md](IOS-ASHELL-SHORTCUTS.md).
-Runtime build notes live in [IOS-ASHELL-WASM-RUNTIME.md](IOS-ASHELL-WASM-RUNTIME.md).
+Focused setup guidance lives in [IOS-ASHELL-SHORTCUTS.md](IOS-ASHELL-SHORTCUTS.md).
 
 ## Scope guardrail
 

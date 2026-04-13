@@ -5,9 +5,6 @@ if [ -z "${BASH_VERSION:-}" ]; then
     SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
     CONFIG_FILE="$SCRIPT_DIR/.dream-mobile.env"
     IOS_CONTAINER_PATTERN='^(/private)?/var/mobile/Containers/Data/Application/'
-    if [ -f "$CONFIG_FILE" ]; then
-        exec sh "$SCRIPT_DIR/installers/mobile/ios-ashell-cli.sh" "$@"
-    fi
     if [ -f "$CONFIG_FILE" ] && grep -q 'DREAM_MOBILE_PLATFORM="ios-ashell"' "$CONFIG_FILE" 2>/dev/null; then
         exec sh "$SCRIPT_DIR/installers/mobile/ios-ashell-cli.sh" "$@"
     fi
@@ -54,12 +51,14 @@ Usage:
   ./dream-mobile.sh status
   ./dream-mobile.sh chat
   ./dream-mobile.sh prompt "sua pergunta"
+  ./dream-mobile.sh export notes/brief.txt "gere um resumo claro deste repo"
 
 Commands:
   install    Build the mobile runtime and download the preview model
   status     Show the current mobile runtime status
   chat       Open an interactive shell chat with the installed model
   prompt     Send one prompt and print the answer
+  export     Generate a file with the model and save it under Downloads on Android
 EOF
 }
 
@@ -85,6 +84,12 @@ status() {
     echo "Threads:  ${DREAM_MOBILE_THREADS}"
     echo "CLI:      ${DREAM_MOBILE_LLAMA_CLI}"
     echo "Path:     ${DREAM_MOBILE_MODEL_PATH}"
+    if [[ -n "${DREAM_MOBILE_EXPORT_DIR:-}" ]]; then
+        echo "Exports:  ${DREAM_MOBILE_EXPORT_DIR}"
+    fi
+    if [[ -n "${DREAM_MOBILE_EXPORT_MODE:-}" ]]; then
+        echo "Mode:     ${DREAM_MOBILE_EXPORT_MODE}"
+    fi
     success "Runtime looks ready"
 }
 
@@ -114,6 +119,41 @@ one_prompt() {
         -p "$*"
 }
 
+export_prompt() {
+    require_runtime
+    [[ "${DREAM_MOBILE_PLATFORM:-}" == "android-termux" ]] || fail "The export command is currently available only on Android / Termux."
+    [[ $# -ge 2 ]] || fail "Usage: ./dream-mobile.sh export notes/output.txt \"o que voce quer gerar\""
+
+    local relative_target="$1"
+    shift
+
+    [[ "$relative_target" != /* ]] || fail "Use a relative path inside the Android export directory."
+    [[ ! "$relative_target" =~ (^|/)\.\.(/|$) ]] || fail "Parent path segments are not allowed in export targets."
+    [[ -n "${DREAM_MOBILE_EXPORT_DIR:-}" ]] || fail "No export directory is configured for Android mobile preview."
+
+    local target_path="$DREAM_MOBILE_EXPORT_DIR/$relative_target"
+    local target_dir
+    target_dir="$(dirname "$target_path")"
+    mkdir -p "$target_dir"
+
+    local export_prompt_text
+    export_prompt_text=$'Write the requested deliverable directly.\nReturn only the final file contents.\nDo not add markdown fences, commentary, or role labels.\n\nRequest: '"$*"
+
+    "${DREAM_MOBILE_LLAMA_CLI}" \
+        -m "${DREAM_MOBILE_MODEL_PATH}" \
+        -c "${DREAM_MOBILE_CONTEXT}" \
+        -t "${DREAM_MOBILE_THREADS}" \
+        -ngl 0 \
+        -cnv \
+        -n 768 \
+        -p "$export_prompt_text" > "$target_path"
+
+    success "Saved generated file to $target_path"
+    if [[ "${DREAM_MOBILE_EXPORT_MODE:-}" != "shared-downloads" ]]; then
+        log "Shared Downloads is not configured yet. Run termux-setup-storage, then reinstall to export into Android Downloads."
+    fi
+}
+
 cmd="${1:-status}"
 case "$cmd" in
     install)
@@ -131,6 +171,10 @@ case "$cmd" in
     prompt)
         shift
         one_prompt "$@"
+        ;;
+    export)
+        shift
+        export_prompt "$@"
         ;;
     -h|--help|help)
         usage

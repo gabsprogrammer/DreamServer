@@ -92,11 +92,12 @@ See [`docs/WINDOWS-QUICKSTART.md`](docs/WINDOWS-QUICKSTART.md) for details.
 ### Android (Termux preview)
 
 ```bash
+termux-setup-storage
 ./install.sh
 ./dream-mobile.sh chat
 ```
 
-On Termux, `./install.sh` now switches into a shell-only mobile preview: it installs build dependencies, compiles `llama.cpp`, downloads `Qwen3-0.6B`, and leaves you with `./dream-mobile.sh` for chatting locally in the shell.
+On Termux, `./install.sh` now switches into a shell-only mobile preview: it installs build dependencies, compiles `llama.cpp`, downloads `Qwen3-0.6B`, and leaves you with `./dream-mobile.sh` for chatting locally in the shell. If shared Android storage has been granted through `termux-setup-storage`, the preview can also export generated files into Downloads.
 
 See [`docs/MOBILE-SHELL-QUICKSTART.md`](docs/MOBILE-SHELL-QUICKSTART.md) for the current scope and limitations.
 

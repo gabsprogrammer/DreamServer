@@ -52,7 +52,10 @@ MOBILE_RUNTIME_DIR="$ROOT_DIR/mobile-runtime"
 LLAMA_DIR="$MOBILE_RUNTIME_DIR/llama.cpp"
 LLAMA_BUILD_DIR="$LLAMA_DIR/build"
 MODEL_DIR="$ROOT_DIR/data/models/mobile"
+EXPORT_FALLBACK_DIR="$ROOT_DIR/data/exports/mobile"
 CONFIG_FILE="$ROOT_DIR/.dream-mobile.env"
+EXPORT_DIR=""
+EXPORT_MODE=""
 
 usage() {
     cat <<'EOF'
@@ -184,14 +187,62 @@ detect_mobile_platform() {
     detect_platform
 }
 
+fail_termux_partial_upgrade() {
+    cat >&2 <<'EOF'
+[error] Termux package state looks inconsistent.
+
+Dream Server mobile preview depends on a healthy Termux userland.
+Termux uses a rolling-release package model and does not support partial upgrades.
+
+Fix inside Termux:
+  apt update && apt full-upgrade
+
+If repositories or mirrors still look wrong, refresh the mirror first:
+  termux-change-repo
+
+Then rerun:
+  ./install.sh
+EOF
+    exit 1
+}
+
+verify_termux_runtime_health() {
+    command -v curl >/dev/null 2>&1 || fail "curl is missing from Termux after dependency install."
+    command -v git >/dev/null 2>&1 || fail "git is missing from Termux after dependency install."
+    command -v cmake >/dev/null 2>&1 || fail "cmake is missing from Termux after dependency install."
+    command -v clang >/dev/null 2>&1 || fail "clang is missing from Termux after dependency install."
+
+    if ! curl --version >/dev/null 2>&1; then
+        fail_termux_partial_upgrade
+    fi
+
+    if ! git --version >/dev/null 2>&1; then
+        fail_termux_partial_upgrade
+    fi
+}
+
 ensure_termux_dependencies() {
     log "Installing Termux build dependencies"
     run_cmd pkg update -y
+    run_cmd pkg upgrade -y
     run_cmd pkg install -y git cmake make clang curl
+    verify_termux_runtime_health
 }
 
 prepare_runtime_dirs() {
-    run_cmd mkdir -p "$MOBILE_RUNTIME_DIR" "$MODEL_DIR"
+    run_cmd mkdir -p "$MOBILE_RUNTIME_DIR" "$MODEL_DIR" "$EXPORT_FALLBACK_DIR"
+}
+
+resolve_export_dir() {
+    local shared_downloads="${HOME:-$ROOT_DIR}/storage/downloads"
+
+    if [[ -d "$shared_downloads" ]]; then
+        EXPORT_DIR="$shared_downloads"
+        EXPORT_MODE="shared-downloads"
+    else
+        EXPORT_DIR="$EXPORT_FALLBACK_DIR"
+        EXPORT_MODE="repo-fallback"
+    fi
 }
 
 clone_or_refresh_llama_cpp() {
@@ -264,6 +315,8 @@ DREAM_MOBILE_LLAMA_DIR="$LLAMA_DIR"
 DREAM_MOBILE_LLAMA_CLI="$llama_cli"
 DREAM_MOBILE_CONTEXT="$MOBILE_CONTEXT"
 DREAM_MOBILE_THREADS="$MOBILE_THREADS"
+DREAM_MOBILE_EXPORT_DIR="$EXPORT_DIR"
+DREAM_MOBILE_EXPORT_MODE="$EXPORT_MODE"
 EOF
 }
 
@@ -275,13 +328,20 @@ print_summary() {
     echo "Model:     $MODEL_NAME ($MODEL_FILE)"
     echo "Context:   $MOBILE_CONTEXT"
     echo "Threads:   $MOBILE_THREADS"
+    echo "Exports:   $EXPORT_DIR"
     echo ""
     echo "Next steps:"
     echo "  ./dream-mobile.sh status"
     echo "  ./dream-mobile.sh chat"
     echo "  ./dream-mobile.sh prompt \"oi, me explica esse repo\""
+    echo "  ./dream-mobile.sh export notes/brief.txt \"gere um resumo claro deste repo\""
     echo ""
     echo "This mobile preview is intentionally limited to shell chat for now."
+    if [[ "$EXPORT_MODE" = "repo-fallback" ]]; then
+        echo ""
+        warn "Android shared storage is not linked yet."
+        echo "Run 'termux-setup-storage' once, grant the permission, and rerun ./install.sh to export into Downloads."
+    fi
 }
 
 main() {
@@ -305,6 +365,7 @@ main() {
     esac
 
     prepare_runtime_dirs
+    resolve_export_dir
     ensure_termux_dependencies
     clone_or_refresh_llama_cpp
     build_llama_cli
