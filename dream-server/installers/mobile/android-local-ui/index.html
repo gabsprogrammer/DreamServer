@@ -291,40 +291,23 @@ Server</pre>
 
         <section class="view" id="chatView">
           <div class="chat-layout">
-            <aside class="panel chat-sidecard">
-              <div class="panel-header">
-                <div>
-                  <p class="panel-kicker" id="chatSideKicker">Session</p>
-                  <h3 id="chatSideTitle">Local model</h3>
-                </div>
-              </div>
-              <div class="chat-side-metrics">
-                <div class="chat-side-row">
-                  <span id="chatSideModelLabel">Model</span>
-                  <strong id="chatSideModel">-</strong>
-                </div>
-                <div class="chat-side-row">
-                  <span id="chatSideContextLabel">Context</span>
-                  <strong id="chatSideContext">-</strong>
-                </div>
-                <div class="chat-side-row">
-                  <span id="chatSideTurnsLabel">Turns</span>
-                  <strong id="chatSideTurns">-</strong>
-                </div>
-                <div class="chat-side-row">
-                  <span id="chatSideLatencyLabel">Last reply</span>
-                  <strong id="chatSideLatency">-</strong>
-                </div>
-              </div>
-              <button class="ghost-action" id="resetButton" type="button">Reset session</button>
-            </aside>
-
             <section class="panel chat-panel">
               <div class="chat-head">
                 <div>
                   <p class="panel-kicker" id="chatPanelKicker">Chat</p>
                   <h2 id="chatPanelTitle">Talk to Dream locally</h2>
                 </div>
+                <div class="chat-head-actions">
+                  <div class="chat-meta-strip">
+                    <span class="chat-meta-pill" id="chatMetaContext">Context --</span>
+                    <span class="chat-meta-pill" id="chatMetaTurns">Turns --</span>
+                    <span class="chat-meta-pill" id="chatMetaLatency">Last --</span>
+                  </div>
+                  <button class="ghost-action ghost-action--inline" id="resetButton" type="button">Reset session</button>
+                </div>
+              </div>
+
+              <div class="chat-subhead">
                 <p class="chat-status" id="statusText">Ready.</p>
               </div>
 

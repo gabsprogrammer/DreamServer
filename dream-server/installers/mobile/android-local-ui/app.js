@@ -160,6 +160,14 @@ function formatUptime(seconds) {
   return `${mins}m`;
 }
 
+function summarizeExportPath(path) {
+  if (!path) return "-";
+  if (path.includes("/data/data/com.termux/")) return "/data/data/com.termux/...";
+  if (path.includes("/storage/emulated/0/Download")) return "/storage/emulated/0/Download/...";
+  if (path.includes("/storage/emulated/0/Downloads")) return "/storage/emulated/0/Downloads/...";
+  return compactText(path, 36);
+}
+
 function compactText(text, limit = 140) {
   if (!text) return ui.responsePreviewFallback;
   const normalized = text.replace(/\s+/g, " ").trim();
@@ -280,7 +288,7 @@ function buildServices(snapshot) {
     limited: [
       {
         title: prefersPortuguese ? "Exports" : "Exports",
-        detail: exportsInfo.dir_short || exportsInfo.dir || "-",
+        detail: summarizeExportPath(exportsInfo.dir || exportsInfo.dir_short || ""),
       },
       {
         title: prefersPortuguese ? "GPU Telemetry" : "GPU Telemetry",
@@ -393,6 +401,8 @@ function updateStatus(snapshot) {
 
   const deviceLabel = [device?.manufacturer, device?.model].filter(Boolean).join(" ");
   const androidLabel = device?.android ? `Android ${device.android}` : "Android";
+  const exportLabel = summarizeExportPath(exportsInfo?.dir || exportsInfo?.dir_short || "");
+  const uptimeValue = uptimeS || (session?.started_at ? Math.max(1, Math.round((Date.now() / 1000) - session.started_at)) : null);
   const sessionLabel = session?.ready
     ? prefersPortuguese
       ? `Sessao pronta • ${session.turns || 0} turnos`
@@ -406,7 +416,7 @@ function updateStatus(snapshot) {
   sessionBadgeEl.textContent = sessionLabel;
   setText("sidebarSession", sessionLabel);
   setText("sidebarDevice", `${deviceLabel || "Android"} • ${androidLabel}`);
-  setText("sidebarExport", exportsInfo?.dir_short || exportsInfo?.dir || "-");
+  setText("sidebarExport", exportLabel);
   setText("sidebarModelName", model?.name || "Qwen mobile");
   setText("deviceChip", `${deviceLabel || "Android"} • ${androidLabel}`);
   setText("localUrlChip", localUrl || "http://127.0.0.1:8765");
@@ -471,17 +481,21 @@ function updateStatus(snapshot) {
   if (sidebarFill) sidebarFill.style.width = `${Math.min(memory?.used_percent || 0, 100)}%`;
 
   setText("storageMeta", storage?.available ? `${storage.export_free_gb} GB ${prefersPortuguese ? "livres" : "free"}` : "--");
-  setText("uptimeCardValue", formatUptime(uptimeS));
-  setText("uptimeCardMeta", device?.chip ? `${device.chip}` : androidLabel);
+  setText("uptimeCardValue", formatUptime(uptimeValue));
+  setText(
+    "uptimeCardMeta",
+    uptimeS
+      ? (device?.chip ? `${device.chip}` : androidLabel)
+      : (prefersPortuguese ? "fallback da sessao local" : "local session fallback"),
+  );
   setText("modelCardValue", model?.name || "--");
   setText("modelCardMeta", model?.path_short || model?.path || "--");
   setText("modelName", model?.name || "--");
   setText("modelCardLabel", prefersPortuguese ? "Modelo" : "Model");
   setText("chartContextChip", `Context ${model?.context ?? "--"}`);
-  setText("chatSideModel", model?.name || "--");
-  setText("chatSideContext", `${model?.context ?? "--"}`);
-  setText("chatSideTurns", `${session?.turns ?? 0}`);
-  setText("chatSideLatency", formatMs(session?.last_latency_ms));
+  setText("chatMetaContext", `Context ${model?.context ?? "--"}`);
+  setText("chatMetaTurns", `${prefersPortuguese ? "Turnos" : "Turns"} ${session?.turns ?? 0}`);
+  setText("chatMetaLatency", `${prefersPortuguese ? "Ultima" : "Last"} ${formatMs(session?.last_latency_ms)}`);
 
   const services = buildServices(snapshot);
   renderServiceList("servicesOnline", services.online);
