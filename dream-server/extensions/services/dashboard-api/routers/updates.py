@@ -227,6 +227,7 @@ async def get_update_dry_run():
     latest: Optional[str] = None
     changelog_url: Optional[str] = None
     update_available = False
+    version_check_error: Optional[str] = None
 
     try:
         req = urllib.request.Request(
@@ -241,8 +242,8 @@ async def get_update_dry_run():
                 def _parts(v: str) -> list[int]:
                     return ([int(x) for x in v.split(".") if x.isdigit()][:3] + [0, 0, 0])[:3]
                 update_available = _parts(latest) > _parts(current)
-    except (urllib.error.URLError, urllib.error.HTTPError, OSError, json.JSONDecodeError, ValueError):
-        pass
+    except (urllib.error.URLError, urllib.error.HTTPError, OSError, json.JSONDecodeError, ValueError) as e:
+        version_check_error = f"Could not reach GitHub: {e}"
 
     # ── configured image tags from compose files ──────────────────────────────
     images: list[str] = []
@@ -276,6 +277,7 @@ async def get_update_dry_run():
         "changelog_url": changelog_url,
         "images": images,
         "env_keys": env_snapshot,
+        "version_check_error": version_check_error,
     }
 
 

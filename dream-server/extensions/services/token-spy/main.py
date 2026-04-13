@@ -712,6 +712,7 @@ async def _handle_non_streaming(client, raw_body, headers, model, sys_analysis,
     try:
         data = resp.json()
     except Exception:
+        log.warning("Failed to parse Anthropic response JSON — token usage will be recorded as zero")
         data = {}
 
     resp_usage = data.get("usage", {})
@@ -942,6 +943,7 @@ async def _handle_openai_non_streaming(client, raw_body, headers, model, sys_ana
     try:
         data = resp.json()
     except Exception:
+        log.warning("Failed to parse OpenAI response JSON — token usage will be recorded as zero")
         data = {}
 
     resp_usage = data.get("usage", {})
@@ -1184,7 +1186,8 @@ def _get_remote_session_status(agent: str) -> dict:
         "                    history_chars += sum(len(str(x)) for x in c)\n"
         "                elif isinstance(c, str):\n"
         "                    history_chars += len(c)\n"
-        "        except: pass\n"
+        "        except Exception:\n"
+        "            pass  # skip corrupt JSONL lines\n"
         "    print(json.dumps({'turns': turns, 'chars': history_chars, 'tool_results': tool_results,"
         " 'file_bytes': os.path.getsize(largest), 'total_lines': len(lines), 'files': len(files)}))"
     )
@@ -1266,7 +1269,8 @@ def _kill_remote_session(agent: str, reason: str = "dashboard") -> dict:
         "        for k in list(data.keys()):\n"
         "            if isinstance(data[k], dict) and data[k].get('sessionId') == sid: del data[k]\n"
         "        with open(sj, 'w') as fh: json.dump(data, fh, indent=2)\n"
-        "    except: pass\n"
+        "    except Exception as e:\n"
+        "        print(json.dumps({'warn': 'sessions.json update failed', 'error': str(e)}))\n"
         "    print(json.dumps({'action': 'killed', 'session_id': sid, 'size_bytes': size}))"
     )
     try:
