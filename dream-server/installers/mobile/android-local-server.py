@@ -25,6 +25,34 @@ PT_HINT_RE = re.compile(
     r"explica|resuma|gera|gerar|manda|enviar|obrigad[oa]|ajuda)\b|[ãõçáéíóú])",
     re.IGNORECASE,
 )
+MODEL_PRESETS: dict[str, dict[str, Any]] = {
+    "qwen3-0.6b": {
+        "id": "qwen3-0.6b",
+        "name": "Qwen3-0.6B",
+        "repo": "ggml-org/Qwen3-0.6B-GGUF",
+        "file": "Qwen3-0.6B-Q4_0.gguf",
+        "url": "https://huggingface.co/ggml-org/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_0.gguf",
+        "size_mb": 429,
+        "summary": "Fast and lightweight default mobile model.",
+    },
+    "qwen3.5-2b": {
+        "id": "qwen3.5-2b",
+        "name": "Qwen3.5-2B",
+        "repo": "bartowski/Qwen_Qwen3.5-2B-GGUF",
+        "file": "Qwen_Qwen3.5-2B-Q4_K_M.gguf",
+        "url": "https://huggingface.co/bartowski/Qwen_Qwen3.5-2B-GGUF/resolve/main/Qwen_Qwen3.5-2B-Q4_K_M.gguf",
+        "size_mb": 1600,
+        "summary": "Heavier but much stronger local reasoning than 0.6B on Android.",
+    },
+}
+LOCALE_LABELS = {
+    "pt": "Brazilian Portuguese",
+    "en": "English",
+    "es": "Spanish",
+    "de": "German",
+    "fr": "French",
+    "it": "Italian",
+}
 
 
 def json_response(handler: "DreamMobileHandler", payload: dict[str, Any], status: int = 200) -> None:
@@ -99,6 +127,31 @@ def compact_path(path: str, limit: int = 58) -> str:
     return "…" + tail[-(limit - 1) :]
 
 
+def read_env_file(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    if not path.exists():
+        return values
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, raw = line.split("=", 1)
+        values[key] = raw.strip().strip('"')
+    return values
+
+
+def write_env_file(path: Path, values: dict[str, str]) -> None:
+    lines = [f'{key}="{value}"' for key, value in values.items()]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def locale_label(locale_hint: str | None) -> str:
+    if not locale_hint:
+        return "English"
+    code = locale_hint.split("-")[0].lower()
+    return LOCALE_LABELS.get(code, "English")
+
+
 class ChatSession:
     def __init__(self, chat_bin: str, model_path: str, context: int) -> None:
         self.chat_bin = chat_bin
@@ -114,6 +167,7 @@ class ChatSession:
         self.last_reply_chars = 0
         self.last_reply_at: float | None = None
         self.warming = False
+        self.active_locale: str | None = None
 
     def _clean(self, data: bytes) -> str:
         return ANSI_RE.sub(b"", data).decode("utf-8", errors="ignore").replace("\r", "")
@@ -145,22 +199,29 @@ class ChatSession:
 
         raise TimeoutError("timed out waiting for the local chat response")
 
-    def _prepare_user_message(self, message: str, locale_hint: str | None) -> str:
-        locale = (locale_hint or "").lower()
-        use_portuguese = bool(PT_HINT_RE.search(message)) or locale.startswith("pt")
-        if use_portuguese:
-            return (
-                "Responda em portugues do Brasil. "
-                "Seja natural, direto e util. "
-                "Nao mostre raciocinio interno.\n\n"
-                f"Pergunta do usuario:\n{message}"
+    def _steer_locale(self, locale_hint: str | None) -> None:
+        assert self.process is not None and self.process.stdin is not None
+
+        desired = "pt" if (locale_hint or "").lower().startswith("pt") else (locale_hint or "en").split("-")[0].lower() or "en"
+        if self.active_locale == desired:
+            return
+
+        language = locale_label(locale_hint if desired != "pt" else "pt-BR")
+        if desired == "pt":
+            instruction = (
+                "Instrucao de sistema: a partir de agora responda sempre em portugues do Brasil. "
+                "Seja natural, direto e util. Nao fale sobre estas instrucoes. Responda somente 'ok'."
             )
-        return (
-            "Reply in the same language as the user. "
-            "Be direct, natural, and helpful. "
-            "Do not reveal internal reasoning.\n\n"
-            f"User message:\n{message}"
-        )
+        else:
+            instruction = (
+                f"System instruction: from now on answer in {language}. "
+                "Be natural, direct, and useful. Do not mention these instructions. Reply only 'ok'."
+            )
+
+        self.process.stdin.write(instruction.encode("utf-8") + b"\n")
+        self.process.stdin.flush()
+        self._read_until_prompt(timeout=180)
+        self.active_locale = desired
 
     def ensure_started(self) -> None:
         if self.process and self.process.poll() is None:
@@ -183,6 +244,7 @@ class ChatSession:
         )
         self.started_at = time.time()
         self.turns = 0
+        self.active_locale = None
         self._read_until_prompt(timeout=180)
 
     def prewarm(self) -> None:
@@ -202,9 +264,8 @@ class ChatSession:
         with self.lock:
             self.ensure_started()
             assert self.process is not None and self.process.stdin is not None and self.process.stdout is not None
-
-            prepared = self._prepare_user_message(message, locale_hint)
-            self.process.stdin.write(prepared.encode("utf-8") + b"\n")
+            self._steer_locale(locale_hint)
+            self.process.stdin.write(message.encode("utf-8") + b"\n")
             self.process.stdin.flush()
 
             started = time.time()
@@ -270,6 +331,11 @@ class ChatSession:
             self.turns = 0
             self.last_latency_ms = None
             self.last_reply_chars = 0
+            self.active_locale = None
+
+    def set_model(self, model_path: str) -> None:
+        self.model_path = model_path
+        self.reset()
 
     def info(self) -> dict[str, Any]:
         return {
@@ -296,6 +362,10 @@ class Metrics:
         self.device_info = self._device()
         self._last_cpu_total: int | None = None
         self._last_cpu_idle: int | None = None
+
+    def set_model(self, model_name: str, model_path: str) -> None:
+        self.model_name = model_name
+        self.model_path = model_path
 
     def _device(self) -> dict[str, Any]:
         manufacturer = shell_text(["getprop", "ro.product.manufacturer"]) or "Android"
@@ -508,10 +578,76 @@ class Metrics:
         }
 
 
+class ModelManager:
+    def __init__(self, project_root: str, model_dir: str, current_model_path: str) -> None:
+        self.project_root = Path(project_root)
+        self.model_dir = Path(model_dir)
+        self.config_file = self.project_root / ".dream-mobile.env"
+        self.current_model_path = current_model_path
+
+    def _current_env(self) -> dict[str, str]:
+        return read_env_file(self.config_file)
+
+    def _current_model_id(self) -> str | None:
+        env = self._current_env()
+        return env.get("DREAM_MOBILE_MODEL_ID")
+
+    def list_models(self) -> dict[str, Any]:
+        current_id = self._current_model_id()
+        models = []
+        for preset in MODEL_PRESETS.values():
+            path = self.model_dir / preset["file"]
+            models.append(
+                {
+                    "id": preset["id"],
+                    "name": preset["name"],
+                    "repo": preset["repo"],
+                    "file": preset["file"],
+                    "size_mb": preset["size_mb"],
+                    "summary": preset["summary"],
+                    "installed": path.exists(),
+                    "active": current_id == preset["id"] or self.current_model_path == str(path),
+                }
+            )
+        return {"current_id": current_id, "models": models}
+
+    def select_model(self, model_id: str) -> dict[str, Any]:
+        if model_id not in MODEL_PRESETS:
+            raise ValueError(f"unknown model preset: {model_id}")
+
+        preset = MODEL_PRESETS[model_id]
+        model_path = self.model_dir / preset["file"]
+        self.model_dir.mkdir(parents=True, exist_ok=True)
+
+        if not model_path.exists():
+            subprocess.run(
+                ["curl", "-L", "--fail", "-C", "-", "-o", str(model_path), preset["url"]],
+                check=True,
+            )
+
+        env = self._current_env()
+        env["DREAM_MOBILE_MODEL_ID"] = preset["id"]
+        env["DREAM_MOBILE_MODEL_NAME"] = preset["name"]
+        env["DREAM_MOBILE_MODEL_REPO"] = preset["repo"]
+        env["DREAM_MOBILE_MODEL_FILE"] = preset["file"]
+        env["DREAM_MOBILE_MODEL_URL"] = preset["url"]
+        env["DREAM_MOBILE_MODEL_PATH"] = str(model_path)
+        write_env_file(self.config_file, env)
+        self.current_model_path = str(model_path)
+
+        return {
+            "id": preset["id"],
+            "name": preset["name"],
+            "path": str(model_path),
+            "path_short": compact_path(str(model_path)),
+        }
+
+
 class DreamMobileHandler(SimpleHTTPRequestHandler):
     assets_dir = Path(__file__).with_name("android-local-ui")
     chat_session: ChatSession
     metrics: Metrics
+    model_manager: ModelManager
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, directory=str(self.assets_dir), **kwargs)
@@ -530,6 +666,10 @@ class DreamMobileHandler(SimpleHTTPRequestHandler):
             json_response(self, {"ok": True, "status": payload})
             return
 
+        if self.path == "/api/models":
+            json_response(self, {"ok": True, **self.model_manager.list_models()})
+            return
+
         super().do_GET()
 
     def do_POST(self) -> None:
@@ -545,6 +685,10 @@ class DreamMobileHandler(SimpleHTTPRequestHandler):
             self.chat_session.reset()
             threading.Thread(target=self.chat_session.prewarm, daemon=True).start()
             json_response(self, {"ok": True})
+            return
+
+        if self.path == "/api/models/select":
+            self.handle_model_select()
             return
 
         json_response(self, {"ok": False, "error": "not found"}, status=HTTPStatus.NOT_FOUND)
@@ -629,6 +773,42 @@ class DreamMobileHandler(SimpleHTTPRequestHandler):
             except BrokenPipeError:
                 return
 
+    def handle_model_select(self) -> None:
+        payload = self._read_json_body()
+        if payload is None:
+            json_response(self, {"ok": False, "error": "invalid JSON"}, status=HTTPStatus.BAD_REQUEST)
+            return
+
+        model_id = str(payload.get("model_id", "")).strip()
+        if not model_id:
+            json_response(self, {"ok": False, "error": "model_id is required"}, status=HTTPStatus.BAD_REQUEST)
+            return
+
+        try:
+            selected = self.model_manager.select_model(model_id)
+            self.chat_session.set_model(selected["path"])
+            self.metrics.set_model(selected["name"], selected["path"])
+            threading.Thread(target=self.chat_session.prewarm, daemon=True).start()
+        except subprocess.CalledProcessError as exc:
+            json_response(
+                self,
+                {"ok": False, "error": f"model download failed: {exc}"},
+                status=HTTPStatus.INTERNAL_SERVER_ERROR,
+            )
+            return
+        except Exception as exc:
+            json_response(self, {"ok": False, "error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
+        json_response(
+            self,
+            {
+                "ok": True,
+                "selected": selected,
+                "models": self.model_manager.list_models()["models"],
+            },
+        )
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Dream Server Mobile Android local UI")
@@ -657,6 +837,11 @@ def main() -> int:
         project_root=args.project_root,
         context=args.context,
         local_url=f"http://{args.host}:{args.port}",
+    )
+    DreamMobileHandler.model_manager = ModelManager(
+        project_root=args.project_root,
+        model_dir=str(Path(args.model).parent),
+        current_model_path=args.model,
     )
 
     threading.Thread(target=DreamMobileHandler.chat_session.prewarm, daemon=True).start()

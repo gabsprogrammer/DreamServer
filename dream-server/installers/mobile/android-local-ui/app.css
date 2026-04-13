@@ -410,6 +410,88 @@ button {
   margin-top: 16px;
 }
 
+.models-grid {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.model-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015)),
+    linear-gradient(180deg, rgba(18, 18, 26, 0.94), rgba(13, 13, 19, 0.98));
+  box-shadow: var(--shadow);
+}
+
+.model-head,
+.model-meta,
+.model-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.model-name {
+  margin: 0;
+  font-size: 1.18rem;
+  letter-spacing: -0.03em;
+}
+
+.model-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.model-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: var(--text-soft);
+  font-size: 0.76rem;
+}
+
+.model-pill--active {
+  color: #fff;
+  border-color: rgba(72, 215, 163, 0.22);
+  background: rgba(72, 215, 163, 0.12);
+}
+
+.model-pill--installed {
+  color: #fff4d8;
+  border-color: rgba(255, 199, 102, 0.18);
+  background: rgba(255, 199, 102, 0.1);
+}
+
+.model-summary,
+.model-repo {
+  margin: 0;
+  color: var(--text-soft);
+  line-height: 1.55;
+}
+
+.model-action {
+  border: 0;
+  border-radius: 14px;
+  padding: 11px 16px;
+  color: #fff;
+  background: linear-gradient(135deg, rgba(157, 0, 255, 0.98), rgba(125, 44, 255, 0.94));
+}
+
+.model-action:disabled {
+  opacity: 0.66;
+}
+
 .feature-card {
   display: grid;
   gap: 12px;
@@ -805,6 +887,10 @@ textarea:focus {
 
   .feature-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .models-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .dashboard-grid {

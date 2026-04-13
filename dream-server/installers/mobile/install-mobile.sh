@@ -114,6 +114,13 @@ resolve_model() {
             MODEL_URL="https://huggingface.co/ggml-org/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_0.gguf"
             MODEL_SIZE_MB=429
             ;;
+        qwen3.5-2b|qwen-3.5-2b|qwen35-2b)
+            MODEL_NAME="Qwen3.5-2B"
+            MODEL_REPO="bartowski/Qwen_Qwen3.5-2B-GGUF"
+            MODEL_FILE="Qwen_Qwen3.5-2B-Q4_K_M.gguf"
+            MODEL_URL="https://huggingface.co/bartowski/Qwen_Qwen3.5-2B-GGUF/resolve/main/Qwen_Qwen3.5-2B-Q4_K_M.gguf"
+            MODEL_SIZE_MB=1600
+            ;;
         *)
             fail "Unsupported mobile model preset: $MODEL_ID"
             ;;

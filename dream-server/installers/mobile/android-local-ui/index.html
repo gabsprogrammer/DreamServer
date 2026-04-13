@@ -36,6 +36,13 @@ Server</pre>
             <small id="navChatMeta">Local model session</small>
           </span>
         </button>
+        <button class="nav-item" data-view-target="modelsView" type="button">
+          <span class="nav-icon">◌</span>
+          <span class="nav-copy">
+            <strong id="navModelsLabel">Models</strong>
+            <small id="navModelsMeta">Switch local GGUF</small>
+          </span>
+        </button>
       </nav>
 
       <section class="sidebar-status">
@@ -330,6 +337,23 @@ Server</pre>
               </form>
             </section>
           </div>
+        </section>
+
+        <section class="view" id="modelsView">
+          <section class="hero-panel hero-panel--models">
+            <div class="hero-copy">
+              <p class="hero-kicker" id="modelsHeroKicker">MODELS</p>
+              <h2 class="hero-title" id="modelsHeroTitle">Local model library</h2>
+              <p class="hero-lede" id="modelsHeroLede">
+                See the current GGUF, try a stronger Android preset, and switch the local session without rebuilding llama.cpp.
+              </p>
+            </div>
+            <div class="hero-meta">
+              <div class="hero-chip" id="modelsActiveChip">Current model</div>
+            </div>
+          </section>
+
+          <section class="models-grid" id="modelsGrid"></section>
         </section>
       </main>
     </div>

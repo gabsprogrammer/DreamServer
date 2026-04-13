@@ -15,6 +15,8 @@ const inputEl = document.getElementById("messageInput");
 const sendButtonEl = document.getElementById("sendButton");
 const goToChatButtonEl = document.getElementById("goToChatButton");
 const previewChatButtonEl = document.getElementById("previewChatButton");
+const modelsGridEl = document.getElementById("modelsGrid");
+const modelsActiveChipEl = document.getElementById("modelsActiveChip");
 
 const prefersPortuguese = (navigator.language || "").toLowerCase().startsWith("pt");
 const ui = prefersPortuguese
@@ -37,7 +39,7 @@ const ui = prefersPortuguese
       chatFailed: "A sessao local falhou.",
       waitingFirstReply: "Aguardando a primeira resposta...",
       welcome:
-        "Sessao local Android online. Fale em portugues normalmente que eu vou responder no mesmo idioma e transmitir a resposta conforme ela for sendo gerada.",
+        "Sessao local Android online. Pergunte qualquer coisa e eu vou transmitir a resposta conforme ela for sendo gerada.",
       placeholder: "Pergunte algo, peça um resumo ou teste uma tarefa local curta...",
       reset: "Resetar sessao",
       assistant: "Dream",
@@ -63,6 +65,14 @@ const ui = prefersPortuguese
       servicesLimited: "Limitado",
       servicesInactive: "Desktop only",
       chatPanelTitle: "Converse com o Dream localmente",
+      models: "Models",
+      modelsMeta: "Trocar GGUF local",
+      modelsHeroTitle: "Biblioteca de modelos locais",
+      modelsHeroLede: "Veja o GGUF atual, teste um preset Android mais forte e troque a sessao local sem recompilar o runtime.",
+      modelsCurrent: "Modelo atual",
+      modelsActionUse: "Usar modelo",
+      modelsActionInstall: "Baixar e usar",
+      modelsBusy: "Baixando modelo...",
       composerLabel: "Mensagem",
       send: "Enviar",
       resetStatus: "Sessao resetada.",
@@ -86,7 +96,7 @@ const ui = prefersPortuguese
       chatFailed: "The local session failed.",
       waitingFirstReply: "Waiting for the first reply...",
       welcome:
-        "Local Android session online. Ask naturally and I will stream the answer as it is generated.",
+        "Local Android session online. Ask anything and I will stream the answer as it is generated.",
       placeholder: "Ask about code, request a summary, or test a quick local task...",
       reset: "Reset session",
       assistant: "Dream",
@@ -112,6 +122,14 @@ const ui = prefersPortuguese
       servicesLimited: "Limited",
       servicesInactive: "Desktop only",
       chatPanelTitle: "Talk to Dream locally",
+      models: "Models",
+      modelsMeta: "Switch local GGUF",
+      modelsHeroTitle: "Local model library",
+      modelsHeroLede: "See the current GGUF, try a stronger Android preset, and switch the local session without rebuilding the runtime.",
+      modelsCurrent: "Current model",
+      modelsActionUse: "Use model",
+      modelsActionInstall: "Download and use",
+      modelsBusy: "Downloading model...",
       composerLabel: "Message",
       send: "Send",
       resetStatus: "Session reset.",
@@ -127,6 +145,7 @@ const state = {
     battery: [],
   },
   lastAssistantPreview: "",
+  models: [],
 };
 
 function setText(id, value) {
@@ -217,7 +236,7 @@ function switchView(viewId) {
   document.querySelectorAll(".nav-item").forEach((el) => {
     el.classList.toggle("is-active", el.dataset.viewTarget === viewId);
   });
-  topbarTitleEl.textContent = viewId === "chatView" ? ui.chat : ui.dashboard;
+  topbarTitleEl.textContent = viewId === "chatView" ? ui.chat : viewId === "modelsView" ? ui.models : ui.dashboard;
   closeSidebar();
 }
 
@@ -343,6 +362,101 @@ function renderServiceList(targetId, items) {
   });
 }
 
+function renderModels() {
+  if (!modelsGridEl) return;
+  modelsGridEl.innerHTML = "";
+
+  (state.models || []).forEach((model) => {
+    const card = document.createElement("article");
+    card.className = "model-card";
+
+    const head = document.createElement("div");
+    head.className = "model-head";
+
+    const titleWrap = document.createElement("div");
+    const title = document.createElement("h3");
+    title.className = "model-name";
+    title.textContent = model.name;
+    const repo = document.createElement("p");
+    repo.className = "model-repo";
+    repo.textContent = model.repo;
+    titleWrap.append(title, repo);
+
+    const pills = document.createElement("div");
+    pills.className = "model-pills";
+    if (model.active) {
+      const activePill = document.createElement("span");
+      activePill.className = "model-pill model-pill--active";
+      activePill.textContent = prefersPortuguese ? "ativo" : "active";
+      pills.appendChild(activePill);
+    }
+    if (model.installed) {
+      const installedPill = document.createElement("span");
+      installedPill.className = "model-pill model-pill--installed";
+      installedPill.textContent = prefersPortuguese ? "baixado" : "downloaded";
+      pills.appendChild(installedPill);
+    }
+    const sizePill = document.createElement("span");
+    sizePill.className = "model-pill";
+    sizePill.textContent = `${model.size_mb} MB`;
+    pills.appendChild(sizePill);
+
+    head.append(titleWrap, pills);
+
+    const summary = document.createElement("p");
+    summary.className = "model-summary";
+    summary.textContent = model.summary;
+
+    const actions = document.createElement("div");
+    actions.className = "model-actions";
+    const action = document.createElement("button");
+    action.className = "model-action";
+    action.disabled = !!model.active;
+    action.textContent = model.installed ? ui.modelsActionUse : ui.modelsActionInstall;
+    action.addEventListener("click", async () => {
+      action.disabled = true;
+      action.textContent = ui.modelsBusy;
+      try {
+        await selectModel(model.id);
+        statusTextEl.textContent = prefersPortuguese ? "Modelo trocado com sucesso." : "Model switched successfully.";
+      } catch (error) {
+        statusTextEl.textContent = `${prefersPortuguese ? "Erro de modelo" : "Model error"}: ${error.message}`;
+      } finally {
+        renderModels();
+      }
+    });
+    actions.append(action);
+
+    card.append(head, summary, actions);
+    modelsGridEl.appendChild(card);
+  });
+}
+
+async function refreshModels() {
+  const response = await fetch("/api/models", { cache: "no-store" });
+  const payload = await response.json();
+  if (!payload.ok) {
+    throw new Error(payload.error || "failed to load models");
+  }
+  state.models = payload.models || [];
+  renderModels();
+}
+
+async function selectModel(modelId) {
+  const response = await fetch("/api/models/select", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model_id: modelId }),
+  });
+  const payload = await response.json();
+  if (!payload.ok) {
+    throw new Error(payload.error || "failed to switch model");
+  }
+  state.models = payload.models || [];
+  renderModels();
+  await refreshStatus();
+}
+
 function updateStaticCopy() {
   document.documentElement.lang = prefersPortuguese ? "pt-BR" : "en";
   setText("brandKicker", prefersPortuguese ? "LOCAL AI // TERMUX" : "LOCAL AI // TERMUX");
@@ -351,6 +465,8 @@ function updateStaticCopy() {
   setText("navDashboardMeta", ui.overview);
   setText("navChatLabel", ui.chat);
   setText("navChatMeta", ui.modelSession);
+  setText("navModelsLabel", ui.models);
+  setText("navModelsMeta", ui.modelsMeta);
   setText("topbarEyebrow", ui.app);
   setText("heroKicker", ui.heroKicker);
   setText("heroTitle", ui.heroTitle);
@@ -361,6 +477,9 @@ function updateStaticCopy() {
   setText("featureDashboardCopy", ui.featureDashboardCopy);
   setText("featureExportCopy", ui.featureExportCopy);
   setText("featureBetaCopy", ui.featureBetaCopy);
+  setText("modelsHeroTitle", ui.modelsHeroTitle);
+  setText("modelsHeroLede", ui.modelsHeroLede);
+  setText("modelsActiveChip", ui.modelsCurrent);
   setText("telemetryTitle", ui.telemetryTitle);
   setText("chartLatencyLabel", ui.chartLatency);
   setText("chartCpuLabel", ui.chartCpu);
@@ -411,7 +530,7 @@ function updateStatus(snapshot) {
       ? prefersPortuguese ? "Aquecendo sessao" : "Warming session"
       : prefersPortuguese ? "Sessao fria" : "Session cold";
 
-  topbarTitleEl.textContent = state.activeView === "chatView" ? ui.chat : ui.dashboard;
+  topbarTitleEl.textContent = state.activeView === "chatView" ? ui.chat : state.activeView === "modelsView" ? ui.models : ui.dashboard;
   runtimePillEl.textContent = session?.ready ? ui.runtimeLive : session?.warming ? ui.runtimeWarming : ui.runtimeCold;
   sessionBadgeEl.textContent = sessionLabel;
   setText("sidebarSession", sessionLabel);
@@ -493,6 +612,7 @@ function updateStatus(snapshot) {
   setText("modelName", model?.name || "--");
   setText("modelCardLabel", prefersPortuguese ? "Modelo" : "Model");
   setText("chartContextChip", `Context ${model?.context ?? "--"}`);
+  setText("modelsActiveChip", `${ui.modelsCurrent}: ${model?.name || "--"}`);
   setText("chatMetaContext", `Context ${model?.context ?? "--"}`);
   setText("chatMetaTurns", `${prefersPortuguese ? "Turnos" : "Turns"} ${session?.turns ?? 0}`);
   setText("chatMetaLatency", `${prefersPortuguese ? "Ultima" : "Last"} ${formatMs(session?.last_latency_ms)}`);
@@ -622,6 +742,7 @@ updateStaticCopy();
 refreshStatus().catch((error) => {
   statusTextEl.textContent = error.message;
 });
+refreshModels().catch(() => {});
 setInterval(() => {
   refreshStatus().catch(() => {});
 }, 4000);
