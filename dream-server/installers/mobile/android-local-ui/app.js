@@ -13,6 +13,9 @@ const messagesEl = document.getElementById("messages");
 const formEl = document.getElementById("chatForm");
 const inputEl = document.getElementById("messageInput");
 const sendButtonEl = document.getElementById("sendButton");
+const attachmentInputEl = document.getElementById("attachmentInput");
+const attachmentButtonEl = document.getElementById("attachButton");
+const attachmentListEl = document.getElementById("attachmentList");
 const goToChatButtonEl = document.getElementById("goToChatButton");
 const previewChatButtonEl = document.getElementById("previewChatButton");
 const modelsGridEl = document.getElementById("modelsGrid");
@@ -73,6 +76,8 @@ const ui = prefersPortuguese
       modelsActionUse: "Usar modelo",
       modelsActionInstall: "Baixar e usar",
       modelsBusy: "Baixando modelo...",
+      attach: "Anexar imagem ou PDF",
+      attachOnlyMessage: "[anexos enviados]",
       composerLabel: "Mensagem",
       send: "Enviar",
       resetStatus: "Sessao resetada.",
@@ -130,6 +135,8 @@ const ui = prefersPortuguese
       modelsActionUse: "Use model",
       modelsActionInstall: "Download and use",
       modelsBusy: "Downloading model...",
+      attach: "Attach image or PDF",
+      attachOnlyMessage: "[attachments sent]",
       composerLabel: "Message",
       send: "Send",
       resetStatus: "Session reset.",
@@ -146,6 +153,7 @@ const state = {
   },
   lastAssistantPreview: "",
   models: [],
+  attachments: [],
 };
 
 function setText(id, value) {
@@ -200,6 +208,37 @@ function normalizeAssistantText(text) {
     .replace(/<\/?think>/gi, "")
     .replace(/\n{3,}/g, "\n\n")
     .replace(/^\s+/, "");
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderAttachments() {
+  if (!attachmentListEl) return;
+  attachmentListEl.innerHTML = "";
+
+  state.attachments.forEach((item) => {
+    const chip = document.createElement("div");
+    chip.className = "attachment-chip";
+    const label = document.createElement("span");
+    label.textContent = item.name;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "×";
+    remove.setAttribute("aria-label", "Remove attachment");
+    remove.addEventListener("click", () => {
+      state.attachments = state.attachments.filter((entry) => entry.id !== item.id);
+      renderAttachments();
+    });
+    chip.append(label, remove);
+    attachmentListEl.appendChild(chip);
+  });
 }
 
 function appendMessage(role, body) {
@@ -480,6 +519,7 @@ function updateStaticCopy() {
   setText("modelsHeroTitle", ui.modelsHeroTitle);
   setText("modelsHeroLede", ui.modelsHeroLede);
   setText("modelsActiveChip", ui.modelsCurrent);
+  if (attachmentButtonEl) attachmentButtonEl.textContent = ui.attach;
   setText("telemetryTitle", ui.telemetryTitle);
   setText("chartLatencyLabel", ui.chartLatency);
   setText("chartCpuLabel", ui.chartCpu);
@@ -643,7 +683,15 @@ async function streamMessage(message, assistantBodyEl) {
   const response = await fetch("/api/chat-stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, locale: navigator.language || "" }),
+    body: JSON.stringify({
+      message,
+      locale: navigator.language || "",
+      attachments: state.attachments.map((item) => ({
+        name: item.name,
+        type: item.type,
+        data_base64: item.dataBase64,
+      })),
+    }),
   });
 
   if (!response.ok || !response.body) {
@@ -681,12 +729,38 @@ async function streamMessage(message, assistantBodyEl) {
   return normalizeAssistantText(accumulated).trim();
 }
 
+attachmentButtonEl.addEventListener("click", () => {
+  attachmentInputEl.click();
+});
+
+attachmentInputEl.addEventListener("change", async (event) => {
+  const files = Array.from(event.target.files || []);
+  if (!files.length) return;
+
+  const accepted = files.slice(0, 3).filter((file) => {
+    return file.type.startsWith("image/") || file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+  });
+
+  for (const file of accepted) {
+    const dataBase64 = await fileToDataUrl(file);
+    state.attachments.push({
+      id: `${file.name}-${file.size}-${Date.now()}-${Math.random()}`,
+      name: file.name,
+      type: file.type || (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "application/octet-stream"),
+      dataBase64,
+    });
+  }
+
+  attachmentInputEl.value = "";
+  renderAttachments();
+});
+
 formEl.addEventListener("submit", async (event) => {
   event.preventDefault();
   const message = inputEl.value.trim();
-  if (!message) return;
+  if (!message && !state.attachments.length) return;
 
-  appendMessage("user", message);
+  appendMessage("user", message || ui.attachOnlyMessage);
   inputEl.value = "";
   inputEl.focus();
 
@@ -702,6 +776,8 @@ formEl.addEventListener("submit", async (event) => {
     state.lastAssistantPreview = compactText(reply);
     setText("responsePreview", state.lastAssistantPreview);
     statusTextEl.textContent = ui.chatReady;
+    state.attachments = [];
+    renderAttachments();
     await refreshStatus();
   } catch (error) {
     assistantBodyEl.classList.remove("is-streaming");
@@ -721,6 +797,8 @@ resetButtonEl.addEventListener("click", async () => {
     statusTextEl.textContent = ui.resetStatus;
     latencyHintEl.textContent = ui.waitingFirstReply;
     state.lastAssistantPreview = "";
+    state.attachments = [];
+    renderAttachments();
     setText("responsePreview", ui.responsePreviewFallback);
     await refreshStatus();
   } finally {
@@ -739,6 +817,7 @@ closeSidebarButtonEl.addEventListener("click", closeSidebar);
 sidebarScrimEl.addEventListener("click", closeSidebar);
 
 updateStaticCopy();
+renderAttachments();
 refreshStatus().catch((error) => {
   statusTextEl.textContent = error.message;
 });

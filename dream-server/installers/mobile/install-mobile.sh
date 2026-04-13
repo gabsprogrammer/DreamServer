@@ -233,7 +233,7 @@ ensure_termux_dependencies() {
     log "Installing Termux build dependencies"
     run_cmd pkg update -y
     run_cmd pkg upgrade -y
-    run_cmd pkg install -y git cmake make clang curl python
+    run_cmd pkg install -y git cmake make clang curl python poppler
     verify_termux_runtime_health
 }
 

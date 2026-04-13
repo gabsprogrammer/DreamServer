@@ -330,6 +330,11 @@ Server</pre>
               <form class="composer" id="chatForm">
                 <label class="composer-label" for="messageInput" id="composerLabel">Message</label>
                 <textarea id="messageInput" rows="3" placeholder="Ask about code, request a note, or test a quick local task..."></textarea>
+                <div class="attachment-strip">
+                  <input id="attachmentInput" type="file" accept="image/*,application/pdf" multiple class="hidden-file-input">
+                  <button class="attach-button" id="attachButton" type="button">Attach image or PDF</button>
+                  <div class="attachment-list" id="attachmentList"></div>
+                </div>
                 <div class="composer-actions">
                   <p class="composer-hint" id="latencyHint">Waiting for the first reply…</p>
                   <button class="composer-send" id="sendButton" type="submit">Send</button>

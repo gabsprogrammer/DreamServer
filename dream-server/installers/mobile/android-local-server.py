@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import re
@@ -150,6 +151,81 @@ def locale_label(locale_hint: str | None) -> str:
         return "English"
     code = locale_hint.split("-")[0].lower()
     return LOCALE_LABELS.get(code, "English")
+
+
+def decode_attachment_data(data_base64: str) -> bytes:
+    if "," in data_base64:
+        data_base64 = data_base64.split(",", 1)[1]
+    return base64.b64decode(data_base64)
+
+
+def attachment_context(attachments: list[dict[str, Any]]) -> str:
+    if not attachments:
+        return ""
+
+    parts: list[str] = []
+    temp_root = Path(os.environ.get("TMPDIR") or os.environ.get("TMP") or "/tmp")
+    temp_root.mkdir(parents=True, exist_ok=True)
+
+    for item in attachments[:3]:
+        name = str(item.get("name", "attachment")).strip() or "attachment"
+        mime = str(item.get("type", "")).strip().lower()
+        data = str(item.get("data_base64", "")).strip()
+        if not data:
+            continue
+
+        try:
+            raw = decode_attachment_data(data)
+        except Exception:
+            parts.append(f'Attachment "{name}" could not be decoded.')
+            continue
+
+        if mime == "application/pdf" or name.lower().endswith(".pdf"):
+            if shutil.which("pdftotext"):
+                temp_pdf = temp_root / f"dream-mobile-{int(time.time() * 1000)}.pdf"
+                try:
+                    temp_pdf.write_bytes(raw)
+                    result = subprocess.run(
+                        ["pdftotext", "-layout", str(temp_pdf), "-"],
+                        capture_output=True,
+                        text=True,
+                        timeout=20,
+                        check=False,
+                    )
+                    extracted = (result.stdout or "").strip()
+                    if extracted:
+                        parts.append(
+                            f'Attached PDF "{name}" extracted text:\n{extracted[:12000]}'
+                        )
+                    else:
+                        parts.append(
+                            f'Attached PDF "{name}" is present, but no readable text was extracted.'
+                        )
+                finally:
+                    try:
+                        temp_pdf.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+            else:
+                parts.append(
+                    f'Attached PDF "{name}" is present, but PDF text extraction is unavailable on this device.'
+                )
+            continue
+
+        if mime.startswith("image/"):
+            size_kb = max(1, round(len(raw) / 1024))
+            parts.append(
+                f'Attached image "{name}" ({size_kb} KB). '
+                'This current local model is text-only and cannot directly inspect image pixels. '
+                'If the user asks about the image, explain that they should describe it or switch to a future vision-capable model.'
+            )
+            continue
+
+        parts.append(f'Attached file "{name}" is not supported in this local mobile chat yet.')
+
+    if not parts:
+        return ""
+    return "Attachments context:\n" + "\n\n".join(parts) + "\n\n"
 
 
 class ChatSession:
@@ -709,12 +785,14 @@ class DreamMobileHandler(SimpleHTTPRequestHandler):
 
         message = str(payload.get("message", "")).strip()
         locale_hint = str(payload.get("locale", "")).strip()
+        attachments = payload.get("attachments", [])
         if not message:
             json_response(self, {"ok": False, "error": "message is required"}, status=HTTPStatus.BAD_REQUEST)
             return
 
         try:
-            reply, latency_ms = self.chat_session.ask(message, locale_hint=locale_hint)
+            enriched_message = attachment_context(attachments) + message
+            reply, latency_ms = self.chat_session.ask(enriched_message, locale_hint=locale_hint)
         except Exception as exc:  # pragma: no cover - best effort mobile runtime
             json_response(
                 self,
@@ -741,6 +819,7 @@ class DreamMobileHandler(SimpleHTTPRequestHandler):
 
         message = str(payload.get("message", "")).strip()
         locale_hint = str(payload.get("locale", "")).strip()
+        attachments = payload.get("attachments", [])
         if not message:
             json_response(self, {"ok": False, "error": "message is required"}, status=HTTPStatus.BAD_REQUEST)
             return
@@ -753,7 +832,8 @@ class DreamMobileHandler(SimpleHTTPRequestHandler):
 
         try:
             write_ndjson_event(self, {"type": "start", "session": self.chat_session.info()})
-            for chunk in self.chat_session.stream(message, locale_hint=locale_hint):
+            enriched_message = attachment_context(attachments) + message
+            for chunk in self.chat_session.stream(enriched_message, locale_hint=locale_hint):
                 if chunk:
                     write_ndjson_event(self, {"type": "chunk", "text": chunk})
 

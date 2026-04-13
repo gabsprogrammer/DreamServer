@@ -815,6 +815,52 @@ textarea {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.attachment-strip {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
+.attach-button {
+  justify-self: start;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 10px 14px;
+  color: var(--text-soft);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.attachment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: var(--text-soft);
+  font-size: 0.78rem;
+}
+
+.attachment-chip button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
 textarea {
   width: 100%;
   min-height: 104px;
