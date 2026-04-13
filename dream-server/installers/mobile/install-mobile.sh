@@ -265,7 +265,13 @@ build_llama_cli() {
     jobs="$(recommended_threads)"
 
     log "Building llama.cpp CLI for Termux"
-    run_cmd cmake -S "$LLAMA_DIR" -B "$LLAMA_BUILD_DIR" -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=OFF
+    run_cmd cmake -S "$LLAMA_DIR" -B "$LLAMA_BUILD_DIR" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DGGML_OPENMP=OFF \
+        -DLLAMA_BUILD_SERVER=OFF \
+        -DLLAMA_BUILD_TESTS=OFF \
+        -DLLAMA_BUILD_EXAMPLES=OFF \
+        -DLLAMA_CURL=OFF
     run_cmd cmake --build "$LLAMA_BUILD_DIR" --config Release -j "$jobs" --target llama-cli
 }
 
