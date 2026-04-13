@@ -56,7 +56,7 @@ const ui = prefersPortuguese
       featureChatCopy: "Conversa persistente com o modelo local rodando dentro do Termux.",
       featureDashboardCopy: "Um cockpit localhost mobile mais proximo da linguagem visual do Dream Server real.",
       featureExportCopy: "Arquivos gerados podem ir para o Downloads do Android quando o storage compartilhado estiver ligado.",
-      featureBetaCopy: "Versao lite beta: nao inclui toda a malha de servicos, voz ou automacao do Dream Server desktop.",
+      featureBetaCopy: "Versao lite beta: ainda nao e a malha completa do desktop, mas ja inclui uma ponte local de acoes para abrir apps e executar automacoes simples.",
       responsePreviewFallback:
         "A sessao local ainda esta aquecendo. Quando uma resposta chegar, um preview vai aparecer aqui.",
       telemetryTitle: "Telemetria de inferencia",
@@ -117,7 +117,7 @@ const ui = prefersPortuguese
       featureChatCopy: "Persistent conversation with the model running directly inside Termux.",
       featureDashboardCopy: "A localhost mobile cockpit that feels closer to the real Dream Server dashboard.",
       featureExportCopy: "Generated files can land in Android Downloads when shared storage is linked.",
-      featureBetaCopy: "Lite beta scope: not the full Dream Server mesh, voice stack, or workflow fabric from desktop.",
+      featureBetaCopy: "Lite beta scope: still not the full desktop mesh, but it now includes a local action bridge for opening apps and simple device automation.",
       responsePreviewFallback:
         "The local session is still warming up. Once a reply lands, a preview will appear here.",
       telemetryTitle: "Inference telemetry",
@@ -334,6 +334,7 @@ function buildServices(snapshot) {
   const exportsInfo = snapshot.exports || {};
   const battery = snapshot.battery || {};
   const gpu = snapshot.gpu || {};
+  const automation = snapshot.automation || {};
 
   return {
     online: [
@@ -351,6 +352,13 @@ function buildServices(snapshot) {
       },
     ],
     limited: [
+      {
+        title: prefersPortuguese ? "Action Bridge" : "Action Bridge",
+        detail: automation.summary
+          || (prefersPortuguese
+            ? "Automacao local pronta para abrir apps e executar acoes simples."
+            : "Local automation is ready for app launching and simple actions."),
+      },
       {
         title: prefersPortuguese ? "Exports" : "Exports",
         detail: summarizeExportPath(exportsInfo.dir || exportsInfo.dir_short || ""),
@@ -376,10 +384,6 @@ function buildServices(snapshot) {
       {
         title: prefersPortuguese ? "Voice Assistant" : "Voice Assistant",
         detail: prefersPortuguese ? "Fora do escopo da versao mobile lite" : "Out of scope for the mobile lite build",
-      },
-      {
-        title: prefersPortuguese ? "Workflow Automation" : "Workflow Automation",
-        detail: prefersPortuguese ? "Presente no desktop, nao neste Termux localhost" : "Desktop feature, not in this Termux localhost build",
       },
       {
         title: prefersPortuguese ? "Full Control Center" : "Full Control Center",
@@ -728,6 +732,13 @@ async function streamMessage(message, assistantBodyEl) {
         accumulated += event.text || "";
         assistantBodyEl.textContent = normalizeAssistantText(accumulated);
         messagesEl.scrollTop = messagesEl.scrollHeight;
+      } else if (event.type === "tool") {
+        const summary = event.summary
+          || (prefersPortuguese ? "Executando acao local..." : "Running local action...");
+        statusTextEl.textContent = summary;
+        if (!accumulated) {
+          assistantBodyEl.textContent = summary;
+        }
       } else if (event.type === "done") {
         latencyHintEl.textContent = `${prefersPortuguese ? "Ultima resposta" : "Last reply"}: ${formatMs(event.latency_ms)}`;
       } else if (event.type === "stopped") {

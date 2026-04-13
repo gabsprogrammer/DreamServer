@@ -7,6 +7,7 @@ import json
 import os
 import re
 import select
+import shlex
 import shutil
 import subprocess
 import sys
@@ -15,11 +16,14 @@ import time
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
+from urllib.parse import urlparse
 
 
 ANSI_RE = re.compile(rb"\x1b\[[0-9;?]*[A-Za-z]")
 PROMPT_MARKER = b"\x1b[32m> \x1b[0m"
+TOOL_BLOCK_RE = re.compile(r"<dream-tool>\s*(\{.*?\})\s*</dream-tool>", re.IGNORECASE | re.DOTALL)
+FENCED_JSON_RE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.IGNORECASE | re.DOTALL)
 PT_HINT_RE = re.compile(
     r"(?:\b(?:oi|ol[aá]|voc[eê]|voce|como|qual|quero|preciso|pode|pra|para|"
     r"me|minha|minhas|meu|meus|reuni[aã]o|amanh[aã]|email|celular|arquivo|"
@@ -54,6 +58,54 @@ LOCALE_LABELS = {
     "fr": "French",
     "it": "Italian",
 }
+APP_ALIASES: dict[str, list[str]] = {
+    "calculator": ["com.miui.calculator", "com.android.calculator2"],
+    "calculadora": ["com.miui.calculator", "com.android.calculator2"],
+    "camera": ["com.android.camera", "com.android.camera2"],
+    "camera miui": ["com.android.camera", "com.android.camera2"],
+    "chrome": ["com.android.chrome"],
+    "configuracoes": ["com.android.settings"],
+    "configurações": ["com.android.settings"],
+    "files": ["com.google.android.apps.nbu.files", "com.android.documentsui"],
+    "galeria": ["com.miui.gallery", "com.google.android.apps.photos"],
+    "gmail": ["com.google.android.gm"],
+    "google": ["com.google.android.googlequicksearchbox"],
+    "maps": ["com.google.android.apps.maps"],
+    "mensagens": ["com.google.android.apps.messaging", "com.android.mms"],
+    "phone": ["com.android.dialer", "com.google.android.dialer"],
+    "play store": ["com.android.vending"],
+    "settings": ["com.android.settings"],
+    "termux": ["com.termux"],
+    "telefone": ["com.android.dialer", "com.google.android.dialer"],
+    "whatsapp": ["com.whatsapp", "com.gbwhatsapp"],
+    "youtube": ["com.google.android.youtube"],
+}
+
+AGENT_SYSTEM_PROMPT = """You are Dream Mobile Agent running locally inside Termux on Android.
+
+You should answer normally in the user's language unless you need to perform a real action on the phone.
+
+When an action is needed, reply with exactly one tool block and nothing else:
+<dream-tool>{"tool":"open_app","args":{"query":"calculator"}}</dream-tool>
+
+Available tools:
+- open_app: open an Android app by human name or package. args: {"query":"calculator"} or {"package":"com.android.chrome"}
+- list_apps: search installed Android packages. args: {"query":"calc"}
+- open_url: open a website. args: {"url":"https://example.com"}
+- type_text: type text into the currently focused field. args: {"text":"123+456"}
+- keyevent: send a key event. args: {"key":"ENTER"} or {"key":"KEYCODE_ENTER"}
+- tap: tap the screen. args: {"x":540,"y":1800}
+- swipe: swipe on the screen. args: {"x1":540,"y1":1800,"x2":540,"y2":600,"duration_ms":250}
+- android_shell: run one safe Android/Termux command for app launching, package lookup, input, or device inspection. args: {"command":"am start -a android.intent.action.VIEW -d https://example.com"}
+
+Rules:
+- Use at most one tool call per response.
+- If a task needs multiple steps, use one tool, wait for the tool result, then decide the next step.
+- Never invent tool results.
+- After a tool result, either call another tool or answer the user normally.
+- If the request is risky, destructive, privacy-sensitive, or unclear, ask before acting.
+- Never wrap the tool JSON in markdown fences.
+"""
 
 
 def json_response(handler: "DreamMobileHandler", payload: dict[str, Any], status: int = 200) -> None:
@@ -226,6 +278,493 @@ def attachment_context(attachments: list[dict[str, Any]]) -> str:
     if not parts:
         return ""
     return "Attachments context:\n" + "\n\n".join(parts) + "\n\n"
+
+
+def parse_tool_call(text: str) -> dict[str, Any] | None:
+    payload_raw = None
+    text = text or ""
+    match = TOOL_BLOCK_RE.search(text)
+    if match:
+        payload_raw = match.group(1)
+    else:
+        fenced = FENCED_JSON_RE.search(text)
+        if fenced:
+            payload_raw = fenced.group(1)
+        else:
+            stripped = text.strip()
+            if stripped.startswith("{") and stripped.endswith("}"):
+                payload_raw = stripped
+    if not payload_raw:
+        return None
+    try:
+        payload = json.loads(payload_raw)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict) or not payload.get("tool"):
+        return None
+    args = payload.get("args")
+    if args is None:
+        payload["args"] = {}
+    elif not isinstance(args, dict):
+        return None
+    return payload
+
+
+def strip_tool_blocks(text: str) -> str:
+    cleaned = TOOL_BLOCK_RE.sub("", text or "").strip()
+    return cleaned
+
+
+def encode_android_input_text(raw: str) -> str:
+    text = (raw or "")[:160]
+    text = text.replace("%", "%25")
+    text = text.replace(" ", "%s")
+    text = text.replace("\n", "%s")
+    return text
+
+
+class AndroidActionExecutor:
+    def __init__(self) -> None:
+        self._package_cache: list[str] | None = None
+
+    def capabilities(self) -> dict[str, Any]:
+        tool_names = [
+            "open_app",
+            "list_apps",
+            "open_url",
+            "type_text",
+            "keyevent",
+            "tap",
+            "swipe",
+            "android_shell",
+        ]
+        input_ready = shutil.which("input") is not None
+        open_ready = any(shutil.which(name) for name in ("termux-open-url", "am", "monkey"))
+        return {
+            "enabled": True,
+            "tools": tool_names,
+            "input_ready": input_ready,
+            "open_ready": open_ready,
+            "summary": (
+                "Bridge local pronto para abrir apps, abrir links e fazer automacao basica por toque/teclado."
+            ),
+        }
+
+    def execute(self, tool_name: str, args: dict[str, Any]) -> dict[str, Any]:
+        handlers = {
+            "android_shell": self.android_shell,
+            "keyevent": self.keyevent,
+            "list_apps": self.list_apps,
+            "open_app": self.open_app,
+            "open_url": self.open_url,
+            "swipe": self.swipe,
+            "tap": self.tap,
+            "type_text": self.type_text,
+        }
+        handler = handlers.get(tool_name)
+        if handler is None:
+            return {
+                "ok": False,
+                "tool": tool_name,
+                "error": f"unknown tool: {tool_name}",
+                "summary": f"Ferramenta desconhecida: {tool_name}",
+            }
+        try:
+            result = handler(args or {})
+        except Exception as exc:  # pragma: no cover - best effort mobile runtime
+            return {
+                "ok": False,
+                "tool": tool_name,
+                "error": str(exc),
+                "summary": f"Falha ao executar {tool_name}: {exc}",
+            }
+        result.setdefault("tool", tool_name)
+        return result
+
+    def _run(self, command: list[str], timeout: float = 15.0) -> dict[str, Any]:
+        try:
+            proc = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            return {
+                "ok": False,
+                "command": command,
+                "error": str(exc),
+                "summary": f"Comando falhou ao iniciar: {' '.join(command)}",
+            }
+
+        stdout = (proc.stdout or "").strip()
+        stderr = (proc.stderr or "").strip()
+        ok = proc.returncode == 0
+        result = {
+            "ok": ok,
+            "command": command,
+            "exit_code": proc.returncode,
+            "stdout": stdout,
+            "stderr": stderr,
+        }
+        if not ok:
+            result["error"] = stderr or stdout or f"command exited with code {proc.returncode}"
+        return result
+
+    def _installed_packages(self) -> list[str]:
+        if self._package_cache is not None:
+            return self._package_cache
+
+        packages: list[str] = []
+        result = self._run(["pm", "list", "packages"], timeout=20)
+        if result.get("ok"):
+            for line in str(result.get("stdout", "")).splitlines():
+                line = line.strip()
+                if line.startswith("package:"):
+                    packages.append(line.split(":", 1)[1].strip())
+        self._package_cache = packages
+        return packages
+
+    def _resolve_package(self, query: str | None, package: str | None) -> str | None:
+        installed = self._installed_packages()
+        if package:
+            return package if package in installed else None
+
+        if not query:
+            return None
+
+        lowered = query.strip().lower()
+        for alias in APP_ALIASES.get(lowered, []):
+            if alias in installed:
+                return alias
+
+        compact = lowered.replace(" ", "")
+        matches = [pkg for pkg in installed if lowered in pkg.lower() or compact in pkg.lower()]
+        return matches[0] if matches else None
+
+    def _safe_shell_allowed(self, argv: list[str]) -> bool:
+        allowed_shapes = (
+            ("am", "start"),
+            ("cmd", "package", "resolve-activity"),
+            ("cmd", "package", "list"),
+            ("dumpsys", "activity"),
+            ("dumpsys", "package"),
+            ("dumpsys", "window"),
+            ("getprop",),
+            ("input", "keyevent"),
+            ("input", "swipe"),
+            ("input", "tap"),
+            ("input", "text"),
+            ("monkey",),
+            ("pm", "list", "packages"),
+            ("pm", "path"),
+            ("settings", "get"),
+            ("termux-clipboard-get",),
+            ("termux-clipboard-set",),
+            ("termux-open",),
+            ("termux-open-url",),
+            ("termux-share",),
+            ("termux-toast",),
+        )
+        return any(tuple(argv[: len(shape)]) == shape for shape in allowed_shapes)
+
+    def list_apps(self, args: dict[str, Any]) -> dict[str, Any]:
+        query = str(args.get("query", "")).strip().lower()
+        packages = self._installed_packages()
+        if query:
+            compact = query.replace(" ", "")
+            packages = [pkg for pkg in packages if query in pkg.lower() or compact in pkg.lower()]
+        top = packages[:12]
+        return {
+            "ok": True,
+            "matches": top,
+            "count": len(packages),
+            "summary": (
+                f"Encontrei {len(packages)} app(s) instalado(s) para '{query or 'todos'}'."
+            ),
+        }
+
+    def open_app(self, args: dict[str, Any]) -> dict[str, Any]:
+        query = str(args.get("query", "")).strip()
+        package = str(args.get("package", "")).strip()
+        resolved_package = self._resolve_package(query, package)
+        if not resolved_package:
+            return {
+                "ok": False,
+                "error": "app not found",
+                "summary": f"Nao encontrei um app instalado para '{query or package}'.",
+            }
+
+        if shutil.which("monkey"):
+            monkey_result = self._run(
+                ["monkey", "-p", resolved_package, "-c", "android.intent.category.LAUNCHER", "1"],
+                timeout=20,
+            )
+            if monkey_result.get("ok"):
+                return {
+                    "ok": True,
+                    "package": resolved_package,
+                    "method": "monkey",
+                    "summary": f"Abri o app {resolved_package}.",
+                }
+
+        if shutil.which("am"):
+            resolved_activity = shell_text(
+                ["cmd", "package", "resolve-activity", "--brief", resolved_package],
+                timeout=5,
+            )
+            if resolved_activity and "/" in resolved_activity:
+                start_result = self._run(["am", "start", "-n", resolved_activity], timeout=20)
+                if start_result.get("ok"):
+                    return {
+                        "ok": True,
+                        "package": resolved_package,
+                        "activity": resolved_activity,
+                        "method": "am-start",
+                        "summary": f"Abri o app {resolved_package}.",
+                    }
+
+            fallback = self._run(
+                [
+                    "am",
+                    "start",
+                    "-a",
+                    "android.intent.action.MAIN",
+                    "-c",
+                    "android.intent.category.LAUNCHER",
+                    "-p",
+                    resolved_package,
+                ],
+                timeout=20,
+            )
+            if fallback.get("ok"):
+                return {
+                    "ok": True,
+                    "package": resolved_package,
+                    "method": "am-main",
+                    "summary": f"Abri o app {resolved_package}.",
+                }
+
+        return {
+            "ok": False,
+            "package": resolved_package,
+            "error": "unable to launch app",
+            "summary": f"Nao consegui abrir o app {resolved_package}.",
+        }
+
+    def open_url(self, args: dict[str, Any]) -> dict[str, Any]:
+        url = str(args.get("url", "")).strip()
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"}:
+            return {
+                "ok": False,
+                "error": "invalid url",
+                "summary": "URL invalida. Use http:// ou https://.",
+            }
+
+        if shutil.which("termux-open-url"):
+            result = self._run(["termux-open-url", url], timeout=15)
+            if result.get("ok"):
+                return {"ok": True, "url": url, "summary": f"Abri o link {url}."}
+
+        if shutil.which("am"):
+            result = self._run(
+                ["am", "start", "-a", "android.intent.action.VIEW", "-d", url],
+                timeout=20,
+            )
+            if result.get("ok"):
+                return {"ok": True, "url": url, "summary": f"Abri o link {url}."}
+
+        return {
+            "ok": False,
+            "url": url,
+            "error": "no url opener available",
+            "summary": "Nao encontrei um abridor de links disponivel.",
+        }
+
+    def type_text(self, args: dict[str, Any]) -> dict[str, Any]:
+        text = str(args.get("text", "")).strip()
+        if not text:
+            return {"ok": False, "error": "text is required", "summary": "Nao veio texto para digitar."}
+        if not shutil.which("input"):
+            return {"ok": False, "error": "input command unavailable", "summary": "O comando input nao esta disponivel."}
+        result = self._run(["input", "text", encode_android_input_text(text)], timeout=10)
+        if result.get("ok"):
+            return {"ok": True, "text": text, "summary": f"Digitei o texto: {text[:40]}."}
+        return {
+            "ok": False,
+            "text": text,
+            "error": result.get("error", "typing failed"),
+            "summary": "Nao consegui digitar no foco atual.",
+        }
+
+    def keyevent(self, args: dict[str, Any]) -> dict[str, Any]:
+        key = str(args.get("key", "")).strip()
+        if not key:
+            return {"ok": False, "error": "key is required", "summary": "Faltou a tecla para enviar."}
+        if not shutil.which("input"):
+            return {"ok": False, "error": "input command unavailable", "summary": "O comando input nao esta disponivel."}
+        normalized = key if key.isdigit() or key.startswith("KEYCODE_") else f"KEYCODE_{key.upper()}"
+        result = self._run(["input", "keyevent", normalized], timeout=10)
+        if result.get("ok"):
+            return {"ok": True, "key": normalized, "summary": f"Enviei a tecla {normalized}."}
+        return {
+            "ok": False,
+            "key": normalized,
+            "error": result.get("error", "keyevent failed"),
+            "summary": f"Nao consegui enviar a tecla {normalized}.",
+        }
+
+    def tap(self, args: dict[str, Any]) -> dict[str, Any]:
+        if not shutil.which("input"):
+            return {"ok": False, "error": "input command unavailable", "summary": "O comando input nao esta disponivel."}
+        try:
+            x = int(args.get("x"))
+            y = int(args.get("y"))
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "x and y must be integers", "summary": "As coordenadas do toque estao invalidas."}
+        result = self._run(["input", "tap", str(x), str(y)], timeout=10)
+        if result.get("ok"):
+            return {"ok": True, "x": x, "y": y, "summary": f"Toquei em ({x}, {y})."}
+        return {
+            "ok": False,
+            "x": x,
+            "y": y,
+            "error": result.get("error", "tap failed"),
+            "summary": f"Nao consegui tocar em ({x}, {y}).",
+        }
+
+    def swipe(self, args: dict[str, Any]) -> dict[str, Any]:
+        if not shutil.which("input"):
+            return {"ok": False, "error": "input command unavailable", "summary": "O comando input nao esta disponivel."}
+        try:
+            x1 = int(args.get("x1"))
+            y1 = int(args.get("y1"))
+            x2 = int(args.get("x2"))
+            y2 = int(args.get("y2"))
+            duration = int(args.get("duration_ms", 250))
+        except (TypeError, ValueError):
+            return {
+                "ok": False,
+                "error": "invalid swipe coordinates",
+                "summary": "Os dados do gesto de deslizar estao invalidos.",
+            }
+        result = self._run(
+            ["input", "swipe", str(x1), str(y1), str(x2), str(y2), str(duration)],
+            timeout=10,
+        )
+        if result.get("ok"):
+            return {
+                "ok": True,
+                "summary": f"Deslizei de ({x1}, {y1}) para ({x2}, {y2}).",
+                "x1": x1,
+                "y1": y1,
+                "x2": x2,
+                "y2": y2,
+                "duration_ms": duration,
+            }
+        return {
+            "ok": False,
+            "error": result.get("error", "swipe failed"),
+            "summary": "Nao consegui executar o gesto de deslizar.",
+        }
+
+    def android_shell(self, args: dict[str, Any]) -> dict[str, Any]:
+        command = str(args.get("command", "")).strip()
+        if not command:
+            return {"ok": False, "error": "command is required", "summary": "Faltou o comando Android/Termux."}
+        try:
+            argv = shlex.split(command)
+        except ValueError as exc:
+            return {"ok": False, "error": str(exc), "summary": "O comando veio com aspas invalidas."}
+        if not argv or not self._safe_shell_allowed(argv):
+            return {
+                "ok": False,
+                "error": "command is not allowed",
+                "summary": "Esse comando nao esta liberado no modo de automacao local.",
+            }
+        result = self._run(argv, timeout=20)
+        stdout = str(result.get("stdout", ""))
+        summary = stdout.splitlines()[0][:140] if stdout else "Comando executado."
+        if not result.get("ok"):
+            summary = str(result.get("error", "Comando falhou."))[:140]
+        result["summary"] = summary
+        return result
+
+
+class AgentOrchestrator:
+    def __init__(self, chat_session: ChatSession, executor: AndroidActionExecutor) -> None:
+        self.chat_session = chat_session
+        self.executor = executor
+
+    def _agent_message(self, user_message: str, attachments: list[dict[str, Any]] | None) -> str:
+        context = attachment_context(attachments or [])
+        return (
+            f"{AGENT_SYSTEM_PROMPT}\n"
+            f"{context}"
+            "User request:\n"
+            f"{user_message}\n"
+        )
+
+    def _tool_feedback(self, tool_name: str, args: dict[str, Any], result: dict[str, Any]) -> str:
+        tool_json = json.dumps({"tool": tool_name, "args": args}, ensure_ascii=False)
+        result_json = json.dumps(result, ensure_ascii=False)
+        return (
+            "Tool result received.\n"
+            f"Tool call: {tool_json}\n"
+            f"Tool result: {result_json}\n"
+            "If the task is complete, answer the user normally in their language.\n"
+            "If another action is still needed, reply with exactly one new <dream-tool> block.\n"
+        )
+
+    def run(
+        self,
+        user_message: str,
+        locale_hint: str | None = None,
+        attachments: list[dict[str, Any]] | None = None,
+        on_event: Callable[[dict[str, Any]], None] | None = None,
+    ) -> tuple[str, list[dict[str, Any]]]:
+        prompt = self._agent_message(user_message, attachments)
+        history: list[dict[str, Any]] = []
+
+        for _ in range(6):
+            if self.chat_session.stop_requested.is_set():
+                raise InterruptedError("generation stopped")
+
+            reply, _ = self.chat_session.ask(prompt, locale_hint=locale_hint)
+            tool_call = parse_tool_call(reply)
+            cleaned = strip_tool_blocks(reply)
+            if not tool_call:
+                final_reply = cleaned or reply.strip()
+                return final_reply, history
+
+            tool_name = str(tool_call.get("tool", "")).strip()
+            args = dict(tool_call.get("args") or {})
+            running_summary = f"Executando {tool_name}..."
+            if on_event:
+                on_event({"type": "tool", "status": "running", "tool": tool_name, "summary": running_summary})
+
+            result = self.executor.execute(tool_name, args)
+            history.append({"tool": tool_name, "args": args, "result": result})
+
+            if on_event:
+                on_event(
+                    {
+                        "type": "tool",
+                        "status": "done",
+                        "tool": tool_name,
+                        "summary": result.get("summary") or f"Ferramenta {tool_name} executada.",
+                        "result": result,
+                    }
+                )
+
+            prompt = self._tool_feedback(tool_name, args, result)
+
+        return (
+            "Nao consegui concluir a automacao local dentro do limite de passos. Tente pedir em etapas menores.",
+            history,
+        )
 
 
 class ChatSession:
@@ -744,6 +1283,8 @@ class DreamMobileHandler(SimpleHTTPRequestHandler):
     chat_session: ChatSession
     metrics: Metrics
     model_manager: ModelManager
+    action_executor: AndroidActionExecutor
+    agent: AgentOrchestrator
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, directory=str(self.assets_dir), **kwargs)
@@ -759,6 +1300,7 @@ class DreamMobileHandler(SimpleHTTPRequestHandler):
         if self.path == "/api/status":
             payload = self.metrics.snapshot()
             payload["session"] = self.chat_session.info()
+            payload["automation"] = self.action_executor.capabilities()
             json_response(self, {"ok": True, "status": payload})
             return
 
@@ -816,8 +1358,11 @@ class DreamMobileHandler(SimpleHTTPRequestHandler):
             return
 
         try:
-            enriched_message = attachment_context(attachments) + message
-            reply, latency_ms = self.chat_session.ask(enriched_message, locale_hint=locale_hint)
+            reply, actions = self.agent.run(
+                user_message=message,
+                locale_hint=locale_hint,
+                attachments=attachments,
+            )
         except InterruptedError:
             json_response(self, {"ok": False, "error": "generation stopped"}, status=499)
             return
@@ -834,7 +1379,8 @@ class DreamMobileHandler(SimpleHTTPRequestHandler):
             {
                 "ok": True,
                 "reply": reply,
-                "latency_ms": latency_ms,
+                "latency_ms": self.chat_session.info().get("last_latency_ms"),
+                "actions": actions,
                 "session": self.chat_session.info(),
             },
         )
@@ -860,9 +1406,14 @@ class DreamMobileHandler(SimpleHTTPRequestHandler):
 
         try:
             write_ndjson_event(self, {"type": "start", "session": self.chat_session.info()})
-            enriched_message = attachment_context(attachments) + message
-            for chunk in self.chat_session.stream(enriched_message, locale_hint=locale_hint):
-                if chunk:
+            reply, _ = self.agent.run(
+                user_message=message,
+                locale_hint=locale_hint,
+                attachments=attachments,
+                on_event=lambda event: write_ndjson_event(self, event),
+            )
+            if reply:
+                for chunk in re.findall(r".{1,320}", reply, flags=re.DOTALL):
                     write_ndjson_event(self, {"type": "chunk", "text": chunk})
 
             write_ndjson_event(
@@ -955,6 +1506,11 @@ def main() -> int:
         project_root=args.project_root,
         model_dir=str(Path(args.model).parent),
         current_model_path=args.model,
+    )
+    DreamMobileHandler.action_executor = AndroidActionExecutor()
+    DreamMobileHandler.agent = AgentOrchestrator(
+        chat_session=DreamMobileHandler.chat_session,
+        executor=DreamMobileHandler.action_executor,
     )
 
     threading.Thread(target=DreamMobileHandler.chat_session.prewarm, daemon=True).start()
