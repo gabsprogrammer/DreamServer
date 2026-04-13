@@ -70,7 +70,7 @@ load_config() {
 
 require_runtime() {
     load_config
-    [[ -x "${DREAM_MOBILE_LLAMA_CLI:-}" ]] || fail "llama-cli was not found at ${DREAM_MOBILE_LLAMA_CLI:-<unset>}"
+    [[ -x "${DREAM_MOBILE_LLAMA_CHAT_CLI:-${DREAM_MOBILE_LLAMA_CLI:-}}" ]] || fail "Mobile chat binary was not found at ${DREAM_MOBILE_LLAMA_CHAT_CLI:-${DREAM_MOBILE_LLAMA_CLI:-<unset>}}"
     [[ -f "${DREAM_MOBILE_MODEL_PATH:-}" ]] || fail "Model file was not found at ${DREAM_MOBILE_MODEL_PATH:-<unset>}"
 }
 
@@ -82,7 +82,10 @@ status() {
     echo "File:     ${DREAM_MOBILE_MODEL_FILE}"
     echo "Context:  ${DREAM_MOBILE_CONTEXT}"
     echo "Threads:  ${DREAM_MOBILE_THREADS}"
-    echo "CLI:      ${DREAM_MOBILE_LLAMA_CLI}"
+    echo "Chat CLI: ${DREAM_MOBILE_LLAMA_CHAT_CLI:-${DREAM_MOBILE_LLAMA_CLI:-<unset>}}"
+    if [[ -n "${DREAM_MOBILE_LLAMA_PROMPT_CLI:-}" ]]; then
+        echo "Prompt:   ${DREAM_MOBILE_LLAMA_PROMPT_CLI}"
+    fi
     echo "Path:     ${DREAM_MOBILE_MODEL_PATH}"
     if [[ -n "${DREAM_MOBILE_EXPORT_DIR:-}" ]]; then
         echo "Exports:  ${DREAM_MOBILE_EXPORT_DIR}"
@@ -95,28 +98,22 @@ status() {
 
 interactive_chat() {
     require_runtime
-    exec "${DREAM_MOBILE_LLAMA_CLI}" \
+    exec "${DREAM_MOBILE_LLAMA_CHAT_CLI:-${DREAM_MOBILE_LLAMA_CLI}}" \
         -m "${DREAM_MOBILE_MODEL_PATH}" \
         -c "${DREAM_MOBILE_CONTEXT}" \
-        -t "${DREAM_MOBILE_THREADS}" \
-        -ngl 0 \
-        -i \
-        -cnv \
-        --color
+        -ngl 0
 }
 
 one_prompt() {
     require_runtime
     [[ $# -gt 0 ]] || fail "Provide a prompt after 'prompt'."
+    [[ -x "${DREAM_MOBILE_LLAMA_PROMPT_CLI:-}" ]] || fail "Mobile prompt binary was not found at ${DREAM_MOBILE_LLAMA_PROMPT_CLI:-<unset>}"
 
-    "${DREAM_MOBILE_LLAMA_CLI}" \
+    "${DREAM_MOBILE_LLAMA_PROMPT_CLI}" \
         -m "${DREAM_MOBILE_MODEL_PATH}" \
-        -c "${DREAM_MOBILE_CONTEXT}" \
-        -t "${DREAM_MOBILE_THREADS}" \
         -ngl 0 \
-        -cnv \
         -n 512 \
-        -p "$*"
+        "$*"
 }
 
 export_prompt() {
@@ -139,14 +136,13 @@ export_prompt() {
     local export_prompt_text
     export_prompt_text=$'Write the requested deliverable directly.\nReturn only the final file contents.\nDo not add markdown fences, commentary, or role labels.\n\nRequest: '"$*"
 
-    "${DREAM_MOBILE_LLAMA_CLI}" \
+    [[ -x "${DREAM_MOBILE_LLAMA_PROMPT_CLI:-}" ]] || fail "Mobile prompt binary was not found at ${DREAM_MOBILE_LLAMA_PROMPT_CLI:-<unset>}"
+
+    "${DREAM_MOBILE_LLAMA_PROMPT_CLI}" \
         -m "${DREAM_MOBILE_MODEL_PATH}" \
-        -c "${DREAM_MOBILE_CONTEXT}" \
-        -t "${DREAM_MOBILE_THREADS}" \
         -ngl 0 \
-        -cnv \
         -n 768 \
-        -p "$export_prompt_text" > "$target_path"
+        "$export_prompt_text" > "$target_path"
 
     success "Saved generated file to $target_path"
     if [[ "${DREAM_MOBILE_EXPORT_MODE:-}" != "shared-downloads" ]]; then

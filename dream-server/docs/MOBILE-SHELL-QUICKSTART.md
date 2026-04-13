@@ -35,7 +35,7 @@ What the installer does on Termux:
 
 1. Detects that the shell is Termux.
 2. Installs build dependencies with `pkg`.
-3. Clones and builds `llama.cpp`.
+3. Clones and builds the minimal `llama.cpp` binaries needed for local mobile chat.
 4. Downloads the official GGUF build of `Qwen3-0.6B`.
 5. Detects whether shared Android storage is available through `~/storage/downloads`.
 6. Writes `.dream-mobile.env` so `./dream-mobile.sh` can run the model later.

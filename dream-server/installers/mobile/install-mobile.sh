@@ -264,22 +264,23 @@ build_llama_cli() {
     local jobs
     jobs="$(recommended_threads)"
 
-    log "Building llama.cpp CLI for Termux"
+    log "Building llama.cpp chat binaries for Termux"
     run_cmd cmake -S "$LLAMA_DIR" -B "$LLAMA_BUILD_DIR" \
         -DCMAKE_BUILD_TYPE=Release \
         -DGGML_OPENMP=OFF \
+        -DLLAMA_BUILD_TOOLS=OFF \
         -DLLAMA_BUILD_SERVER=OFF \
         -DLLAMA_BUILD_TESTS=OFF \
-        -DLLAMA_BUILD_EXAMPLES=OFF \
+        -DLLAMA_BUILD_EXAMPLES=ON \
         -DLLAMA_CURL=OFF
-    run_cmd cmake --build "$LLAMA_BUILD_DIR" --config Release -j "$jobs" --target llama-cli
+    run_cmd cmake --build "$LLAMA_BUILD_DIR" --config Release -j "$jobs" --target llama-simple-chat llama-simple
 }
 
-resolve_llama_cli() {
+resolve_llama_chat_binary() {
     local candidate
     for candidate in \
-        "$LLAMA_BUILD_DIR/bin/llama-cli" \
-        "$LLAMA_BUILD_DIR/bin/Release/llama-cli"
+        "$LLAMA_BUILD_DIR/bin/llama-simple-chat" \
+        "$LLAMA_BUILD_DIR/bin/Release/llama-simple-chat"
     do
         if [[ -x "$candidate" ]]; then
             echo "$candidate"
@@ -287,7 +288,22 @@ resolve_llama_cli() {
         fi
     done
 
-    echo "$LLAMA_BUILD_DIR/bin/llama-cli"
+    echo "$LLAMA_BUILD_DIR/bin/llama-simple-chat"
+}
+
+resolve_llama_prompt_binary() {
+    local candidate
+    for candidate in \
+        "$LLAMA_BUILD_DIR/bin/llama-simple" \
+        "$LLAMA_BUILD_DIR/bin/Release/llama-simple"
+    do
+        if [[ -x "$candidate" ]]; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+
+    echo "$LLAMA_BUILD_DIR/bin/llama-simple"
 }
 
 download_model() {
@@ -301,8 +317,10 @@ download_model() {
 }
 
 write_config() {
-    local llama_cli
-    llama_cli="$(resolve_llama_cli)"
+    local llama_chat_cli
+    local llama_prompt_cli
+    llama_chat_cli="$(resolve_llama_chat_binary)"
+    llama_prompt_cli="$(resolve_llama_prompt_binary)"
 
     if $DRY_RUN; then
         log "Would write mobile config to $CONFIG_FILE"
@@ -318,7 +336,9 @@ DREAM_MOBILE_MODEL_FILE="$MODEL_FILE"
 DREAM_MOBILE_MODEL_URL="$MODEL_URL"
 DREAM_MOBILE_MODEL_PATH="$MODEL_PATH"
 DREAM_MOBILE_LLAMA_DIR="$LLAMA_DIR"
-DREAM_MOBILE_LLAMA_CLI="$llama_cli"
+DREAM_MOBILE_LLAMA_CLI="$llama_chat_cli"
+DREAM_MOBILE_LLAMA_CHAT_CLI="$llama_chat_cli"
+DREAM_MOBILE_LLAMA_PROMPT_CLI="$llama_prompt_cli"
 DREAM_MOBILE_CONTEXT="$MOBILE_CONTEXT"
 DREAM_MOBILE_THREADS="$MOBILE_THREADS"
 DREAM_MOBILE_EXPORT_DIR="$EXPORT_DIR"
