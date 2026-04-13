@@ -1,15 +1,178 @@
+const appShellEl = document.querySelector(".mobile-shell");
+const sidebarEl = document.getElementById("sidebar");
+const sidebarScrimEl = document.getElementById("sidebarScrim");
+const openSidebarButtonEl = document.getElementById("openSidebarButton");
+const closeSidebarButtonEl = document.getElementById("closeSidebarButton");
+const topbarTitleEl = document.getElementById("topbarTitle");
+const runtimePillEl = document.getElementById("runtimePill");
+const sessionBadgeEl = document.getElementById("sessionBadge");
+const statusTextEl = document.getElementById("statusText");
+const latencyHintEl = document.getElementById("latencyHint");
+const resetButtonEl = document.getElementById("resetButton");
 const messagesEl = document.getElementById("messages");
 const formEl = document.getElementById("chatForm");
 const inputEl = document.getElementById("messageInput");
 const sendButtonEl = document.getElementById("sendButton");
-const statusTextEl = document.getElementById("statusText");
-const latencyHintEl = document.getElementById("latencyHint");
-const sessionBadgeEl = document.getElementById("sessionBadge");
-const resetButtonEl = document.getElementById("resetButton");
+const goToChatButtonEl = document.getElementById("goToChatButton");
+const previewChatButtonEl = document.getElementById("previewChatButton");
+
+const prefersPortuguese = (navigator.language || "").toLowerCase().startsWith("pt");
+const ui = prefersPortuguese
+  ? {
+      app: "Dream Server Mobile",
+      dashboard: "Dashboard",
+      chat: "Chat",
+      overview: "Visao geral + telemetria",
+      modelSession: "Sessao do modelo local",
+      heroKicker: "ANDROID LOCAL COCKPIT",
+      heroTitle: "Dream Server Mobile Lite",
+      heroLede:
+        "Qwen local no Termux, telemetria real do aparelho, localhost no Chrome e um cockpit inspirado no dashboard do Dream Server desktop.",
+      runtimeLive: "Localhost ativo",
+      runtimeWarming: "Aquecendo sessao",
+      runtimeCold: "Sessao fria",
+      openChat: "Abrir chat",
+      chatReady: "Pronto.",
+      chatThinking: "Dream esta respondendo localmente...",
+      chatFailed: "A sessao local falhou.",
+      waitingFirstReply: "Aguardando a primeira resposta...",
+      welcome:
+        "Sessao local Android online. Fale em portugues normalmente que eu vou responder no mesmo idioma e transmitir a resposta conforme ela for sendo gerada.",
+      placeholder: "Pergunte algo, peça um resumo ou teste uma tarefa local curta...",
+      reset: "Resetar sessao",
+      assistant: "Dream",
+      you: "Voce",
+      sidebarSession: "Sessao",
+      sidebarDevice: "Aparelho",
+      sidebarExports: "Exports",
+      sidebarMemory: "Memoria",
+      sidebarRuntime: "Android Lite",
+      featureChatCopy: "Conversa persistente com o modelo local rodando dentro do Termux.",
+      featureDashboardCopy: "Um cockpit localhost mobile mais proximo da linguagem visual do Dream Server real.",
+      featureExportCopy: "Arquivos gerados podem ir para o Downloads do Android quando o storage compartilhado estiver ligado.",
+      featureBetaCopy: "Versao lite beta: nao inclui toda a malha de servicos, voz ou automacao do Dream Server desktop.",
+      responsePreviewFallback:
+        "A sessao local ainda esta aquecendo. Quando uma resposta chegar, um preview vai aparecer aqui.",
+      telemetryTitle: "Telemetria de inferencia",
+      chartLatency: "Latencia da resposta",
+      chartCpu: "Carga da CPU",
+      chartMemory: "Pressao de memoria",
+      chartBattery: "Bateria",
+      servicesTitle: "Superficie mobile",
+      servicesOnline: "Online",
+      servicesLimited: "Limitado",
+      servicesInactive: "Desktop only",
+      chatPanelTitle: "Converse com o Dream localmente",
+      composerLabel: "Mensagem",
+      send: "Enviar",
+      resetStatus: "Sessao resetada.",
+    }
+  : {
+      app: "Dream Server Mobile",
+      dashboard: "Dashboard",
+      chat: "Chat",
+      overview: "Overview + telemetry",
+      modelSession: "Local model session",
+      heroKicker: "ANDROID LOCAL COCKPIT",
+      heroTitle: "Dream Server Mobile Lite",
+      heroLede:
+        "Local Qwen on Termux, real phone telemetry, localhost in Chrome, and a cockpit that borrows the language of the Dream Server desktop dashboard.",
+      runtimeLive: "Localhost live",
+      runtimeWarming: "Warming session",
+      runtimeCold: "Session cold",
+      openChat: "Open Chat",
+      chatReady: "Ready.",
+      chatThinking: "Dream is responding locally...",
+      chatFailed: "The local session failed.",
+      waitingFirstReply: "Waiting for the first reply...",
+      welcome:
+        "Local Android session online. Ask naturally and I will stream the answer as it is generated.",
+      placeholder: "Ask about code, request a summary, or test a quick local task...",
+      reset: "Reset session",
+      assistant: "Dream",
+      you: "You",
+      sidebarSession: "Session",
+      sidebarDevice: "Device",
+      sidebarExports: "Exports",
+      sidebarMemory: "Memory",
+      sidebarRuntime: "Android Lite",
+      featureChatCopy: "Persistent conversation with the model running directly inside Termux.",
+      featureDashboardCopy: "A localhost mobile cockpit that feels closer to the real Dream Server dashboard.",
+      featureExportCopy: "Generated files can land in Android Downloads when shared storage is linked.",
+      featureBetaCopy: "Lite beta scope: not the full Dream Server mesh, voice stack, or workflow fabric from desktop.",
+      responsePreviewFallback:
+        "The local session is still warming up. Once a reply lands, a preview will appear here.",
+      telemetryTitle: "Inference telemetry",
+      chartLatency: "Reply latency",
+      chartCpu: "CPU load",
+      chartMemory: "Memory pressure",
+      chartBattery: "Battery",
+      servicesTitle: "Mobile surface",
+      servicesOnline: "Online",
+      servicesLimited: "Limited",
+      servicesInactive: "Desktop only",
+      chatPanelTitle: "Talk to Dream locally",
+      composerLabel: "Message",
+      send: "Send",
+      resetStatus: "Session reset.",
+    };
+
+const state = {
+  activeView: "dashboardView",
+  status: null,
+  histories: {
+    latency: [],
+    cpu: [],
+    memory: [],
+    battery: [],
+  },
+  lastAssistantPreview: "",
+};
 
 function setText(id, value) {
   const el = document.getElementById(id);
   if (el) el.textContent = value ?? "-";
+}
+
+function formatPercent(value) {
+  if (value == null || Number.isNaN(value)) return "--";
+  return `${Math.round(Number(value))}%`;
+}
+
+function formatMs(value) {
+  if (value == null || Number.isNaN(value)) return "--";
+  if (value >= 1000) return `${(value / 1000).toFixed(1)} s`;
+  return `${Math.round(value)} ms`;
+}
+
+function formatTemp(value) {
+  if (value == null || Number.isNaN(value)) return prefersPortuguese ? "sem sensor" : "no sensor";
+  return `${Number(value).toFixed(1)} C`;
+}
+
+function formatUptime(seconds) {
+  if (!seconds) return "--";
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  if (days > 0) return `${days}d ${hours}h ${mins}m`;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m`;
+}
+
+function compactText(text, limit = 140) {
+  if (!text) return ui.responsePreviewFallback;
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (normalized.length <= limit) return normalized;
+  return `${normalized.slice(0, limit - 1)}…`;
+}
+
+function normalizeAssistantText(text) {
+  return text
+    .replace(/^\s*(assistant>|Assistant:)\s*/i, "")
+    .replace(/<\/?think>/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/^\s+/, "");
 }
 
 function appendMessage(role, body) {
@@ -18,7 +181,7 @@ function appendMessage(role, body) {
 
   const roleEl = document.createElement("div");
   roleEl.className = "message-role";
-  roleEl.textContent = role === "user" ? "You" : "Dream";
+  roleEl.textContent = role === "user" ? ui.you : ui.assistant;
 
   const bodyEl = document.createElement("div");
   bodyEl.className = "message-body";
@@ -27,30 +190,310 @@ function appendMessage(role, body) {
   wrapper.append(roleEl, bodyEl);
   messagesEl.appendChild(wrapper);
   messagesEl.scrollTop = messagesEl.scrollHeight;
+  return bodyEl;
+}
+
+function openSidebar() {
+  appShellEl.classList.add("sidebar-open");
+}
+
+function closeSidebar() {
+  appShellEl.classList.remove("sidebar-open");
+}
+
+function switchView(viewId) {
+  state.activeView = viewId;
+  document.querySelectorAll(".view").forEach((el) => {
+    el.classList.toggle("is-active", el.id === viewId);
+  });
+  document.querySelectorAll(".nav-item").forEach((el) => {
+    el.classList.toggle("is-active", el.dataset.viewTarget === viewId);
+  });
+  topbarTitleEl.textContent = viewId === "chatView" ? ui.chat : ui.dashboard;
+  closeSidebar();
+}
+
+function pushHistory(key, value) {
+  if (value == null || Number.isNaN(value)) return;
+  const list = state.histories[key];
+  list.push(Number(value));
+  if (list.length > 18) list.shift();
+}
+
+function buildChartPath(values, width = 420, height = 170) {
+  if (!values.length) return { line: "", area: "", x: 20, y: 130 };
+  const paddingX = 20;
+  const paddingTop = 18;
+  const paddingBottom = 24;
+  const usableWidth = width - paddingX * 2;
+  const usableHeight = height - paddingTop - paddingBottom;
+  const max = Math.max(...values, 1);
+  const points = values.map((value, index) => {
+    const x = paddingX + (usableWidth / Math.max(values.length - 1, 1)) * index;
+    const y = height - paddingBottom - (value / max) * usableHeight;
+    return { x, y };
+  });
+
+  let line = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
+  for (let index = 1; index < points.length; index += 1) {
+    line += ` L ${points[index].x.toFixed(2)} ${points[index].y.toFixed(2)}`;
+  }
+  const lastPoint = points[points.length - 1];
+  const area = `${line} L ${lastPoint.x.toFixed(2)} ${height - paddingBottom} L ${points[0].x.toFixed(2)} ${height - paddingBottom} Z`;
+  return { line, area, x: lastPoint.x, y: lastPoint.y };
+}
+
+function renderChart(values, pathId, areaId, dotId) {
+  const { line, area, x, y } = buildChartPath(values);
+  const pathEl = document.getElementById(pathId);
+  const areaEl = document.getElementById(areaId);
+  const dotEl = document.getElementById(dotId);
+  if (pathEl) pathEl.setAttribute("d", line);
+  if (areaEl) areaEl.setAttribute("d", area);
+  if (dotEl) {
+    dotEl.setAttribute("cx", String(x));
+    dotEl.setAttribute("cy", String(y));
+  }
+}
+
+function buildServices(snapshot) {
+  const session = snapshot.session || {};
+  const exportsInfo = snapshot.exports || {};
+  const battery = snapshot.battery || {};
+  const gpu = snapshot.gpu || {};
+
+  return {
+    online: [
+      {
+        title: prefersPortuguese ? "AI Chat" : "AI Chat",
+        detail: session.ready
+          ? `${session.turns || 0} ${prefersPortuguese ? "turnos na sessao local" : "turns in the local session"}`
+          : prefersPortuguese
+            ? "Sessao em aquecimento no Termux"
+            : "Session warming inside Termux",
+      },
+      {
+        title: prefersPortuguese ? "Dashboard Local" : "Local Dashboard",
+        detail: snapshot.local_url || "http://127.0.0.1:8765",
+      },
+    ],
+    limited: [
+      {
+        title: prefersPortuguese ? "Exports" : "Exports",
+        detail: exportsInfo.dir_short || exportsInfo.dir || "-",
+      },
+      {
+        title: prefersPortuguese ? "GPU Telemetry" : "GPU Telemetry",
+        detail: gpu.available
+          ? `${gpu.busy_percent != null ? `${gpu.busy_percent}%` : gpu.status} • ${gpu.label || "Adreno"}`
+          : prefersPortuguese
+            ? "Kernel Android nao expoe todos os contadores"
+            : "Android kernel does not expose all counters",
+      },
+      {
+        title: prefersPortuguese ? "Battery API" : "Battery API",
+        detail: battery.available
+          ? `${battery.status || "ready"} • ${battery.source || "sysfs"}`
+          : prefersPortuguese
+            ? "Sensor ou permissao indisponivel"
+            : "Sensor or permission unavailable",
+      },
+    ],
+    inactive: [
+      {
+        title: prefersPortuguese ? "Voice Assistant" : "Voice Assistant",
+        detail: prefersPortuguese ? "Fora do escopo da versao mobile lite" : "Out of scope for the mobile lite build",
+      },
+      {
+        title: prefersPortuguese ? "Workflow Automation" : "Workflow Automation",
+        detail: prefersPortuguese ? "Presente no desktop, nao neste Termux localhost" : "Desktop feature, not in this Termux localhost build",
+      },
+      {
+        title: prefersPortuguese ? "Full Control Center" : "Full Control Center",
+        detail: prefersPortuguese ? "A interface mobile espelha a linguagem visual, nao o stack inteiro" : "The mobile UI mirrors the look, not the full stack",
+      },
+    ],
+  };
+}
+
+function renderServiceList(targetId, items) {
+  const root = document.getElementById(targetId);
+  if (!root) return;
+  root.innerHTML = "";
+  items.forEach((item) => {
+    const card = document.createElement("div");
+    card.className = "service-item";
+
+    const title = document.createElement("strong");
+    title.textContent = item.title;
+
+    const detail = document.createElement("span");
+    detail.textContent = item.detail;
+
+    card.append(title, detail);
+    root.appendChild(card);
+  });
+}
+
+function updateStaticCopy() {
+  document.documentElement.lang = prefersPortuguese ? "pt-BR" : "en";
+  setText("brandKicker", prefersPortuguese ? "LOCAL AI // TERMUX" : "LOCAL AI // TERMUX");
+  setText("brandSubtitle", prefersPortuguese ? "Mobile Lite Beta" : "Mobile Lite Beta");
+  setText("navDashboardLabel", ui.dashboard);
+  setText("navDashboardMeta", ui.overview);
+  setText("navChatLabel", ui.chat);
+  setText("navChatMeta", ui.modelSession);
+  setText("topbarEyebrow", ui.app);
+  setText("heroKicker", ui.heroKicker);
+  setText("heroTitle", ui.heroTitle);
+  setText("heroLede", ui.heroLede);
+  goToChatButtonEl.textContent = ui.openChat;
+  previewChatButtonEl.textContent = ui.openChat;
+  setText("featureChatCopy", ui.featureChatCopy);
+  setText("featureDashboardCopy", ui.featureDashboardCopy);
+  setText("featureExportCopy", ui.featureExportCopy);
+  setText("featureBetaCopy", ui.featureBetaCopy);
+  setText("telemetryTitle", ui.telemetryTitle);
+  setText("chartLatencyLabel", ui.chartLatency);
+  setText("chartCpuLabel", ui.chartCpu);
+  setText("chartMemoryLabel", ui.chartMemory);
+  setText("chartBatteryLabel", ui.chartBattery);
+  setText("servicesTitle", ui.servicesTitle);
+  setText("servicesOnlineTitle", ui.servicesOnline);
+  setText("servicesLimitedTitle", ui.servicesLimited);
+  setText("servicesInactiveTitle", ui.servicesInactive);
+  setText("chatPanelTitle", ui.chatPanelTitle);
+  setText("assistantLabel", ui.assistant);
+  setText("welcomeMessage", ui.welcome);
+  setText("composerLabel", ui.composerLabel);
+  inputEl.placeholder = ui.placeholder;
+  sendButtonEl.textContent = ui.send;
+  resetButtonEl.textContent = ui.reset;
+  setText("sidebarSessionLabel", ui.sidebarSession);
+  setText("sidebarDeviceLabel", ui.sidebarDevice);
+  setText("sidebarExportLabel", ui.sidebarExports);
+  setText("sidebarMemoryLabel", ui.sidebarMemory);
+  setText("sidebarRuntimeLabel", ui.sidebarRuntime);
+  setText("responsePreview", ui.responsePreviewFallback);
+  setText("statusText", ui.chatReady);
+  setText("latencyHint", ui.waitingFirstReply);
 }
 
 function updateStatus(snapshot) {
-  const { model, cpu, gpu, battery, memory, storage, exports, local_url, session } = snapshot;
+  state.status = snapshot;
+  const { model, cpu, gpu, battery, memory, storage, exports: exportsInfo, local_url: localUrl, device, session, uptime_s: uptimeS } = snapshot;
 
-  setText("modelName", model?.name || "Qwen mobile");
-  setText("modelMeta", `Context ${model?.context ?? "-"} • ${model?.path ?? "-"}`);
+  pushHistory("latency", session?.last_latency_ms ?? null);
+  pushHistory("cpu", cpu?.usage_percent ?? null);
+  pushHistory("memory", memory?.used_percent ?? null);
+  pushHistory("battery", Number(battery?.level));
 
-  setText("cpuTemp", cpu?.temp_c != null ? `${cpu.temp_c} C` : "No temp");
-  setText("cpuMeta", `${cpu?.cores ?? "-"} cores • load ${cpu?.load_1 ?? "-"} / ${cpu?.load_5 ?? "-"}`);
+  renderChart(state.histories.latency, "latencyPath", "latencyArea", "latencyDot");
+  renderChart(state.histories.memory, "memoryPath", "memoryArea", "memoryDot");
 
-  setText("gpuBusy", gpu?.available ? (gpu?.busy_percent != null ? `${gpu.busy_percent}% busy` : "online") : "Unavailable");
-  setText("gpuMeta", gpu?.available ? `${gpu?.label ?? "GPU"} • ${gpu?.freq ?? "freq n/a"}${gpu?.max_freq ? ` / ${gpu.max_freq}` : ""}` : "No readable Android GPU counters");
+  const deviceLabel = [device?.manufacturer, device?.model].filter(Boolean).join(" ");
+  const androidLabel = device?.android ? `Android ${device.android}` : "Android";
+  const sessionLabel = session?.ready
+    ? prefersPortuguese
+      ? `Sessao pronta • ${session.turns || 0} turnos`
+      : `Session ready • ${session.turns || 0} turns`
+    : session?.warming
+      ? prefersPortuguese ? "Aquecendo sessao" : "Warming session"
+      : prefersPortuguese ? "Sessao fria" : "Session cold";
 
-  setText("batteryLevel", battery?.available ? `${battery?.level ?? "-"}%` : "No battery");
-  setText("batteryMeta", battery?.available ? `${battery?.status ?? "unknown"}${battery?.temp_c != null ? ` • ${battery.temp_c} C` : ""}` : "Battery data unavailable");
+  topbarTitleEl.textContent = state.activeView === "chatView" ? ui.chat : ui.dashboard;
+  runtimePillEl.textContent = session?.ready ? ui.runtimeLive : session?.warming ? ui.runtimeWarming : ui.runtimeCold;
+  sessionBadgeEl.textContent = sessionLabel;
+  setText("sidebarSession", sessionLabel);
+  setText("sidebarDevice", `${deviceLabel || "Android"} • ${androidLabel}`);
+  setText("sidebarExport", exportsInfo?.dir_short || exportsInfo?.dir || "-");
+  setText("sidebarModelName", model?.name || "Qwen mobile");
+  setText("deviceChip", `${deviceLabel || "Android"} • ${androidLabel}`);
+  setText("localUrlChip", localUrl || "http://127.0.0.1:8765");
+  setText("runtimePill", session?.ready ? ui.runtimeLive : ui.runtimeWarming);
+  setText("featureChatStatus", session?.ready ? "READY" : "WARMING");
+  setText("featureExportStatus", exportsInfo?.dir && exportsInfo?.dir.includes("/downloads") ? "READY" : "FALLBACK");
 
-  setText("memoryUsage", memory?.available ? `${memory.used_gb} / ${memory.total_gb} GB` : "No memory data");
-  setText("storageMeta", storage?.available ? `RAM ${memory.used_percent}% • export free ${storage.export_free_gb} GB` : "Storage data unavailable");
+  const cpuSummary = cpu?.usage_percent != null ? `${cpu.usage_percent.toFixed(1)}%` : "--";
+  const cpuMeta = [
+    cpu?.cores ? `${cpu.cores} ${prefersPortuguese ? "nucleos" : "cores"}` : null,
+    cpu?.load_1 != null ? `${prefersPortuguese ? "load" : "load"} ${cpu.load_1}/${cpu.load_5}` : null,
+    cpu?.temp_c != null ? `${cpu.temp_c.toFixed(1)} C` : null,
+  ].filter(Boolean).join(" • ");
 
-  setText("exportDir", exports?.dir || "-");
-  setText("localUrl", local_url || "-");
+  setText("cpuCardValue", cpuSummary);
+  setText("cpuCardMeta", cpuMeta || (prefersPortuguese ? "Telemetria da CPU indisponivel" : "CPU telemetry unavailable"));
+  setText("cpuUsageValue", cpuSummary);
+  setText("cpuValue", cpuSummary);
+  setText("chartTempChip", cpu?.temp_c != null ? `CPU ${cpu.temp_c.toFixed(1)} C` : "CPU --");
 
-  sessionBadgeEl.textContent = session?.ready ? `session ready • ${session.turns} turns` : "starting session";
+  const gpuValue = gpu?.available
+    ? gpu?.busy_percent != null
+      ? `${gpu.busy_percent}%`
+      : gpu?.freq || "live"
+    : prefersPortuguese
+      ? "Limitado"
+      : "Limited";
+  const gpuMeta = gpu?.available
+    ? [gpu.label, gpu.freq || gpu.status, gpu.max_freq ? `/ ${gpu.max_freq}` : null].filter(Boolean).join(" • ")
+    : prefersPortuguese
+      ? "O kernel do Android nao expoe frequencia/ocupacao completas da GPU"
+      : "The Android kernel is not exposing full GPU frequency/busy counters";
+
+  setText("gpuCardValue", gpuValue);
+  setText("gpuCardMeta", gpuMeta);
+
+  const batteryValue = battery?.available && battery?.level != null ? `${battery.level}%` : "--";
+  const batteryMeta = battery?.available
+    ? [battery.status || (prefersPortuguese ? "desconhecido" : "unknown"), battery.temp_c != null ? `${battery.temp_c.toFixed(1)} C` : null, battery.health || null]
+        .filter(Boolean)
+        .join(" • ")
+    : prefersPortuguese
+      ? "Bateria indisponivel ou sem permissao"
+      : "Battery unavailable or missing permission";
+
+  setText("batteryCardValue", batteryValue);
+  setText("batteryCardMeta", batteryMeta);
+  setText("batteryValue", batteryValue);
+
+  const memoryValue = memory?.available ? `${memory.used_gb} / ${memory.total_gb} GB` : "--";
+  const memoryMeta = memory?.available
+    ? `${memory.used_percent}% ${prefersPortuguese ? "ocupado" : "used"}`
+    : prefersPortuguese
+      ? "Sem leitura de memoria"
+      : "No memory telemetry";
+
+  setText("memoryCardValue", memoryValue);
+  setText("memoryCardMeta", memoryMeta);
+  setText("memoryValue", memoryMeta);
+  setText("sidebarMemoryValue", memory?.available ? `${memory.used_percent}%` : "--");
+  const sidebarFill = document.getElementById("sidebarMemoryFill");
+  if (sidebarFill) sidebarFill.style.width = `${Math.min(memory?.used_percent || 0, 100)}%`;
+
+  setText("storageMeta", storage?.available ? `${storage.export_free_gb} GB ${prefersPortuguese ? "livres" : "free"}` : "--");
+  setText("uptimeCardValue", formatUptime(uptimeS));
+  setText("uptimeCardMeta", device?.chip ? `${device.chip}` : androidLabel);
+  setText("modelCardValue", model?.name || "--");
+  setText("modelCardMeta", model?.path_short || model?.path || "--");
+  setText("modelName", model?.name || "--");
+  setText("modelCardLabel", prefersPortuguese ? "Modelo" : "Model");
+  setText("chartContextChip", `Context ${model?.context ?? "--"}`);
+  setText("chatSideModel", model?.name || "--");
+  setText("chatSideContext", `${model?.context ?? "--"}`);
+  setText("chatSideTurns", `${session?.turns ?? 0}`);
+  setText("chatSideLatency", formatMs(session?.last_latency_ms));
+
+  const services = buildServices(snapshot);
+  renderServiceList("servicesOnline", services.online);
+  renderServiceList("servicesLimited", services.limited);
+  renderServiceList("servicesInactive", services.inactive);
+
+  if (session?.last_reply_chars) {
+    setText(
+      "responsePreview",
+      state.lastAssistantPreview || ui.responsePreviewFallback,
+    );
+  }
 }
 
 async function refreshStatus() {
@@ -62,18 +505,46 @@ async function refreshStatus() {
   updateStatus(payload.status);
 }
 
-async function sendMessage(message) {
-  const response = await fetch("/api/chat", {
+async function streamMessage(message, assistantBodyEl) {
+  const response = await fetch("/api/chat-stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, locale: navigator.language || "" }),
   });
-  const payload = await response.json();
-  if (!payload.ok) {
-    throw new Error(payload.error || "local chat failed");
+
+  if (!response.ok || !response.body) {
+    const fallback = await response.text();
+    throw new Error(fallback || "local chat failed");
   }
-  latencyHintEl.textContent = `Last reply: ${payload.latency_ms} ms`;
-  return payload.reply;
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let accumulated = "";
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const event = JSON.parse(line);
+      if (event.type === "chunk") {
+        accumulated += event.text || "";
+        assistantBodyEl.textContent = normalizeAssistantText(accumulated);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      } else if (event.type === "done") {
+        latencyHintEl.textContent = `${prefersPortuguese ? "Ultima resposta" : "Last reply"}: ${formatMs(event.latency_ms)}`;
+      } else if (event.type === "error") {
+        throw new Error(event.error || "local chat failed");
+      }
+    }
+  }
+
+  return normalizeAssistantText(accumulated).trim();
 }
 
 formEl.addEventListener("submit", async (event) => {
@@ -84,17 +555,24 @@ formEl.addEventListener("submit", async (event) => {
   appendMessage("user", message);
   inputEl.value = "";
   inputEl.focus();
+
+  const assistantBodyEl = appendMessage("assistant", "");
+  assistantBodyEl.classList.add("is-streaming");
   sendButtonEl.disabled = true;
-  statusTextEl.textContent = "Dream is thinking locally...";
+  statusTextEl.textContent = ui.chatThinking;
 
   try {
-    const reply = await sendMessage(message);
-    appendMessage("assistant", reply || "(no visible response)");
-    statusTextEl.textContent = "Ready.";
+    const reply = await streamMessage(message, assistantBodyEl);
+    assistantBodyEl.classList.remove("is-streaming");
+    assistantBodyEl.textContent = reply || (prefersPortuguese ? "(sem resposta visivel)" : "(no visible response)");
+    state.lastAssistantPreview = compactText(reply);
+    setText("responsePreview", state.lastAssistantPreview);
+    statusTextEl.textContent = ui.chatReady;
     await refreshStatus();
   } catch (error) {
-    appendMessage("assistant", `Local error: ${error.message}`);
-    statusTextEl.textContent = "The local session failed.";
+    assistantBodyEl.classList.remove("is-streaming");
+    assistantBodyEl.textContent = `${prefersPortuguese ? "Erro local" : "Local error"}: ${error.message}`;
+    statusTextEl.textContent = ui.chatFailed;
   } finally {
     sendButtonEl.disabled = false;
   }
@@ -104,19 +582,32 @@ resetButtonEl.addEventListener("click", async () => {
   resetButtonEl.disabled = true;
   try {
     await fetch("/api/reset", { method: "POST" });
-    latencyHintEl.textContent = "Session reset.";
-    sessionBadgeEl.textContent = "session reset";
     messagesEl.innerHTML = "";
-    appendMessage("assistant", "Fresh local session ready. Ask something new.");
+    appendMessage("assistant", ui.welcome);
+    statusTextEl.textContent = ui.resetStatus;
+    latencyHintEl.textContent = ui.waitingFirstReply;
+    state.lastAssistantPreview = "";
+    setText("responsePreview", ui.responsePreviewFallback);
     await refreshStatus();
   } finally {
     resetButtonEl.disabled = false;
   }
 });
 
+document.querySelectorAll("[data-view-target]").forEach((button) => {
+  button.addEventListener("click", () => switchView(button.dataset.viewTarget));
+});
+
+goToChatButtonEl.addEventListener("click", () => switchView("chatView"));
+previewChatButtonEl.addEventListener("click", () => switchView("chatView"));
+openSidebarButtonEl.addEventListener("click", openSidebar);
+closeSidebarButtonEl.addEventListener("click", closeSidebar);
+sidebarScrimEl.addEventListener("click", closeSidebar);
+
+updateStaticCopy();
 refreshStatus().catch((error) => {
   statusTextEl.textContent = error.message;
 });
 setInterval(() => {
   refreshStatus().catch(() => {});
-}, 5000);
+}, 4000);
