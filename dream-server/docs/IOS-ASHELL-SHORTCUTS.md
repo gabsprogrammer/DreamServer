@@ -10,11 +10,17 @@ Keep the iOS shell path intentionally small and stable:
 - load the local `Qwen3-0.6B` runtime
 - talk to the model with a fast interactive chat
 
+This is a **lite beta** path for iPhone shell use. It is not the same experience as the full Dream Server desktop install on Windows, macOS, or Linux.
+
 ## Install on iPhone
+
+First, install [a-Shell on the App Store](https://apps.apple.com/us/app/a-shell/id1473805438) on your iPhone.
 
 Inside `a-Shell`:
 
 ```sh
+lg2 clone https://github.com/gabsprogrammer/DreamServer.git
+cd DreamServer
 sh ./install.sh
 sh ./dream-mobile.sh status
 sh ./dream-mobile.sh chat
@@ -37,6 +43,13 @@ The iOS preview now exposes only these shell commands:
 - `chat`
 
 This keeps the `a-Shell` path focused on the part that is currently working well: local chat.
+
+Out of scope for this lite beta:
+
+- full Docker stack
+- Dashboard / WebUI
+- workflows, agents, and voice services
+- desktop feature parity
 
 ## Runtime note
 

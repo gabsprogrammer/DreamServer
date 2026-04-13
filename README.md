@@ -32,7 +32,7 @@ If AI is becoming critical infrastructure, it shouldn’t be rented. Self-hostin
 > | **Windows** (NVIDIA + AMD) | **Supported** — install and run today |
 > | **macOS** (Apple Silicon) | **Supported** — install and run today |
 > | **Android** (Termux) | **Preview** — shell-only local chat bootstrap |
-> | **iOS** (a-Shell) | **Preview** — CLI + Apple Shortcuts intent bridge |
+> | **iOS** (a-Shell) | **Preview** — local shell chat with Qwen3-0.6B |
 >
 > **Tested Linux distros:** Ubuntu 24.04/22.04, Debian 12, Fedora 41+, Arch Linux, CachyOS, openSUSE Tumbleweed. Other distros using apt, dnf, pacman, or zypper should also work — [open an issue](https://github.com/Light-Heart-Labs/DreamServer/issues) if yours doesn't.
 >
@@ -148,15 +148,45 @@ See the [Mobile Shell Quickstart](dream-server/docs/MOBILE-SHELL-QUICKSTART.md) 
 <details>
 <summary><b>iOS (a-Shell preview)</b></summary>
 
+Before running the commands below, install [a-Shell on the App Store](https://apps.apple.com/us/app/a-shell/id1473805438) on your iPhone.
+
 ```sh
+lg2 clone https://github.com/gabsprogrammer/DreamServer.git
+cd DreamServer
 sh ./install.sh
 sh ./dream-mobile.sh status
-sh ./dream-mobile.sh doctor
+sh ./dream-mobile.sh chat
 ```
 
-This preview path is CLI-first and Shortcut-friendly. It downloads `Qwen3-0.6B` on-device today, returns JSON intents for Apple Shortcuts, and now ships a host-side experimental WASI builder for the future `llama-cli.wasm` runtime. The current blocker for real local Qwen chat in `a-Shell` is the published `wasi-sdk` exception runtime, which the repo documents explicitly.
+This preview path is a **lite beta** for iPhone shell use. It is intentionally narrow: install Dream Server inside `a-Shell`, download `Qwen3-0.6B-Q4_0.gguf`, and chat with the model locally in the shell.
 
-See the [iOS a-Shell + Apple Shortcuts guide](dream-server/docs/IOS-ASHELL-SHORTCUTS.md) and the [iOS a-Shell WASM runtime notes](dream-server/docs/IOS-ASHELL-WASM-RUNTIME.md) for details.
+What `sh ./install.sh` does on iPhone:
+
+1. Detects `a-Shell`.
+2. Downloads the mobile `Qwen3-0.6B-Q4_0.gguf` model into `data/models/mobile/`.
+3. Points the iOS preview at the prebuilt `llama-cli.wasm` runtime under `dream-server/mobile-runtime/ios-ashell/bin/`.
+4. Leaves you with a small shell surface: `install`, `status`, and `chat`.
+
+What `sh ./dream-mobile.sh status` shows:
+
+- whether the model download is present
+- whether the wasm runtime path is configured
+- the current chat defaults used on iPhone
+
+What `sh ./dream-mobile.sh chat` does:
+
+- launches the prebuilt `llama-cli.wasm` through `a-Shell`'s `wasm` runner
+- loads the downloaded GGUF model
+- starts the fast local interactive chat loop on the iPhone
+
+Current scope:
+
+- local chat in the shell
+- lite beta path only, not feature-parity with desktop Dream Server
+- no full Dream Server Docker stack on iOS yet
+- no dashboard, workflows, agents, or WebUI in iPhone shell mode
+
+See the [iOS a-Shell guide](dream-server/docs/IOS-ASHELL-SHORTCUTS.md) for the focused iPhone flow.
 
 </details>
 

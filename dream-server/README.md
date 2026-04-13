@@ -18,7 +18,7 @@
 > | **macOS** (Apple Silicon) | **Supported** — install and run today |
 > | **Windows** (NVIDIA + AMD) | **Supported** — install and run today |
 > | **Android** (Termux) | **Preview** — shell-only local chat bootstrap |
-> | **iOS** (a-Shell) | **Preview** — CLI + Apple Shortcuts intent bridge |
+> | **iOS** (a-Shell) | **Preview** — lite beta local shell chat |
 >
 > Linux, Windows, and macOS are the fully supported desktop paths. Android / Termux and iOS / a-Shell are preview paths. See [`docs/SUPPORT-MATRIX.md`](docs/SUPPORT-MATRIX.md) for detailed status.
 
@@ -102,15 +102,21 @@ See [`docs/MOBILE-SHELL-QUICKSTART.md`](docs/MOBILE-SHELL-QUICKSTART.md) for the
 
 ### iOS (a-Shell preview)
 
+Before running the commands below, install [a-Shell on the App Store](https://apps.apple.com/us/app/a-shell/id1473805438) on your iPhone.
+
 ```bash
+lg2 clone https://github.com/gabsprogrammer/DreamServer.git
+cd DreamServer
 sh ./install.sh
 sh ./dream-mobile.sh status
-sh ./dream-mobile.sh doctor
+sh ./dream-mobile.sh chat
 ```
 
-On iOS, the preview now targets a CLI + Apple Shortcuts loop. `sh ./dream-mobile.sh intent` returns stable JSON for Shortcut routing, `install` downloads `Qwen3-0.6B`, and the repo now includes a host-side experimental WASI builder for the future `llama-cli.wasm` runtime. Real local Qwen chat in `a-Shell` is still blocked by the published `wasi-sdk` exception runtime.
+On iOS, the preview is now a **lite beta** focused on local shell chat only. `sh ./install.sh` detects `a-Shell`, downloads `Qwen3-0.6B-Q4_0.gguf`, points the preview at the bundled `llama-cli.wasm` runtime, and leaves you with a small iPhone shell surface: `install`, `status`, and `chat`.
 
-See [`docs/IOS-ASHELL-SHORTCUTS.md`](docs/IOS-ASHELL-SHORTCUTS.md) and [`docs/IOS-ASHELL-WASM-RUNTIME.md`](docs/IOS-ASHELL-WASM-RUNTIME.md) for the current flow and blocker.
+This iPhone path does **not** try to mirror the full desktop Dream Server stack yet. It is for local shell chat on-device, not for dashboard, Docker services, workflows, or agent parity with Windows, macOS, and Linux.
+
+See [`docs/IOS-ASHELL-SHORTCUTS.md`](docs/IOS-ASHELL-SHORTCUTS.md) for the current iPhone flow.
 
 ---
 
