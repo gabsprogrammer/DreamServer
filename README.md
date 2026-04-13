@@ -137,10 +137,11 @@ git clone https://github.com/gabsprogrammer/DreamServer.git
 cd DreamServer
 termux-setup-storage
 ./install.sh
+./dream-mobile.sh local
 ./dream-mobile.sh chat
 ```
 
-This preview path detects Termux, builds a local `llama.cpp` CLI runtime, downloads `Qwen3-0.6B`, and lets you chat in the shell. It also lays the groundwork for mobile-native workflows by exporting generated files into Android shared storage when `termux-setup-storage` has been granted. It does **not** launch the full Docker-based Dream Server stack yet.
+This preview path detects Termux, builds a local `llama.cpp` runtime, downloads `Qwen3-0.6B`, and gives you both shell chat and a lightweight localhost UI on Android. It also lays the groundwork for mobile-native workflows by exporting generated files into Android shared storage when `termux-setup-storage` has been granted. It does **not** launch the full Docker-based Dream Server stack yet.
 
 See the [Mobile Shell Quickstart](dream-server/docs/MOBILE-SHELL-QUICKSTART.md) for details.
 

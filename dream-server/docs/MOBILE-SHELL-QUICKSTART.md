@@ -28,6 +28,7 @@ git clone https://github.com/gabsprogrammer/DreamServer.git
 cd DreamServer
 termux-setup-storage
 ./install.sh
+./dream-mobile.sh local
 ./dream-mobile.sh chat
 ```
 
@@ -49,10 +50,17 @@ Useful commands:
 
 ```bash
 ./dream-mobile.sh status
+./dream-mobile.sh local
 ./dream-mobile.sh chat
 ./dream-mobile.sh prompt "me resume este projeto"
 ./dream-mobile.sh export notes/brief.txt "gere um resumo claro deste repo"
 ```
+
+Android localhost UI:
+
+- `./dream-mobile.sh local` starts a small local web server on `127.0.0.1:8765`
+- if `termux-open-url` is available, Dream Server opens the page in your browser automatically
+- the page keeps the Android preview focused on one thing: local chat plus live device status
 
 Android export behavior:
 

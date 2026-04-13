@@ -50,6 +50,8 @@ Usage:
   ./dream-mobile.sh install
   ./dream-mobile.sh status
   ./dream-mobile.sh chat
+  ./dream-mobile.sh local
+  ./dream-mobile.sh local-stop
   ./dream-mobile.sh prompt "sua pergunta"
   ./dream-mobile.sh export notes/brief.txt "gere um resumo claro deste repo"
 
@@ -57,6 +59,8 @@ Commands:
   install    Build the mobile runtime and download the preview model
   status     Show the current mobile runtime status
   chat       Open an interactive shell chat with the installed model
+  local      Start the Android localhost UI and open it in the browser
+  local-stop Stop the Android localhost UI if it is running
   prompt     Send one prompt and print the answer
   export     Generate a file with the model and save it under Downloads on Android
 EOF
@@ -72,6 +76,62 @@ require_runtime() {
     load_config
     [[ -x "${DREAM_MOBILE_LLAMA_CHAT_CLI:-${DREAM_MOBILE_LLAMA_CLI:-}}" ]] || fail "Mobile chat binary was not found at ${DREAM_MOBILE_LLAMA_CHAT_CLI:-${DREAM_MOBILE_LLAMA_CLI:-<unset>}}"
     [[ -f "${DREAM_MOBILE_MODEL_PATH:-}" ]] || fail "Model file was not found at ${DREAM_MOBILE_MODEL_PATH:-<unset>}"
+}
+
+require_android_runtime() {
+    require_runtime
+    [[ "${DREAM_MOBILE_PLATFORM:-}" == "android-termux" ]] || fail "This command is currently available only on Android / Termux."
+}
+
+resolve_python_bin() {
+    if command -v python >/dev/null 2>&1; then
+        echo "python"
+        return 0
+    fi
+    if command -v python3 >/dev/null 2>&1; then
+        echo "python3"
+        return 0
+    fi
+    fail "python is required for the Android localhost UI. Re-run ./install.sh."
+}
+
+local_server_pid_file() {
+    echo "$SCRIPT_DIR/.dream-mobile-local.pid"
+}
+
+local_server_log_file() {
+    echo "$SCRIPT_DIR/.dream-mobile-local.log"
+}
+
+local_server_url() {
+    echo "http://${DREAM_MOBILE_LOCAL_HOST:-127.0.0.1}:${DREAM_MOBILE_LOCAL_PORT:-8765}"
+}
+
+local_server_alive() {
+    local pid_file pid
+    pid_file="$(local_server_pid_file)"
+    [[ -f "$pid_file" ]] || return 1
+    pid="$(cat "$pid_file" 2>/dev/null || true)"
+    [[ -n "$pid" ]] || return 1
+    kill -0 "$pid" 2>/dev/null
+}
+
+local_server_healthy() {
+    local url
+    url="$(local_server_url)"
+    curl -fsS "$url/api/health" >/dev/null 2>&1
+}
+
+open_local_url() {
+    local url
+    url="$(local_server_url)"
+
+    if command -v termux-open-url >/dev/null 2>&1; then
+        termux-open-url "$url" >/dev/null 2>&1 &
+        return 0
+    fi
+
+    echo "$url"
 }
 
 status() {
@@ -93,6 +153,9 @@ status() {
     if [[ -n "${DREAM_MOBILE_EXPORT_MODE:-}" ]]; then
         echo "Mode:     ${DREAM_MOBILE_EXPORT_MODE}"
     fi
+    if [[ -n "${DREAM_MOBILE_LOCAL_PORT:-}" ]]; then
+        echo "Local UI: http://${DREAM_MOBILE_LOCAL_HOST:-127.0.0.1}:${DREAM_MOBILE_LOCAL_PORT}"
+    fi
     success "Runtime looks ready"
 }
 
@@ -109,16 +172,20 @@ one_prompt() {
     [[ $# -gt 0 ]] || fail "Provide a prompt after 'prompt'."
     [[ -x "${DREAM_MOBILE_LLAMA_PROMPT_CLI:-}" ]] || fail "Mobile prompt binary was not found at ${DREAM_MOBILE_LLAMA_PROMPT_CLI:-<unset>}"
 
-    "${DREAM_MOBILE_LLAMA_PROMPT_CLI}" \
+    local prompt_text output
+    prompt_text="$*"
+    output="$("${DREAM_MOBILE_LLAMA_PROMPT_CLI}" \
         -m "${DREAM_MOBILE_MODEL_PATH}" \
         -ngl 0 \
         -n 512 \
-        "$*"
+        "$prompt_text" 2>/dev/null)"
+
+    output="${output#"$prompt_text"}"
+    printf '%s\n' "${output#${output%%[![:space:]]*}}"
 }
 
 export_prompt() {
-    require_runtime
-    [[ "${DREAM_MOBILE_PLATFORM:-}" == "android-termux" ]] || fail "The export command is currently available only on Android / Termux."
+    require_android_runtime
     [[ $# -ge 2 ]] || fail "Usage: ./dream-mobile.sh export notes/output.txt \"o que voce quer gerar\""
 
     local relative_target="$1"
@@ -138,16 +205,80 @@ export_prompt() {
 
     [[ -x "${DREAM_MOBILE_LLAMA_PROMPT_CLI:-}" ]] || fail "Mobile prompt binary was not found at ${DREAM_MOBILE_LLAMA_PROMPT_CLI:-<unset>}"
 
-    "${DREAM_MOBILE_LLAMA_PROMPT_CLI}" \
+    local output
+    output="$("${DREAM_MOBILE_LLAMA_PROMPT_CLI}" \
         -m "${DREAM_MOBILE_MODEL_PATH}" \
         -ngl 0 \
         -n 768 \
-        "$export_prompt_text" > "$target_path"
+        "$export_prompt_text" 2>/dev/null)"
+
+    output="${output#"$export_prompt_text"}"
+    printf '%s' "${output#${output%%[![:space:]]*}}" > "$target_path"
 
     success "Saved generated file to $target_path"
     if [[ "${DREAM_MOBILE_EXPORT_MODE:-}" != "shared-downloads" ]]; then
         log "Shared Downloads is not configured yet. Run termux-setup-storage, then reinstall to export into Android Downloads."
     fi
+}
+
+local_ui() {
+    require_android_runtime
+
+    local server_script python_bin pid_file log_file url
+    server_script="${DREAM_MOBILE_LOCAL_SERVER:-$SCRIPT_DIR/installers/mobile/android-local-server.py}"
+    [[ -f "$server_script" ]] || fail "Android local UI server was not found at $server_script"
+    python_bin="$(resolve_python_bin)"
+    pid_file="$(local_server_pid_file)"
+    log_file="$(local_server_log_file)"
+    url="$(local_server_url)"
+
+    if local_server_alive && local_server_healthy; then
+        success "Android local UI is already running at $url"
+        open_local_url >/dev/null 2>&1 || true
+        return 0
+    fi
+
+    if local_server_alive; then
+        kill "$(cat "$pid_file")" >/dev/null 2>&1 || true
+        rm -f "$pid_file"
+    fi
+
+    nohup "$python_bin" "$server_script" \
+        --host "${DREAM_MOBILE_LOCAL_HOST:-127.0.0.1}" \
+        --port "${DREAM_MOBILE_LOCAL_PORT:-8765}" \
+        --model "${DREAM_MOBILE_MODEL_PATH}" \
+        --chat-bin "${DREAM_MOBILE_LLAMA_CHAT_CLI:-${DREAM_MOBILE_LLAMA_CLI}}" \
+        --context "${DREAM_MOBILE_CONTEXT}" \
+        --export-dir "${DREAM_MOBILE_EXPORT_DIR:-$SCRIPT_DIR/data/exports/mobile}" \
+        --project-root "$SCRIPT_DIR" >"$log_file" 2>&1 &
+
+    echo $! > "$pid_file"
+
+    local i
+    for i in $(seq 1 40); do
+        if local_server_healthy; then
+            success "Android local UI is ready at $url"
+            open_local_url >/dev/null 2>&1 || true
+            return 0
+        fi
+        sleep 1
+    done
+
+    echo "[error] Android local UI failed to start. Recent log output:" >&2
+    tail -n 40 "$log_file" >&2 || true
+    exit 1
+}
+
+stop_local_ui() {
+    require_android_runtime
+    local pid_file pid
+    pid_file="$(local_server_pid_file)"
+    [[ -f "$pid_file" ]] || fail "Android local UI is not running."
+    pid="$(cat "$pid_file" 2>/dev/null || true)"
+    [[ -n "$pid" ]] || fail "Android local UI PID file is empty."
+    kill "$pid" >/dev/null 2>&1 || true
+    rm -f "$pid_file"
+    success "Android local UI stopped"
 }
 
 cmd="${1:-status}"
@@ -171,6 +302,14 @@ case "$cmd" in
     export)
         shift
         export_prompt "$@"
+        ;;
+    local)
+        shift
+        local_ui "$@"
+        ;;
+    local-stop)
+        shift
+        stop_local_ui "$@"
         ;;
     -h|--help|help)
         usage

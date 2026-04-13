@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dream Server Mobile</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Dream Server Mobile</p>
+        <h1>Android local cockpit</h1>
+        <p class="lede">A localhost-first mobile chat surface for Termux: local Qwen, live device telemetry, and a shell-native workflow that feels closer to Dream Server than a generic phone chatbot.</p>
+      </div>
+      <div class="hero-actions">
+        <span class="badge" id="sessionBadge">warming up</span>
+        <button class="ghost" id="resetButton" type="button">Reset session</button>
+      </div>
+    </header>
+
+    <section class="stats-grid">
+      <article class="card">
+        <p class="label">Model</p>
+        <h2 id="modelName">-</h2>
+        <p class="meta" id="modelMeta">-</p>
+      </article>
+      <article class="card">
+        <p class="label">CPU</p>
+        <h2 id="cpuTemp">-</h2>
+        <p class="meta" id="cpuMeta">-</p>
+      </article>
+      <article class="card">
+        <p class="label">GPU</p>
+        <h2 id="gpuBusy">-</h2>
+        <p class="meta" id="gpuMeta">-</p>
+      </article>
+      <article class="card">
+        <p class="label">Battery</p>
+        <h2 id="batteryLevel">-</h2>
+        <p class="meta" id="batteryMeta">-</p>
+      </article>
+      <article class="card wide">
+        <p class="label">Memory + Storage</p>
+        <h2 id="memoryUsage">-</h2>
+        <p class="meta" id="storageMeta">-</p>
+      </article>
+      <article class="card wide">
+        <p class="label">Exports</p>
+        <h2 id="exportDir">-</h2>
+        <p class="meta" id="localUrl">-</p>
+      </article>
+    </section>
+
+    <section class="chat-panel">
+      <div class="chat-header">
+        <div>
+          <p class="label">Local Chat</p>
+          <h2>Talk to the Android model</h2>
+        </div>
+        <p class="meta" id="latencyHint">Waiting for the first reply...</p>
+      </div>
+
+      <div class="messages" id="messages">
+        <div class="message assistant">
+          <div class="message-role">Dream</div>
+          <div class="message-body">The Android local UI is up. Ask something and I will route it through the Termux model session.</div>
+        </div>
+      </div>
+
+      <form class="composer" id="chatForm">
+        <label class="composer-label" for="messageInput">Message</label>
+        <textarea id="messageInput" rows="3" placeholder="Ask about code, draft a note, or try a short local task..."></textarea>
+        <div class="composer-actions">
+          <p class="meta" id="statusText">Ready.</p>
+          <button id="sendButton" type="submit">Send</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

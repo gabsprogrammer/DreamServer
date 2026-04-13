@@ -211,6 +211,7 @@ verify_termux_runtime_health() {
     command -v git >/dev/null 2>&1 || fail "git is missing from Termux after dependency install."
     command -v cmake >/dev/null 2>&1 || fail "cmake is missing from Termux after dependency install."
     command -v clang >/dev/null 2>&1 || fail "clang is missing from Termux after dependency install."
+    command -v python >/dev/null 2>&1 || command -v python3 >/dev/null 2>&1 || fail "python is missing from Termux after dependency install."
 
     if ! curl --version >/dev/null 2>&1; then
         fail_termux_partial_upgrade
@@ -225,7 +226,7 @@ ensure_termux_dependencies() {
     log "Installing Termux build dependencies"
     run_cmd pkg update -y
     run_cmd pkg upgrade -y
-    run_cmd pkg install -y git cmake make clang curl
+    run_cmd pkg install -y git cmake make clang curl python
     verify_termux_runtime_health
 }
 
@@ -343,6 +344,9 @@ DREAM_MOBILE_CONTEXT="$MOBILE_CONTEXT"
 DREAM_MOBILE_THREADS="$MOBILE_THREADS"
 DREAM_MOBILE_EXPORT_DIR="$EXPORT_DIR"
 DREAM_MOBILE_EXPORT_MODE="$EXPORT_MODE"
+DREAM_MOBILE_LOCAL_HOST="127.0.0.1"
+DREAM_MOBILE_LOCAL_PORT="8765"
+DREAM_MOBILE_LOCAL_SERVER="$ROOT_DIR/installers/mobile/android-local-server.py"
 EOF
 }
 
@@ -359,6 +363,7 @@ print_summary() {
     echo "Next steps:"
     echo "  ./dream-mobile.sh status"
     echo "  ./dream-mobile.sh chat"
+    echo "  ./dream-mobile.sh local"
     echo "  ./dream-mobile.sh prompt \"oi, me explica esse repo\""
     echo "  ./dream-mobile.sh export notes/brief.txt \"gere um resumo claro deste repo\""
     echo ""
