@@ -244,6 +244,7 @@ class ChatSession:
         self.last_reply_at: float | None = None
         self.warming = False
         self.active_locale: str | None = None
+        self.stop_requested = threading.Event()
 
     def _clean(self, data: bytes) -> str:
         return ANSI_RE.sub(b"", data).decode("utf-8", errors="ignore").replace("\r", "")
@@ -321,6 +322,7 @@ class ChatSession:
         self.started_at = time.time()
         self.turns = 0
         self.active_locale = None
+        self.stop_requested.clear()
         self._read_until_prompt(timeout=180)
 
     def prewarm(self) -> None:
@@ -340,6 +342,7 @@ class ChatSession:
         with self.lock:
             self.ensure_started()
             assert self.process is not None and self.process.stdin is not None and self.process.stdout is not None
+            self.stop_requested.clear()
             self._steer_locale(locale_hint)
             self.process.stdin.write(message.encode("utf-8") + b"\n")
             self.process.stdin.flush()
@@ -350,7 +353,12 @@ class ChatSession:
             emitted = ""
 
             while time.time() < deadline:
+                if self.stop_requested.is_set():
+                    raise InterruptedError("generation stopped")
+
                 if self.process.poll() is not None and not buffer:
+                    if self.stop_requested.is_set():
+                        raise InterruptedError("generation stopped")
                     raise RuntimeError("llama chat process exited unexpectedly")
 
                 ready, _, _ = select.select([self.process.stdout], [], [], 0.2)
@@ -360,6 +368,8 @@ class ChatSession:
                 chunk = os.read(self.process.stdout.fileno(), 2048)
                 if not chunk:
                     if self.process.poll() is not None:
+                        if self.stop_requested.is_set():
+                            raise InterruptedError("generation stopped")
                         break
                     continue
 
@@ -408,10 +418,20 @@ class ChatSession:
             self.last_latency_ms = None
             self.last_reply_chars = 0
             self.active_locale = None
+            self.stop_requested.clear()
 
     def set_model(self, model_path: str) -> None:
         self.model_path = model_path
         self.reset()
+
+    def request_stop(self) -> None:
+        self.stop_requested.set()
+        process = self.process
+        if process and process.poll() is None:
+            try:
+                process.terminate()
+            except OSError:
+                return
 
     def info(self) -> dict[str, Any]:
         return {
@@ -763,6 +783,11 @@ class DreamMobileHandler(SimpleHTTPRequestHandler):
             json_response(self, {"ok": True})
             return
 
+        if self.path == "/api/chat-stop":
+            self.chat_session.request_stop()
+            json_response(self, {"ok": True})
+            return
+
         if self.path == "/api/models/select":
             self.handle_model_select()
             return
@@ -793,6 +818,9 @@ class DreamMobileHandler(SimpleHTTPRequestHandler):
         try:
             enriched_message = attachment_context(attachments) + message
             reply, latency_ms = self.chat_session.ask(enriched_message, locale_hint=locale_hint)
+        except InterruptedError:
+            json_response(self, {"ok": False, "error": "generation stopped"}, status=499)
+            return
         except Exception as exc:  # pragma: no cover - best effort mobile runtime
             json_response(
                 self,
@@ -847,6 +875,11 @@ class DreamMobileHandler(SimpleHTTPRequestHandler):
             )
         except BrokenPipeError:
             return
+        except InterruptedError:
+            try:
+                write_ndjson_event(self, {"type": "stopped"})
+            except BrokenPipeError:
+                return
         except Exception as exc:  # pragma: no cover - best effort mobile runtime
             try:
                 write_ndjson_event(self, {"type": "error", "error": f"local chat failed: {exc}"})

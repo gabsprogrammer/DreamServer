@@ -13,6 +13,7 @@ const messagesEl = document.getElementById("messages");
 const formEl = document.getElementById("chatForm");
 const inputEl = document.getElementById("messageInput");
 const sendButtonEl = document.getElementById("sendButton");
+const stopButtonEl = document.getElementById("stopButton");
 const attachmentInputEl = document.getElementById("attachmentInput");
 const attachmentButtonEl = document.getElementById("attachButton");
 const attachmentListEl = document.getElementById("attachmentList");
@@ -78,6 +79,8 @@ const ui = prefersPortuguese
       modelsBusy: "Baixando modelo...",
       attach: "Anexar imagem ou PDF",
       attachOnlyMessage: "[anexos enviados]",
+      stop: "Parar",
+      stopped: "Geracao interrompida.",
       composerLabel: "Mensagem",
       send: "Enviar",
       resetStatus: "Sessao resetada.",
@@ -137,6 +140,8 @@ const ui = prefersPortuguese
       modelsBusy: "Downloading model...",
       attach: "Attach image or PDF",
       attachOnlyMessage: "[attachments sent]",
+      stop: "Stop",
+      stopped: "Generation stopped.",
       composerLabel: "Message",
       send: "Send",
       resetStatus: "Session reset.",
@@ -154,6 +159,8 @@ const state = {
   lastAssistantPreview: "",
   models: [],
   attachments: [],
+  currentController: null,
+  stopRequestedByUser: false,
 };
 
 function setText(id, value) {
@@ -520,6 +527,7 @@ function updateStaticCopy() {
   setText("modelsHeroLede", ui.modelsHeroLede);
   setText("modelsActiveChip", ui.modelsCurrent);
   if (attachmentButtonEl) attachmentButtonEl.textContent = ui.attach;
+  if (stopButtonEl) stopButtonEl.textContent = ui.stop;
   setText("telemetryTitle", ui.telemetryTitle);
   setText("chartLatencyLabel", ui.chartLatency);
   setText("chartCpuLabel", ui.chartCpu);
@@ -680,9 +688,11 @@ async function refreshStatus() {
 }
 
 async function streamMessage(message, assistantBodyEl) {
+  state.currentController = new AbortController();
   const response = await fetch("/api/chat-stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    signal: state.currentController.signal,
     body: JSON.stringify({
       message,
       locale: navigator.language || "",
@@ -720,6 +730,8 @@ async function streamMessage(message, assistantBodyEl) {
         messagesEl.scrollTop = messagesEl.scrollHeight;
       } else if (event.type === "done") {
         latencyHintEl.textContent = `${prefersPortuguese ? "Ultima resposta" : "Last reply"}: ${formatMs(event.latency_ms)}`;
+      } else if (event.type === "stopped") {
+        throw new DOMException("stopped", "AbortError");
       } else if (event.type === "error") {
         throw new Error(event.error || "local chat failed");
       }
@@ -727,6 +739,17 @@ async function streamMessage(message, assistantBodyEl) {
   }
 
   return normalizeAssistantText(accumulated).trim();
+}
+
+async function stopCurrentChat() {
+  if (!state.currentController) return;
+  state.stopRequestedByUser = true;
+  try {
+    await fetch("/api/chat-stop", { method: "POST" });
+  } catch {
+    // Best effort.
+  }
+  state.currentController.abort();
 }
 
 attachmentButtonEl.addEventListener("click", () => {
@@ -755,6 +778,10 @@ attachmentInputEl.addEventListener("change", async (event) => {
   renderAttachments();
 });
 
+stopButtonEl.addEventListener("click", async () => {
+  await stopCurrentChat();
+});
+
 formEl.addEventListener("submit", async (event) => {
   event.preventDefault();
   const message = inputEl.value.trim();
@@ -766,7 +793,9 @@ formEl.addEventListener("submit", async (event) => {
 
   const assistantBodyEl = appendMessage("assistant", "");
   assistantBodyEl.classList.add("is-streaming");
+  state.stopRequestedByUser = false;
   sendButtonEl.disabled = true;
+  stopButtonEl.disabled = false;
   statusTextEl.textContent = ui.chatThinking;
 
   try {
@@ -781,10 +810,18 @@ formEl.addEventListener("submit", async (event) => {
     await refreshStatus();
   } catch (error) {
     assistantBodyEl.classList.remove("is-streaming");
-    assistantBodyEl.textContent = `${prefersPortuguese ? "Erro local" : "Local error"}: ${error.message}`;
-    statusTextEl.textContent = ui.chatFailed;
+    if (error?.name === "AbortError" || state.stopRequestedByUser) {
+      assistantBodyEl.textContent = assistantBodyEl.textContent || ui.stopped;
+      statusTextEl.textContent = ui.stopped;
+    } else {
+      assistantBodyEl.textContent = `${prefersPortuguese ? "Erro local" : "Local error"}: ${error.message}`;
+      statusTextEl.textContent = ui.chatFailed;
+    }
   } finally {
+    state.currentController = null;
+    state.stopRequestedByUser = false;
     sendButtonEl.disabled = false;
+    stopButtonEl.disabled = true;
   }
 });
 
@@ -818,6 +855,7 @@ sidebarScrimEl.addEventListener("click", closeSidebar);
 
 updateStaticCopy();
 renderAttachments();
+stopButtonEl.disabled = true;
 refreshStatus().catch((error) => {
   statusTextEl.textContent = error.message;
 });

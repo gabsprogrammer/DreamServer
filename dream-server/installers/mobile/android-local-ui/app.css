@@ -290,7 +290,8 @@ button {
 .topbar-pills,
 .hero-meta,
 .panel-chips,
-.composer-actions {
+.composer-actions,
+.composer-buttons {
   display: flex;
   align-items: center;
   gap: 10px;
