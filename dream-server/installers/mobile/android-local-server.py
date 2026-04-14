@@ -844,10 +844,13 @@ def plan_direct_action(user_message: str, executor: AndroidActionExecutor) -> di
 
 
 class ChatSession:
-    def __init__(self, chat_bin: str, model_path: str, context: int) -> None:
+    def __init__(self, chat_bin: str, model_path: str, context: int, threads: int | None = None) -> None:
         self.chat_bin = chat_bin
         self.model_path = model_path
         self.context = context
+        self.threads = threads if threads and threads > 0 else None
+        self.idle_timeout_s = 75.0
+        self.max_total_s = 900.0
         self.process: subprocess.Popen[bytes] | None = None
         self.lock = threading.Lock()
         self.started_at: float | None = None
@@ -928,7 +931,8 @@ class ChatSession:
                 str(self.context),
                 "-ngl",
                 "0",
-            ],
+            ]
+            + (["-t", str(self.threads)] if self.threads else []),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -963,13 +967,16 @@ class ChatSession:
             self.process.stdin.flush()
 
             started = time.time()
-            deadline = started + 300
+            last_activity = started
+            deadline = started + self.max_total_s
             buffer = bytearray()
             emitted = ""
 
             while time.time() < deadline:
                 if self.stop_requested.is_set():
                     raise InterruptedError("generation stopped")
+                if time.time() - last_activity > self.idle_timeout_s:
+                    raise TimeoutError("timed out waiting for the local chat response")
 
                 if self.process.poll() is not None and not buffer:
                     if self.stop_requested.is_set():
@@ -988,6 +995,7 @@ class ChatSession:
                         break
                     continue
 
+                last_activity = time.time()
                 buffer.extend(chunk)
                 marker_index = buffer.find(PROMPT_MARKER)
 
@@ -1054,6 +1062,7 @@ class ChatSession:
             "warming": self.warming,
             "turns": self.turns,
             "started_at": self.started_at,
+            "threads": self.threads,
             "last_latency_ms": self.last_latency_ms,
             "last_reply_chars": self.last_reply_chars,
             "last_reply_at": self.last_reply_at,
@@ -1451,9 +1460,11 @@ class DreamMobileHandler(SimpleHTTPRequestHandler):
             else:
                 latency_ms = 0
         except InterruptedError:
+            self.chat_session.reset()
             json_response(self, {"ok": False, "error": "generation stopped"}, status=499)
             return
         except Exception as exc:  # pragma: no cover - best effort mobile runtime
+            self.chat_session.reset()
             json_response(
                 self,
                 {"ok": False, "error": f"local chat failed: {exc}"},
@@ -1526,11 +1537,13 @@ class DreamMobileHandler(SimpleHTTPRequestHandler):
         except BrokenPipeError:
             return
         except InterruptedError:
+            self.chat_session.reset()
             try:
                 write_ndjson_event(self, {"type": "stopped"})
             except BrokenPipeError:
                 return
         except Exception as exc:  # pragma: no cover - best effort mobile runtime
+            self.chat_session.reset()
             try:
                 write_ndjson_event(self, {"type": "error", "error": f"local chat failed: {exc}"})
             except BrokenPipeError:
@@ -1580,6 +1593,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model", required=True)
     parser.add_argument("--chat-bin", required=True)
     parser.add_argument("--context", type=int, default=1024)
+    parser.add_argument("--threads", type=int, default=0)
     parser.add_argument("--export-dir", required=True)
     parser.add_argument("--project-root", required=True)
     return parser.parse_args()
@@ -1592,6 +1606,7 @@ def main() -> int:
         chat_bin=args.chat_bin,
         model_path=args.model,
         context=args.context,
+        threads=args.threads or None,
     )
     DreamMobileHandler.metrics = Metrics(
         model_name=Path(args.model).name,

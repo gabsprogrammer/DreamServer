@@ -161,9 +161,14 @@ status() {
 
 interactive_chat() {
     require_runtime
+    local thread_args=()
+    if [[ -n "${DREAM_MOBILE_THREADS:-}" ]]; then
+        thread_args=(-t "${DREAM_MOBILE_THREADS}")
+    fi
     exec "${DREAM_MOBILE_LLAMA_CHAT_CLI:-${DREAM_MOBILE_LLAMA_CLI}}" \
         -m "${DREAM_MOBILE_MODEL_PATH}" \
         -c "${DREAM_MOBILE_CONTEXT}" \
+        "${thread_args[@]}" \
         -ngl 0
 }
 
@@ -173,9 +178,14 @@ one_prompt() {
     [[ -x "${DREAM_MOBILE_LLAMA_PROMPT_CLI:-}" ]] || fail "Mobile prompt binary was not found at ${DREAM_MOBILE_LLAMA_PROMPT_CLI:-<unset>}"
 
     local prompt_text output
+    local thread_args=()
+    if [[ -n "${DREAM_MOBILE_THREADS:-}" ]]; then
+        thread_args=(-t "${DREAM_MOBILE_THREADS}")
+    fi
     prompt_text="$*"
     output="$("${DREAM_MOBILE_LLAMA_PROMPT_CLI}" \
         -m "${DREAM_MOBILE_MODEL_PATH}" \
+        "${thread_args[@]}" \
         -ngl 0 \
         -n 512 \
         "$prompt_text" 2>/dev/null)"
@@ -206,8 +216,13 @@ export_prompt() {
     [[ -x "${DREAM_MOBILE_LLAMA_PROMPT_CLI:-}" ]] || fail "Mobile prompt binary was not found at ${DREAM_MOBILE_LLAMA_PROMPT_CLI:-<unset>}"
 
     local output
+    local thread_args=()
+    if [[ -n "${DREAM_MOBILE_THREADS:-}" ]]; then
+        thread_args=(-t "${DREAM_MOBILE_THREADS}")
+    fi
     output="$("${DREAM_MOBILE_LLAMA_PROMPT_CLI}" \
         -m "${DREAM_MOBILE_MODEL_PATH}" \
+        "${thread_args[@]}" \
         -ngl 0 \
         -n 768 \
         "$export_prompt_text" 2>/dev/null)"
@@ -224,13 +239,18 @@ export_prompt() {
 local_ui() {
     require_android_runtime
 
-    local server_script python_bin pid_file log_file url
+    local server_script python_bin pid_file log_file url local_threads
     server_script="${DREAM_MOBILE_LOCAL_SERVER:-$SCRIPT_DIR/installers/mobile/android-local-server.py}"
     [[ -f "$server_script" ]] || fail "Android local UI server was not found at $server_script"
     python_bin="$(resolve_python_bin)"
     pid_file="$(local_server_pid_file)"
     log_file="$(local_server_log_file)"
     url="$(local_server_url)"
+    local_threads="${DREAM_MOBILE_LOCAL_THREADS:-${DREAM_MOBILE_THREADS:-0}}"
+
+    if [[ "$local_threads" =~ ^[0-9]+$ ]] && (( local_threads > 2 )); then
+        local_threads=2
+    fi
 
     if local_server_alive && local_server_healthy; then
         success "Android local UI is already running at $url"
@@ -249,6 +269,7 @@ local_ui() {
         --model "${DREAM_MOBILE_MODEL_PATH}" \
         --chat-bin "${DREAM_MOBILE_LLAMA_CHAT_CLI:-${DREAM_MOBILE_LLAMA_CLI}}" \
         --context "${DREAM_MOBILE_CONTEXT}" \
+        --threads "${local_threads}" \
         --export-dir "${DREAM_MOBILE_EXPORT_DIR:-$SCRIPT_DIR/data/exports/mobile}" \
         --project-root "$SCRIPT_DIR" >"$log_file" 2>&1 &
 

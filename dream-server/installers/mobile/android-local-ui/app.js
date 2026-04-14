@@ -819,15 +819,19 @@ formEl.addEventListener("submit", async (event) => {
     state.attachments = [];
     renderAttachments();
     await refreshStatus();
-  } catch (error) {
-    assistantBodyEl.classList.remove("is-streaming");
-    if (error?.name === "AbortError" || state.stopRequestedByUser) {
-      assistantBodyEl.textContent = assistantBodyEl.textContent || ui.stopped;
-      statusTextEl.textContent = ui.stopped;
-    } else {
-      assistantBodyEl.textContent = `${prefersPortuguese ? "Erro local" : "Local error"}: ${error.message}`;
-      statusTextEl.textContent = ui.chatFailed;
-    }
+    } catch (error) {
+      assistantBodyEl.classList.remove("is-streaming");
+      if (error?.name === "AbortError" || state.stopRequestedByUser) {
+        assistantBodyEl.textContent = assistantBodyEl.textContent || ui.stopped;
+        statusTextEl.textContent = ui.stopped;
+      } else {
+        if (assistantBodyEl.textContent.trim()) {
+          assistantBodyEl.textContent = `${assistantBodyEl.textContent.trim()}\n\n${prefersPortuguese ? "[interrompido localmente]" : "[stopped locally]"} ${error.message}`;
+        } else {
+          assistantBodyEl.textContent = `${prefersPortuguese ? "Erro local" : "Local error"}: ${error.message}`;
+        }
+        statusTextEl.textContent = ui.chatFailed;
+      }
   } finally {
     state.currentController = null;
     state.stopRequestedByUser = false;
