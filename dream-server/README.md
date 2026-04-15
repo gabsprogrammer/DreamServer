@@ -91,14 +91,38 @@ See [`docs/WINDOWS-QUICKSTART.md`](docs/WINDOWS-QUICKSTART.md) for details.
 
 ### Android (Termux preview)
 
+Install **Termux** on Android first.
+
+- Recommended: install from [F-Droid](https://f-droid.org/packages/com.termux/).
+- If you already have an old Google Play build, replace it before continuing.
+
 ```bash
+termux-change-repo
+apt update && apt full-upgrade -y
+pkg install -y git
 termux-setup-storage
+git clone https://github.com/Light-Heart-Labs/DreamServer.git
+cd DreamServer
 ./install.sh
+./dream-mobile.sh status
 ./dream-mobile.sh local
 ./dream-mobile.sh chat
 ```
 
-On Termux, `./install.sh` now switches into a mobile preview built for Android: it installs build dependencies, compiles the local `llama.cpp` chat runtime, downloads `Qwen3-0.6B`, and leaves you with both `./dream-mobile.sh chat` and `./dream-mobile.sh local`. If shared Android storage has been granted through `termux-setup-storage`, the preview can also export generated files into Downloads.
+On Termux, `./install.sh` switches into a **beta mobile preview** built for Android: it installs build dependencies, compiles the local `llama.cpp` chat runtime, downloads `Qwen3-0.6B`, and leaves you with both `./dream-mobile.sh chat` and `./dream-mobile.sh local`. If shared Android storage has been granted through `termux-setup-storage`, the preview can also export generated files into Downloads.
+
+Android preview scope:
+
+- shell chat
+- localhost mobile UI
+- mobile GGUF model switching
+- export into Downloads when Android shared storage is enabled
+
+Android preview limits:
+
+- still beta
+- not full desktop feature parity
+- no Docker stack, workflows, voice, or desktop dashboard parity yet
 
 See [`docs/MOBILE-SHELL-QUICKSTART.md`](docs/MOBILE-SHELL-QUICKSTART.md) for the current scope and limitations.
 
@@ -107,7 +131,7 @@ See [`docs/MOBILE-SHELL-QUICKSTART.md`](docs/MOBILE-SHELL-QUICKSTART.md) for the
 Before running the commands below, install [a-Shell on the App Store](https://apps.apple.com/us/app/a-shell/id1473805438) on your iPhone.
 
 ```bash
-lg2 clone https://github.com/gabsprogrammer/DreamServer.git
+lg2 clone https://github.com/Light-Heart-Labs/DreamServer.git
 cd DreamServer
 sh ./install.sh
 sh ./dream-mobile.sh status

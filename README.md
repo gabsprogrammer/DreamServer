@@ -132,16 +132,38 @@ See the [macOS Quickstart](dream-server/docs/MACOS-QUICKSTART.md) for details.
 <details>
 <summary><b>Android (Termux preview)</b></summary>
 
+Install **Termux** on Android first.
+
+- Recommended: install from [F-Droid](https://f-droid.org/packages/com.termux/).
+- If you already have an old Google Play build, replace it before continuing. The official Termux project treats Play Store builds as outdated/deprecated and recommends F-Droid or current GitHub/F-Droid distribution instead.
+
 ```bash
-git clone https://github.com/gabsprogrammer/DreamServer.git
-cd DreamServer
+termux-change-repo
+apt update && apt full-upgrade -y
+pkg install -y git
 termux-setup-storage
+git clone https://github.com/Light-Heart-Labs/DreamServer.git
+cd DreamServer
 ./install.sh
+./dream-mobile.sh status
 ./dream-mobile.sh local
 ./dream-mobile.sh chat
 ```
 
-This preview path detects Termux, builds a local `llama.cpp` runtime, downloads `Qwen3-0.6B`, and gives you both shell chat and a lightweight localhost UI on Android. It also lays the groundwork for mobile-native workflows by exporting generated files into Android shared storage when `termux-setup-storage` has been granted. It does **not** launch the full Docker-based Dream Server stack yet.
+This Android path is a **beta mobile preview**. It detects Termux, builds a native local `llama.cpp` runtime, downloads `Qwen3-0.6B`, and gives you both shell chat and a lightweight localhost UI on Android. It can also export generated files into shared storage when `termux-setup-storage` has been granted.
+
+Current Android preview scope:
+
+- local chat in the shell with `./dream-mobile.sh chat`
+- localhost mobile UI with `./dream-mobile.sh local`
+- model switching between supported mobile GGUF presets
+- local file export into Android Downloads when shared storage is enabled
+
+Current Android preview limits:
+
+- still **beta**
+- not the full desktop Dream Server stack
+- no Docker services, dashboard parity, workflows, voice, or full agent stack on Android yet
 
 See the [Mobile Shell Quickstart](dream-server/docs/MOBILE-SHELL-QUICKSTART.md) for details.
 
@@ -153,7 +175,7 @@ See the [Mobile Shell Quickstart](dream-server/docs/MOBILE-SHELL-QUICKSTART.md) 
 Before running the commands below, install [a-Shell on the App Store](https://apps.apple.com/us/app/a-shell/id1473805438) on your iPhone.
 
 ```sh
-lg2 clone https://github.com/gabsprogrammer/DreamServer.git
+lg2 clone https://github.com/Light-Heart-Labs/DreamServer.git
 cd DreamServer
 sh ./install.sh
 sh ./dream-mobile.sh status

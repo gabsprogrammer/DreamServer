@@ -1,6 +1,6 @@
 # Mobile Shell Preview
 
-Last updated: 2026-04-11
+Last updated: 2026-04-14
 
 ## What this is
 
@@ -19,15 +19,24 @@ This path is intentionally small:
 
 ## Current mobile target
 
-### Android / Termux
+### Android / Termux beta
 
-Supported preview flow:
+Install source:
+
+- Recommended: install **Termux** from [F-Droid](https://f-droid.org/packages/com.termux/).
+- If you still have an old Google Play build, replace it before continuing.
+
+From a clean Android install, the supported preview flow is:
 
 ```bash
-git clone https://github.com/gabsprogrammer/DreamServer.git
-cd DreamServer
+termux-change-repo
+apt update && apt full-upgrade -y
+pkg install -y git
 termux-setup-storage
+git clone https://github.com/Light-Heart-Labs/DreamServer.git
+cd DreamServer
 ./install.sh
+./dream-mobile.sh status
 ./dream-mobile.sh local
 ./dream-mobile.sh chat
 ```
@@ -45,6 +54,12 @@ Current default model:
 
 - Repo: `ggml-org/Qwen3-0.6B-GGUF`
 - File: `Qwen3-0.6B-Q4_0.gguf`
+
+Optional stronger model:
+
+```bash
+./install.sh --model qwen3.5-2b --force
+```
 
 Useful commands:
 
@@ -68,6 +83,19 @@ Android export behavior:
 - if shared storage is not configured yet, Dream Server falls back to `data/exports/mobile/` inside the repo
 - rerun `./install.sh` after granting storage permission so the mobile config points at Downloads
 
+Android preview status:
+
+- **beta**
+- already usable for local chat and a small mobile localhost UI
+- still not the same product scope as Linux / macOS / Windows desktop Dream Server
+
+Android preview limits:
+
+- no full Docker service stack
+- no desktop dashboard parity
+- no workflows, voice stack, or full agent stack yet
+- mobile-first local inference and localhost UI only
+
 If the install fails with `curl`, `git`, or `libnghttp2` symbol errors:
 
 ```bash
@@ -78,7 +106,7 @@ termux-change-repo
 
 That usually means the Termux userland is in a partial-upgrade state, not that the Dream Server installer itself is broken.
 
-## iOS / a-Shell
+## iOS / a-Shell lite beta
 
 iOS is now a **lite beta** focused on local shell chat only.
 
@@ -91,7 +119,7 @@ What works today:
 Example flow:
 
 ```bash
-lg2 clone https://github.com/gabsprogrammer/DreamServer.git
+lg2 clone https://github.com/Light-Heart-Labs/DreamServer.git
 cd DreamServer
 sh ./install.sh
 sh ./dream-mobile.sh status
@@ -103,6 +131,14 @@ The iPhone path is intentionally narrow:
 - no full Docker stack
 - no dashboard, workflows, or agents
 - no desktop feature parity yet
+
+iOS preview limits:
+
+- **lite beta**
+- shell chat only
+- no local localhost UI
+- no full Dream Server Docker stack
+- no dashboard, workflows, voice, or desktop parity on iPhone shell mode
 
 Focused setup guidance lives in [IOS-ASHELL-SHORTCUTS.md](IOS-ASHELL-SHORTCUTS.md).
 

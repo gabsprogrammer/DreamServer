@@ -19,7 +19,7 @@ First, install [a-Shell on the App Store](https://apps.apple.com/us/app/a-shell/
 Inside `a-Shell`:
 
 ```sh
-lg2 clone https://github.com/gabsprogrammer/DreamServer.git
+lg2 clone https://github.com/Light-Heart-Labs/DreamServer.git
 cd DreamServer
 sh ./install.sh
 sh ./dream-mobile.sh status
