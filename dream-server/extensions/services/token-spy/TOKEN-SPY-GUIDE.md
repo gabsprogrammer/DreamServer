@@ -6,9 +6,9 @@
 
 ## What Is Token Spy?
 
-Token Spy is a **transparent API proxy** that sits between your AI agents and upstream LLM providers. Every API call passes through Token Spy, which logs token usage, cost, latency, and session health — then forwards the request and response untouched.
+Token Spy is an **authenticated API proxy** that sits between your AI agents and upstream LLM providers. Every API call passes through Token Spy, which logs token usage, cost, latency, and session health before forwarding the request upstream.
 
-You don't need to change anything about how you make API calls. Token Spy is invisible to your application layer. It just watches, logs, and — when configured — enforces session limits to keep your context from growing out of control.
+You do need one proxy-specific change: point your base URL at Token Spy and send `Authorization: Bearer <TOKEN_SPY_API_KEY>` on protected routes. For external providers, Token Spy uses `UPSTREAM_API_KEY` on the server side and does not forward its own Bearer token upstream.
 
 ### Architecture
 
@@ -29,6 +29,14 @@ You (agent) -> Token Spy proxy -> Upstream API (Anthropic, OpenAI, etc.)
 | my-agent   | `:9110`    | `http://localhost:9110/dashboard`   |
 
 Each agent instance shares the same database, so any dashboard shows data for all agents.
+
+### Authentication Model
+
+- Clients authenticate to Token Spy with `Authorization: Bearer <TOKEN_SPY_API_KEY>`
+- Dashboard/API routes and proxy routes both use the same Token Spy API key
+- External Anthropic/OpenAI/Moonshot upstreams should be configured with `UPSTREAM_API_KEY`
+- Local OpenAI-compatible upstreams can run without `UPSTREAM_API_KEY`
+- Token Spy strips its own Bearer token before forwarding requests upstream
 
 ---
 
@@ -70,12 +78,14 @@ All endpoints are available on the proxy port. Multiple instances share the same
 
 **Read current settings:**
 ```bash
-curl http://localhost:9110/api/settings
+curl http://localhost:9110/api/settings \
+  -H "Authorization: Bearer $TOKEN_SPY_API_KEY"
 ```
 
 **Update global session limit (takes effect immediately):**
 ```bash
 curl -X POST http://localhost:9110/api/settings \
+  -H "Authorization: Bearer $TOKEN_SPY_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"session_char_limit": 150000}'
 ```
@@ -83,6 +93,7 @@ curl -X POST http://localhost:9110/api/settings \
 **Set a per-agent override:**
 ```bash
 curl -X POST http://localhost:9110/api/settings \
+  -H "Authorization: Bearer $TOKEN_SPY_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"agents": {"my-agent": {"session_char_limit": 80000}}}'
 ```
@@ -90,6 +101,7 @@ curl -X POST http://localhost:9110/api/settings \
 **Clear a per-agent override (back to inheriting global):**
 ```bash
 curl -X POST http://localhost:9110/api/settings \
+  -H "Authorization: Bearer $TOKEN_SPY_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"agents": {"my-agent": {"session_char_limit": null}}}'
 ```
@@ -97,6 +109,7 @@ curl -X POST http://localhost:9110/api/settings \
 **Change poll frequency (also updates the systemd timer if configured):**
 ```bash
 curl -X POST http://localhost:9110/api/settings \
+  -H "Authorization: Bearer $TOKEN_SPY_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"poll_interval_minutes": 1}'
 ```
@@ -111,7 +124,8 @@ curl http://localhost:9110/health
 
 **Session status (current session health):**
 ```bash
-curl http://localhost:9110/api/session-status?agent=my-agent
+curl "http://localhost:9110/api/session-status?agent=my-agent" \
+  -H "Authorization: Bearer $TOKEN_SPY_API_KEY"
 # -> {
 #     "current_session_turns": 27,
 #     "current_history_chars": 170829,
@@ -130,17 +144,38 @@ Recommendation levels scale with your configured limit:
 
 **Usage data (raw turns):**
 ```bash
-curl "http://localhost:9110/api/usage?hours=24&limit=100"
+curl "http://localhost:9110/api/usage?hours=24&limit=100" \
+  -H "Authorization: Bearer $TOKEN_SPY_API_KEY"
 ```
 
 **Summary (aggregated by agent):**
 ```bash
-curl "http://localhost:9110/api/summary?hours=24"
+curl "http://localhost:9110/api/summary?hours=24" \
+  -H "Authorization: Bearer $TOKEN_SPY_API_KEY"
 ```
 
 **Manual session reset (emergency):**
 ```bash
-curl -X POST "http://localhost:9110/api/reset-session?agent=my-agent"
+curl -X POST "http://localhost:9110/api/reset-session?agent=my-agent" \
+  -H "Authorization: Bearer $TOKEN_SPY_API_KEY"
+```
+
+### Proxy Requests
+
+**Anthropic Messages API via Token Spy:**
+```bash
+curl -X POST http://localhost:9110/v1/messages \
+  -H "Authorization: Bearer $TOKEN_SPY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"claude-sonnet-4","max_tokens":128,"messages":[{"role":"user","content":"Hello"}]}'
+```
+
+**OpenAI-compatible Chat Completions via Token Spy:**
+```bash
+curl -X POST http://localhost:9110/v1/chat/completions \
+  -H "Authorization: Bearer $TOKEN_SPY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"qwen3-coder-next","messages":[{"role":"user","content":"Hello"}]}'
 ```
 
 ### Dashboard

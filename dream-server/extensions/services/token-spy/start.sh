@@ -1,7 +1,7 @@
 #!/bin/bash
 # Token Spy — API Monitor — launcher
 # Starts proxy instances sharing a single database.
-# Pure telemetry — no request modification.
+# Authenticated proxy — strips Token Spy auth before forwarding upstream.
 #
 # Dual upstream routing:
 #   Anthropic Messages API (/v1/messages) → ANTHROPIC_UPSTREAM

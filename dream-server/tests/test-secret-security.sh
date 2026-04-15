@@ -320,6 +320,28 @@ else
     skip "Token-spy db.py not found"
 fi
 
+token_spy_main="extensions/services/token-spy/main.py"
+if [[ -f "$token_spy_main" ]]; then
+    if grep -Fq '@app.post("/v1/messages", dependencies=[Depends(verify_api_key)])' "$token_spy_main" && \
+       grep -Fq '@app.post("/v1/chat/completions", dependencies=[Depends(verify_api_key)])' "$token_spy_main" && \
+       grep -Fq '@app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"], dependencies=[Depends(verify_api_key)])' "$token_spy_main"; then
+        pass "Token-spy proxy routes require API key auth"
+    else
+        fail "Token-spy proxy routes missing API key protection" "Expected verify_api_key on /v1/* and catch-all proxy routes"
+    fi
+
+    if grep -Fq 'for key in (' "$token_spy_main" && \
+       grep -Fq '"anthropic-dangerous-direct-browser-access"' "$token_spy_main" && \
+       grep -Fq 'for key in ("content-type", "accept", "user-agent", "openai-organization", "openai-project"):' "$token_spy_main" && \
+       ! grep -Fq 'for key in ("authorization", "content-type", "accept", "user-agent"):' "$token_spy_main"; then
+        pass "Token-spy upstream headers exclude proxy Authorization"
+    else
+        fail "Token-spy upstream headers may leak proxy Authorization" "Proxy auth should stop at Token Spy and not be forwarded upstream"
+    fi
+else
+    skip "Token-spy main.py not found"
+fi
+
 # Check for password hashing
 password_hashing=0
 while IFS= read -r -d '' pyfile; do
