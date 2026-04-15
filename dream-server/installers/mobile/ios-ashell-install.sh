@@ -1,6 +1,6 @@
 #!/bin/sh
 # ============================================================================
-# Dream Server iOS / a-Shell CLI + Shortcuts Preview Installer
+# Dream Server iOS / a-Shell Lite Beta Installer
 # ============================================================================
 
 set -eu
@@ -30,11 +30,9 @@ IGNORED_FLAGS=""
 
 IOS_RUNTIME_DIR="$ROOT_DIR/mobile-runtime/ios-ashell"
 IOS_BIN_DIR="$IOS_RUNTIME_DIR/bin"
-IOS_SHORTCUTS_DIR="$IOS_RUNTIME_DIR/shortcuts"
 MODEL_DIR="$ROOT_DIR/data/models/mobile"
 CONFIG_FILE="$ROOT_DIR/.dream-mobile.env"
-SHORTCUTS_DOC="$ROOT_DIR/docs/IOS-ASHELL-SHORTCUTS.md"
-SAMPLE_JSON="$IOS_SHORTCUTS_DIR/intent-sample.json"
+IOS_GUIDE_DOC="$ROOT_DIR/docs/IOS-ASHELL-SHORTCUTS.md"
 WASM_BUILD_HELPER="$ROOT_DIR/installers/mobile/build-ios-ashell-wasm-runtime.sh"
 WASM_BUILD_DOC="$ROOT_DIR/docs/IOS-ASHELL-WASM-RUNTIME.md"
 
@@ -76,9 +74,8 @@ Options:
   -h, --help             Show this help
 
 Notes:
-  - This iOS preview is CLI-first and Shortcut-friendly.
+  - This iOS preview is CLI-first and shell-only.
   - The install step downloads Qwen3-0.6B by default.
-  - It can return JSON intents today for Apple Shortcuts.
   - If a local wasm llama runtime is added later, the same commands can use it.
   - The default iOS profile is legacy-fast: rawer prompting, fast streaming, short chat memory.
 EOF
@@ -193,28 +190,7 @@ warn_ignored_flags() {
 }
 
 prepare_dirs() {
-    run_cmd mkdir -p "$IOS_RUNTIME_DIR" "$IOS_BIN_DIR" "$IOS_SHORTCUTS_DIR" "$MODEL_DIR"
-}
-
-write_sample_json() {
-    if [ "$DRY_RUN" = "true" ]; then
-        log "Would write Shortcut sample JSON to $SAMPLE_JSON"
-        return 0
-    fi
-
-    write_lines_file "$SAMPLE_JSON" \
-        "{" \
-        "  \"ok\": true," \
-        "  \"engine\": \"rules\"," \
-        "  \"mode\": \"ios-shortcuts-preview\"," \
-        "  \"action\": {" \
-        "    \"type\": \"open_app\"," \
-        "    \"app_id\": \"calculator\"," \
-        "    \"app_label\": \"Calculadora\"" \
-        "  }," \
-        "  \"spoken_response\": \"Abrindo a Calculadora.\"," \
-        "  \"confidence\": 0.98" \
-        "}"
+    run_cmd mkdir -p "$IOS_RUNTIME_DIR" "$IOS_BIN_DIR" "$MODEL_DIR"
 }
 
 write_config() {
@@ -237,9 +213,8 @@ write_config() {
 
     write_lines_file "$CONFIG_FILE" \
         "DREAM_MOBILE_PLATFORM=\"ios-ashell\"" \
-        "DREAM_MOBILE_MODE=\"ios-shortcuts-preview\"" \
+        "DREAM_MOBILE_MODE=\"ios-ashell-lite-beta\"" \
         "DREAM_MOBILE_ENGINE=\"$ENGINE\"" \
-        "DREAM_MOBILE_INTENT_FORMAT=\"json\"" \
         "DREAM_MOBILE_MODEL_ID=\"$MODEL_ID\"" \
         "DREAM_MOBILE_MODEL_NAME=\"$MODEL_NAME\"" \
         "DREAM_MOBILE_MODEL_REPO=\"$MODEL_REPO\"" \
@@ -256,8 +231,7 @@ write_config() {
         "DREAM_MOBILE_REPLY_TOKENS=\"$MOBILE_REPLY_TOKENS\"" \
         "DREAM_MOBILE_CHAT_REPLY_TOKENS=\"$MOBILE_CHAT_REPLY_TOKENS\"" \
         "DREAM_MOBILE_HISTORY_MESSAGES=\"$MOBILE_HISTORY_MESSAGES\"" \
-        "DREAM_MOBILE_SHORTCUTS_DOC=\"$SHORTCUTS_DOC\"" \
-        "DREAM_MOBILE_SHORTCUTS_SAMPLE=\"$SAMPLE_JSON\""
+        "DREAM_MOBILE_GUIDE_DOC=\"$IOS_GUIDE_DOC\""
 
     success "Wrote iOS preview config"
 }
@@ -285,7 +259,7 @@ print_summary() {
     success "Dream Server iOS / a-Shell preview is ready."
     echo ""
     echo "Platform:   iOS / a-Shell"
-    echo "Mode:       CLI + Apple Shortcuts"
+    echo "Mode:       Lite beta shell chat"
     echo "Engine:     $ENGINE"
     echo "Model:      $MODEL_NAME"
     echo "Model file: $MODEL_PATH"
@@ -300,8 +274,8 @@ print_summary() {
     echo "  sh ./dream-mobile.sh status"
     echo "  sh ./dream-mobile.sh chat"
     echo ""
-    echo "Shortcut guide:"
-    echo "  $SHORTCUTS_DOC"
+    echo "Guide:"
+    echo "  $IOS_GUIDE_DOC"
     echo ""
     if [ "$DOWNLOAD_MODEL" != "true" ]; then
         echo "Model download was skipped for this run."
@@ -331,7 +305,6 @@ main() {
     warn_ignored_flags
     resolve_model
     prepare_dirs
-    write_sample_json
     download_model
     write_config
     print_summary
