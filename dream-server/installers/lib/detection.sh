@@ -390,7 +390,7 @@ fix_nvidia_secure_boot() {
         fi
     done
     if [[ -z "$sign_file" ]]; then
-        sign_file=$(find /usr/src /usr/lib -name sign-file -executable 2>/dev/null | head -1)
+        sign_file=$(find /usr/src /usr/lib -name sign-file -executable -print -quit 2>/dev/null)
     fi
     if [[ -z "$sign_file" ]]; then
         ai_bad "Cannot find kernel sign-file tool."

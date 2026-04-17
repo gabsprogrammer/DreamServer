@@ -609,7 +609,7 @@ else
                 fi
 
                 # Find llama-server binary (may be in a subdirectory)
-                FOUND_BIN=$(find "$TEMP_EXTRACT" -name "llama-server" -type f | head -1)
+                FOUND_BIN=$(find "$TEMP_EXTRACT" -name "llama-server" -type f -print -quit)
                 if [[ -n "$FOUND_BIN" ]]; then
                     cp "$FOUND_BIN" "$LLAMA_SERVER_BIN"
                     chmod +x "$LLAMA_SERVER_BIN"
