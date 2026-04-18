@@ -24,7 +24,7 @@ If AI is becoming critical infrastructure, it shouldn’t be rented. Self-hostin
 
 ---
 
-> **Platform Support — April 2026**
+> **Platform Support — March 2026**
 >
 > | Platform | Status |
 > |----------|--------|

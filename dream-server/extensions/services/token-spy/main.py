@@ -1,9 +1,8 @@
 """
 Token Spy — API Monitor — Authenticated LLM API Proxy.
 
-Captures per-turn token usage and system prompt breakdown while relaying
-provider responses without buffering. Single or multi-instance deployment,
-sharing a SQLite or PostgreSQL-backed metrics store.
+Captures per-turn token usage and system prompt breakdown, streams SSE through
+without buffering. Single or multi-instance deployment, sharing SQLite database.
 
 Supports Anthropic, Moonshot, OpenAI, and generic OpenAI-compatible APIs.
 """
@@ -18,7 +17,6 @@ import shlex
 import tempfile
 import time
 from pathlib import Path
-from urllib.parse import urlparse
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, Security
@@ -271,43 +269,6 @@ async def verify_api_key(
     return credentials.credentials
 
 
-def _uses_local_upstream(base_url: str) -> bool:
-    """Return True when the configured upstream is obviously local/self-hosted."""
-    if API_PROVIDER == "local":
-        return True
-
-    try:
-        hostname = (urlparse(base_url).hostname or "").lower()
-    except ValueError:
-        hostname = ""
-
-    return hostname in {"localhost", "127.0.0.1", "::1", "host.docker.internal"}
-
-
-def _get_upstream_auth_headers(protocol: str, base_url: str) -> dict[str, str]:
-    """Build server-side auth headers for the configured upstream.
-
-    Proxy clients authenticate to Token Spy with TOKEN_SPY_API_KEY. Hosted
-    upstream providers must be authenticated server-side via UPSTREAM_API_KEY.
-    Local/self-hosted upstreams are allowed to run without upstream auth.
-    """
-    if not UPSTREAM_API_KEY:
-        if _uses_local_upstream(base_url):
-            return {}
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                f"Token Spy is missing UPSTREAM_API_KEY for upstream {base_url}. "
-                "Configure UPSTREAM_API_KEY or point Token Spy at a local upstream "
-                "that does not require provider authentication."
-            ),
-        )
-
-    if protocol == "anthropic":
-        return {"x-api-key": UPSTREAM_API_KEY}
-    return {"authorization": f"Bearer {UPSTREAM_API_KEY}"}
-
-
 # ── App ──────────────────────────────────────────────────────────────────────
 
 app = FastAPI(title="Token Spy — API Monitor", docs_url=None, redoc_url=None)
@@ -343,6 +304,63 @@ def get_moonshot_client() -> httpx.AsyncClient:
             limits=_CLIENT_LIMITS,
         )
     return _openai_client
+
+
+def _build_anthropic_upstream_headers(request: Request) -> dict[str, str]:
+    """Build upstream headers for Anthropic-style requests.
+
+    Token Spy auth stays on the proxy boundary. The Bearer token used to
+    authenticate to Token Spy is never forwarded upstream.
+    """
+    headers: dict[str, str] = {}
+    for key in (
+        "x-api-key",
+        "anthropic-version",
+        "content-type",
+        "anthropic-beta",
+        "anthropic-dangerous-direct-browser-access",
+        "user-agent",
+        "x-app",
+        "accept",
+    ):
+        val = request.headers.get(key)
+        if val:
+            headers[key] = val
+
+    if "x-api-key" not in headers:
+        if UPSTREAM_API_KEY:
+            headers["x-api-key"] = UPSTREAM_API_KEY
+        elif API_PROVIDER == "anthropic":
+            raise HTTPException(
+                status_code=500,
+                detail="Token Spy is missing UPSTREAM_API_KEY for Anthropic upstream requests.",
+            )
+
+    return headers
+
+
+def _build_openai_upstream_headers(request: Request) -> dict[str, str]:
+    """Build upstream headers for OpenAI-compatible requests."""
+    headers: dict[str, str] = {}
+    for key in ("content-type", "accept", "user-agent", "openai-organization", "openai-project"):
+        val = request.headers.get(key)
+        if val:
+            headers[key] = val
+
+    if UPSTREAM_API_KEY:
+        headers["authorization"] = f"Bearer {UPSTREAM_API_KEY}"
+    elif API_PROVIDER in ("openai", "moonshot"):
+        raise HTTPException(
+            status_code=500,
+            detail=f"Token Spy is missing UPSTREAM_API_KEY for {API_PROVIDER} upstream requests.",
+        )
+
+    return headers
+
+
+def _uses_openai_upstream() -> bool:
+    """Return True when the configured provider speaks OpenAI-style APIs."""
+    return API_PROVIDER in ("openai", "moonshot", "local", "ollama", "vllm", "llama-server")
 
 
 _db_available = True
@@ -586,7 +604,7 @@ def estimate_cost(model: str, input_tokens: int, output_tokens: int,
 
 @app.post("/v1/messages", dependencies=[Depends(verify_api_key)])
 async def proxy_messages(request: Request):
-    """Authenticated Anthropic proxy for /v1/messages with metrics capture."""
+    """Authenticated proxy for Anthropic /v1/messages with metrics capture."""
     start = time.time()
 
     # Read and parse request body
@@ -615,16 +633,7 @@ async def proxy_messages(request: Request):
         f"body={len(raw_body)}B"
     )
 
-    # Forward provider-relevant headers, but never forward Token Spy auth upstream.
-    forward_headers = {}
-    for key in ("x-api-key", "anthropic-version", "content-type", "anthropic-beta",
-                "anthropic-dangerous-direct-browser-access", "user-agent", "x-app",
-                "accept"):
-        val = request.headers.get(key)
-        if val:
-            forward_headers[key] = val
-
-    forward_headers.update(_get_upstream_auth_headers("anthropic", ANTHROPIC_UPSTREAM))
+    forward_headers = _build_anthropic_upstream_headers(request)
 
     client = get_http_client()
 
@@ -663,7 +672,7 @@ async def _handle_streaming(client, raw_body, headers, model, sys_analysis,
                 headers=headers,
             ) as upstream:
                 async for line in upstream.aiter_lines():
-                    # Yield each SSE line immediately to preserve stream behavior.
+                    # Yield line immediately for transparent passthrough
                     yield line + "\n"
 
                     # Parse SSE events
@@ -746,6 +755,7 @@ async def _handle_non_streaming(client, raw_body, headers, model, sys_analysis,
     try:
         data = resp.json()
     except Exception:
+        log.warning("Failed to parse Anthropic response JSON — token usage will be recorded as zero")
         data = {}
 
     resp_usage = data.get("usage", {})
@@ -852,13 +862,7 @@ async def proxy_chat_completions(request: Request):
         f"body={len(raw_body)}B | roles={roles}"
     )
 
-    forward_headers = {}
-    for key in ("content-type", "accept", "user-agent"):
-        val = request.headers.get(key)
-        if val:
-            forward_headers[key] = val
-
-    forward_headers.update(_get_upstream_auth_headers("openai", OPENAI_UPSTREAM))
+    forward_headers = _build_openai_upstream_headers(request)
 
     client = get_moonshot_client()
 
@@ -974,6 +978,7 @@ async def _handle_openai_non_streaming(client, raw_body, headers, model, sys_ana
     try:
         data = resp.json()
     except Exception:
+        log.warning("Failed to parse OpenAI response JSON — token usage will be recorded as zero")
         data = {}
 
     resp_usage = data.get("usage", {})
@@ -1216,7 +1221,8 @@ def _get_remote_session_status(agent: str) -> dict:
         "                    history_chars += sum(len(str(x)) for x in c)\n"
         "                elif isinstance(c, str):\n"
         "                    history_chars += len(c)\n"
-        "        except: pass\n"
+        "        except Exception:\n"
+        "            pass  # skip corrupt JSONL lines\n"
         "    print(json.dumps({'turns': turns, 'chars': history_chars, 'tool_results': tool_results,"
         " 'file_bytes': os.path.getsize(largest), 'total_lines': len(lines), 'files': len(files)}))"
     )
@@ -1298,7 +1304,8 @@ def _kill_remote_session(agent: str, reason: str = "dashboard") -> dict:
         "        for k in list(data.keys()):\n"
         "            if isinstance(data[k], dict) and data[k].get('sessionId') == sid: del data[k]\n"
         "        with open(sj, 'w') as fh: json.dump(data, fh, indent=2)\n"
-        "    except: pass\n"
+        "    except Exception as e:\n"
+        "        print(json.dumps({'warn': 'sessions.json update failed', 'error': str(e)}))\n"
         "    print(json.dumps({'action': 'killed', 'session_id': sid, 'size_bytes': size}))"
     )
     try:
@@ -2401,30 +2408,16 @@ async def token_events(request: Request):
 
 # ── Catch-all for other endpoints ────────────────────────────────────────────
 
-@app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
-async def proxy_other(
-    request: Request,
-    path: str,
-    _api_key: str = Depends(verify_api_key),
-):
-    """Forward other provider routes through the authenticated proxy."""
+@app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"], dependencies=[Depends(verify_api_key)])
+async def proxy_other(request: Request, path: str):
+    """Forward any other authenticated requests to upstream."""
     # Use the correct upstream client based on provider
-    if API_PROVIDER in ("openai", "moonshot", "local"):
+    if _uses_openai_upstream():
         client = get_moonshot_client()
-        protocol = "openai"
-        upstream_base = OPENAI_UPSTREAM
+        headers = _build_openai_upstream_headers(request)
     else:
         client = get_http_client()
-        protocol = "anthropic"
-        upstream_base = ANTHROPIC_UPSTREAM
-    headers = {}
-    for key in ("x-api-key", "anthropic-version", "content-type", "anthropic-beta",
-                "accept", "user-agent"):
-        val = request.headers.get(key)
-        if val:
-            headers[key] = val
-
-    headers.update(_get_upstream_auth_headers(protocol, upstream_base))
+        headers = _build_anthropic_upstream_headers(request)
 
     body = await request.body()
     try:

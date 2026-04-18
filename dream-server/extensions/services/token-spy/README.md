@@ -1,34 +1,29 @@
 # Token Spy
 
-Authenticated LLM API proxy that captures per-turn token usage, cost, latency, and session health. It sits between your client and upstream providers (Anthropic, OpenAI, Moonshot, or self-hosted OpenAI-compatible servers), logs the request lifecycle, and relays provider responses back to the caller.
+Authenticated LLM API proxy that captures per-turn token usage, cost, latency, and session health. It sits between your application and upstream providers (Anthropic, OpenAI, Moonshot, local models), logs every turn, and streams responses through without buffering.
 
 ## How It Works
 
 ```
-Your client --Bearer TOKEN_SPY_API_KEY--> Token Spy proxy --> Upstream API
-                                              |
-                                              v
-                                          Metrics DB <- Dashboard
-                                              ^
-                                              |
-                                       Session Manager
+Your agent -> Token Spy proxy -> Upstream API (Anthropic, OpenAI, etc.)
+                  |
+                  v
+              SQLite DB <- Dashboard (charts, tables, settings)
+                  ^
+                  |
+           Session Manager (polls every N minutes, enforces limits)
 ```
 
-Point your client's base URL at Token Spy instead of the provider directly.
-
-- Clients authenticate to Token Spy with `TOKEN_SPY_API_KEY`
-- Token Spy authenticates to hosted upstream providers with `UPSTREAM_API_KEY`
-- Token Spy never forwards the proxy bearer token to the upstream provider
-- Local/self-hosted upstreams can run without `UPSTREAM_API_KEY` when they do not require provider auth
+Point your agent's API base URL at Token Spy instead of the upstream provider. Clients authenticate to Token Spy with `TOKEN_SPY_API_KEY`. For external providers, Token Spy uses server-side `UPSTREAM_API_KEY` and never forwards its own Bearer token upstream. Local OpenAI-compatible backends such as llama-server or Ollama can still run without an upstream key.
 
 ## Features
 
 - **Real-time dashboard** -- session health cards, cost charts, token breakdown, cumulative cost, recent turns table
-- **Session health monitoring** -- detects context bloat, recommends resets, and can auto-kill sessions exceeding configured character limits
-- **Multi-provider proxying** -- Anthropic Messages API (`/v1/messages`) and OpenAI-compatible Chat Completions (`/v1/chat/completions`)
-- **Persistent metrics storage** -- SQLite by default, with optional PostgreSQL-backed runtime support
+- **Session health monitoring** -- detects context bloat, recommends resets, can auto-kill sessions exceeding configurable character limits
+- **Multi-provider** -- Anthropic Messages API (`/v1/messages`) and OpenAI Chat Completions (`/v1/chat/completions`)
+- **Dual database backends** -- SQLite (zero-config default) and PostgreSQL/TimescaleDB for production
 - **Per-agent settings** -- configurable session limits and poll intervals, editable via dashboard or REST API
-- **Local model support** -- track self-hosted models (vLLM, Ollama, llama-server) with $0 cost badges
+- **Local model support** -- track self-hosted models (vLLM, Ollama) with $0 cost badges
 
 ## Standalone Usage
 
@@ -36,23 +31,25 @@ Point your client's base URL at Token Spy instead of the provider directly.
 cd token-spy
 pip install -r requirements.txt
 cp .env.example .env
-
-# Required for proxy clients
-export TOKEN_SPY_API_KEY=replace-me
-
-# Required for hosted upstream providers
-export UPSTREAM_API_KEY=provider-key
-
+# Edit .env -- at minimum set AGENT_NAME and TOKEN_SPY_API_KEY
+TOKEN_SPY_API_KEY=dev-token \
+UPSTREAM_API_KEY=provider-secret \
 AGENT_NAME=my-agent python -m uvicorn main:app --host 0.0.0.0 --port 9110
 ```
 
-For local/self-hosted upstreams that do not require provider authentication, `UPSTREAM_API_KEY` can be left unset.
-
 Open `http://localhost:9110/dashboard` to see the monitoring UI.
+
+All `/api/*`, `/token_events`, and `/v1/*` endpoints require:
+
+```bash
+Authorization: Bearer <TOKEN_SPY_API_KEY>
+```
+
+Use `UPSTREAM_API_KEY` for external Anthropic/OpenAI/Moonshot providers. For local no-auth OpenAI-compatible upstreams, `UPSTREAM_API_KEY` is optional.
 
 ## Configuration
 
-See [TOKEN-SPY-GUIDE.md](TOKEN-SPY-GUIDE.md) for all available settings and auth examples.
+See [TOKEN-SPY-GUIDE.md](TOKEN-SPY-GUIDE.md) for all available settings.
 
 ## API Endpoints
 
@@ -66,8 +63,8 @@ See [TOKEN-SPY-GUIDE.md](TOKEN-SPY-GUIDE.md) for all available settings and auth
 | `/api/session-status` | GET | Current session health |
 | `/api/reset-session` | POST | Kill active session |
 | `/token_events` | GET | SSE stream of token events |
-| `/v1/messages` | POST | Authenticated Anthropic proxy |
-| `/v1/chat/completions` | POST | Authenticated OpenAI-compatible proxy |
+| `/v1/messages` | POST | Anthropic proxy |
+| `/v1/chat/completions` | POST | OpenAI-compatible proxy |
 
 See [TOKEN-SPY-GUIDE.md](TOKEN-SPY-GUIDE.md) for full API documentation.
 

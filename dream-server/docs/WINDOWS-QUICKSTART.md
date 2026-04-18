@@ -1,103 +1,104 @@
 # Dream Server Windows Quickstart
 
-> **Status: Supported today**
+> **Status: Coming Soon — Preflight Checks Only (target: end of March 2026)**
 >
-> Dream Server runs on Windows today through **Docker Desktop with the WSL2 backend**. The Windows installer (`.\install.ps1`) performs preflight checks, installs the stack, and hands off runtime orchestration to the Windows CLI (`dream.ps1`).
+> The Windows installer currently runs **system diagnostics and preflight checks only** — it verifies WSL2, Docker Desktop, and GPU readiness but **does not yet produce a running AI stack.** Full Windows runtime support is in active development.
 >
-> See the [Support Matrix](SUPPORT-MATRIX.md) for current platform status.
+> **For a working setup today, use Linux.** See the [Support Matrix](SUPPORT-MATRIX.md) for current platform status.
 
 ---
 
 ## What Works Today
 
-- Complete install and runtime on Windows 10/11 with Docker Desktop + WSL2
-- GPU-aware install flow for NVIDIA and AMD Windows paths
-- Service management through `.\dream-server\installers\windows\dream.ps1`
-- Diagnostics and support bundles via the Windows CLI
-
-Install from a PowerShell session:
+The Windows installer (`install.ps1`) checks your system readiness and generates a preflight report:
 
 ```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-git clone https://github.com/Light-Heart-Labs/DreamServer.git
-cd DreamServer
-.\install.ps1
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/Light-Heart-Labs/DreamServer/v2.1.0/install.ps1" -OutFile install.ps1; .\install.ps1
 ```
 
-After install, manage the stack with the Windows CLI:
+**Prerequisites:** Windows 10 2004+ or Windows 11. NVIDIA GPU recommended but not required (CPU-only works with smaller models). 4GB+ RAM minimum, 16GB+ recommended.
+
+This will verify:
+- WSL2 is installed and set to version 2
+- Docker Desktop is running with WSL2 backend
+- Docker CLI is available inside your WSL distro
+- NVIDIA GPU is visible from both Windows and WSL
+
+The preflight report is saved to `%TEMP%\dream-server-windows-preflight.json`.
+
+---
+
+## What's Coming
+
+When full Windows support ships (target: end of March 2026), the installer will:
+
+1. **Check your system** — WSL2, Docker Desktop, NVIDIA GPU
+2. **Auto-fix issues** — enable WSL2, prompt for Docker install
+3. **Detect GPU** — pick right model tier automatically
+4. **Download model** — 7B to 72B based on your VRAM (~10-40GB)
+5. **Start services** — llama-server, Open WebUI, search, database
+
+**Estimated time (when available):** 10-30 minutes depending on download speed.
+
+---
+
+## Planned: Quick Commands (not yet functional)
+
+The following commands describe the intended Windows experience once full support ships:
 
 ```powershell
-.\dream-server\installers\windows\dream.ps1 status
-.\dream-server\installers\windows\dream.ps1 start
-.\dream-server\installers\windows\dream.ps1 stop
-.\dream-server\installers\windows\dream.ps1 restart
-.\dream-server\installers\windows\dream.ps1 logs open-webui 100
-.\dream-server\installers\windows\dream.ps1 update
-.\dream-server\installers\windows\dream.ps1 report
+# Start after install
+cd $env:LOCALAPPDATA\DreamServer
+docker compose up -d
+
+# Stop
+docker compose down
+
+# View logs
+docker compose logs -f
+
+# Check status
+docker compose ps
+
+# Update
+docker compose pull && docker compose up -d
 ```
 
-Open the dashboard at **http://localhost:3000** after services are up.
+---
+
+## Planned: Open the UI
+
+Visit **http://localhost:3000** (once full runtime support is available).
+
+First user becomes admin. Start chatting immediately.
 
 ---
 
-## Requirements
+## Planned: Bootstrap Mode (Faster Start)
 
-- Windows 10 version 2004+ or Windows 11
-- Docker Desktop with **WSL2 backend enabled**
-- A WSL2 distro installed and working
-- NVIDIA GPU or AMD Strix Halo hardware for accelerated local inference
-- Enough RAM / VRAM for the selected model tier
-
-CPU-only and cloud-assisted workflows are possible, but the best local experience still depends on hardware fit.
-
----
-
-## What The Installer Does
-
-`.\install.ps1` performs the Windows-specific setup flow:
-
-1. Checks WSL2, Docker Desktop, and GPU readiness
-2. Selects an install tier based on detected hardware
-3. Generates the Dream Server environment and credentials
-4. Starts the required services
-5. Leaves you with `dream.ps1` for day-to-day management
-
-The Windows path is not a "diagnostics-only" stub anymore. The preflight checks are part of the real installer flow.
-
----
-
-## Common Commands
+Start with a tiny 1.5B model, upgrade later:
 
 ```powershell
-# Overall health, service state, GPU path, and agent status
-.\dream-server\installers\windows\dream.ps1 status
-
-# Restart one service
-.\dream-server\installers\windows\dream.ps1 restart open-webui
-
-# Tail logs
-.\dream-server\installers\windows\dream.ps1 logs llama-server 50
-
-# Open or inspect config
-.\dream-server\installers\windows\dream.ps1 config show
-.\dream-server\installers\windows\dream.ps1 config edit
-
-# Host agent controls
-.\dream-server\installers\windows\dream.ps1 agent status
-.\dream-server\installers\windows\dream.ps1 agent restart
+.\install.ps1 -Bootstrap
 ```
 
-Run `.\dream-server\installers\windows\dream.ps1 help` for the full command list.
+Chat in 2 minutes while full model downloads in background.
 
 ---
 
-## Known Constraints
+## Planned: Installer Flags
 
-- Windows runtime depends on Docker Desktop + WSL2 rather than a pure native service stack.
-- Hardware validation is broader on Linux than on Windows today.
-- Intel Arc remains experimental overall; see the support docs before planning around it.
+These flags describe the intended installer interface once full support ships:
 
-These are support-scope constraints, not "coming soon" blockers.
+| Flag | What It Does |
+|------|--------------|
+| `-Bootstrap` | Quick start with small model |
+| `-Tier 2` | Force specific tier (1-4) |
+| `-Voice` | Enable Whisper + TTS |
+| `-Workflows` | Enable n8n automation |
+| `-Rag` | Enable Qdrant vector DB |
+| `-All` | Everything enabled |
+| `-Diagnose` | Check system only |
 
 ---
 
@@ -105,16 +106,76 @@ These are support-scope constraints, not "coming soon" blockers.
 
 | Issue | Fix |
 |-------|-----|
-| Docker Desktop is not running | Start Docker Desktop and wait for it to finish booting |
-| WSL2 is missing | Run `wsl --install`, reboot if prompted, then retry |
-| GPU is not visible | Update drivers, restart Docker Desktop, rerun `dream.ps1 status` |
-| A service is unhealthy | Inspect logs with `dream.ps1 logs <service>` and generate a bundle with `dream.ps1 report` |
+| "Docker not running" | Start Docker Desktop, wait for whale icon |
+| "WSL2 not found" | `wsl --install` then restart |
+| "nvidia-smi fails" | Update NVIDIA drivers; restart Docker Desktop |
+| "Port in use" | Edit `.env`, change `WEBUI_PORT=3001` |
+| Out of memory | Lower tier: `.\install.ps1 -Tier 1` |
 
-More references:
-- [WINDOWS-INSTALL-WALKTHROUGH.md](WINDOWS-INSTALL-WALKTHROUGH.md)
-- [WSL2-GPU-TROUBLESHOOTING.md](WSL2-GPU-TROUBLESHOOTING.md)
-- [DOCKER-DESKTOP-OPTIMIZATION.md](DOCKER-DESKTOP-OPTIMIZATION.md)
+Full guide: [WINDOWS-INSTALL-WALKTHROUGH.md](WINDOWS-INSTALL-WALKTHROUGH.md)
 
 ---
 
-*Last updated: 2026-04-14*
+## System Requirements by Tier
+
+| Tier | VRAM | Model | Use Case |
+|------|------|-------|----------|
+| 1 | 8-12GB | 7B Qwen | Basic chat, coding help |
+| 2 | 12-20GB | 14B AWQ | Daily driver, good reasoning |
+| 3 | 20-40GB | 32B AWQ | Power user, complex tasks |
+| 4 | 40GB+ | 72B AWQ | Maximum capability |
+
+---
+
+## Architecture
+
+```
+Windows Host
+  ├── Docker Desktop (WSL2 backend)
+  │     ├── llama-server container (GPU accelerated)
+  │     ├── Open WebUI (port 3000)
+  │     ├── SearXNG search
+  │     └── PostgreSQL + Qdrant
+  └── WSL2 Ubuntu (file system, networking)
+```
+
+GPU access: Windows driver → WSL2 → Docker Container Toolkit → llama-server
+
+---
+
+## Files & Locations
+
+| What | Where |
+|------|-------|
+| Install directory | `%LOCALAPPDATA%\DreamServer` |
+| Config | `.env` file in install directory |
+| Models | Docker volume `dream-server_model-cache` |
+| Logs | `docker compose logs` |
+| Data | Docker volumes (auto-managed) |
+
+---
+
+## Updating
+
+```powershell
+cd $env:LOCALAPPDATA\DreamServer
+# Get latest
+git pull
+# Update containers
+docker compose pull
+# Restart
+docker compose up -d
+```
+
+---
+
+## Need Help?
+
+- Full walkthrough: [WINDOWS-INSTALL-WALKTHROUGH.md](WINDOWS-INSTALL-WALKTHROUGH.md)
+- GPU issues: [WSL2-GPU-TROUBLESHOOTING.md](WSL2-GPU-TROUBLESHOOTING.md)
+- Docker tuning: [DOCKER-DESKTOP-OPTIMIZATION.md](DOCKER-DESKTOP-OPTIMIZATION.md)
+- General FAQ: [FAQ.md](../FAQ.md)
+
+---
+
+*Last updated: 2026-03-04*

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Token Spy — API Monitor — launcher
-# Starts authenticated proxy instances sharing a single database.
-# Metrics capture plus request relaying for hosted or local upstreams.
+# Starts proxy instances sharing a single database.
+# Authenticated proxy — strips Token Spy auth before forwarding upstream.
 #
 # Dual upstream routing:
 #   Anthropic Messages API (/v1/messages) → ANTHROPIC_UPSTREAM
