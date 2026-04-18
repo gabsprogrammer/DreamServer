@@ -221,7 +221,7 @@ MOCK
     touch "$SCRIPT_DIR/docker-compose.base.yml"
     mkdir -p "$BATS_TEST_TMPDIR/bin"
 
-    # Create curl, jq, and sed wrappers but NOT rsync, then use an isolated PATH
+    # Create curl and jq, then shadow command -v rsync so the warning path is deterministic
     cat > "$BATS_TEST_TMPDIR/bin/curl" << 'MOCK'
 #!/bin/bash
 echo "curl 8.0.0"
@@ -232,13 +232,9 @@ MOCK
 echo "jq-1.7"
 MOCK
     chmod +x "$BATS_TEST_TMPDIR/bin/jq"
-    cat > "$BATS_TEST_TMPDIR/bin/sed" << 'MOCK'
-#!/bin/bash
-/usr/bin/sed "$@"
-MOCK
-    chmod +x "$BATS_TEST_TMPDIR/bin/sed"
+    export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 
-    run /usr/bin/env PATH="'"$BATS_TEST_TMPDIR/bin"'" /usr/bin/bash -c '
+    run bash -c '
         export SCRIPT_DIR="'"$SCRIPT_DIR"'"
         export INSTALL_DIR="'"$INSTALL_DIR"'"
         export LOG_FILE="'"$LOG_FILE"'"
@@ -246,6 +242,7 @@ MOCK
         export DRY_RUN=false
         export PKG_MANAGER="apt"
         export VERSION="2.3.0"
+        export PATH="'"$BATS_TEST_TMPDIR/bin:$PATH"'"
 
         log() { :; }
         warn() { echo "WARN: $1"; }
@@ -256,6 +253,12 @@ MOCK
         show_phase() { :; }
         show_stranger_boot() { :; }
         dream_progress() { :; }
+        command() {
+            if [[ "$1" == "-v" && "$2" == "rsync" ]]; then
+                return 1
+            fi
+            builtin command "$@"
+        }
 
         source "'"$BATS_TEST_DIRNAME/../../installers/phases/01-preflight.sh"'"
     '
