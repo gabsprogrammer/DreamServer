@@ -20,7 +20,7 @@ from pathlib import Path
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, Security
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from filters import apply_filters
 from providers import ProviderRegistry
@@ -1707,7 +1707,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Token Spy — API Monitor</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: -apple-system, system-ui, sans-serif; background: #0d1117; color: #e6edf3; padding: 20px; }
@@ -1721,7 +1720,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   .chart-container { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
   .chart-container h3 { font-size: 0.95em; margin-bottom: 12px; }
   .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-  canvas { max-height: 300px; }
+  canvas { width: 100%; height: 280px; max-height: 300px; display: block; }
+  .chart-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; color: #8b949e; font-size: 0.8em; }
+  .chart-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+  .chart-legend-swatch { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
   table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
   th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #21262d; }
   th { color: #8b949e; font-weight: 600; }
@@ -1826,28 +1828,33 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <div class="chart-row">
   <div class="chart-container">
     <h3>Cost Per Turn (Session Timeline)</h3>
-    <canvas id="cost-chart"></canvas>
+    <canvas id="cost-chart" data-height="280"></canvas>
+    <div class="chart-legend" id="cost-legend"></div>
   </div>
   <div class="chart-container">
     <h3>History Growth (chars)</h3>
-    <canvas id="history-chart"></canvas>
+    <canvas id="history-chart" data-height="280"></canvas>
+    <div class="chart-legend" id="history-legend"></div>
   </div>
 </div>
 
 <div class="chart-row">
   <div class="chart-container">
     <h3>Token Usage Over Time</h3>
-    <canvas id="tokens-chart"></canvas>
+    <canvas id="tokens-chart" data-height="280"></canvas>
+    <div class="chart-legend" id="tokens-legend"></div>
   </div>
   <div class="chart-container">
     <h3>Cost Breakdown by Type</h3>
-    <canvas id="breakdown-chart"></canvas>
+    <canvas id="breakdown-chart" data-height="280"></canvas>
+    <div class="chart-legend" id="breakdown-legend"></div>
   </div>
 </div>
 
 <div class="chart-container">
   <h3>Cumulative Cost Over Time</h3>
-  <canvas id="cumulative-chart" style="max-height:260px;"></canvas>
+  <canvas id="cumulative-chart" data-height="260" style="height:260px;max-height:260px;"></canvas>
+  <div class="chart-legend" id="cumulative-legend"></div>
 </div>
 
 <div class="chart-container">
@@ -1872,6 +1879,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   </table>
 </div>
 
+<script src="/dashboard-assets/charts.js"></script>
 <script>
 function _getApiKey(){return sessionStorage.getItem('token_spy_api_key')||''}
 function _authHeaders(){return {Authorization:'Bearer '+_getApiKey()}}
@@ -1914,6 +1922,14 @@ async function loadAll() {
 function parseTs(ts) {
   if (!ts) return new Date(NaN);
   return new Date(ts);
+}
+
+function formatTimeTick(ts) {
+  if (!(ts instanceof Date) || Number.isNaN(ts.getTime())) return '\\u2014';
+  if (getHours() >= 168) {
+    return ts.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  }
+  return ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 function fmt(n) {
@@ -2021,103 +2037,77 @@ function renderSummary(data) {
 }
 
 function renderCostChart(usage) {
-  const ctx = document.getElementById('cost-chart').getContext('2d');
+  const canvas = document.getElementById('cost-chart');
   if (costChart) costChart.destroy();
   const sorted = [...usage].reverse();
   const colors = ['#58a6ff', '#f0883e', '#3fb950', '#a371f7', '#da3633', '#e6edf3'];
   const agents = [...new Set(usage.map(u => u.agent))];
-  const datasets = agents.map((agent, i) => {
+  const series = agents.map((agent, i) => {
     const agentData = sorted.filter(u => u.agent === agent);
     return {
       label: agent,
-      data: agentData.map(u => ({x: parseTs(u.timestamp), y: u.estimated_cost_usd})),
-      borderColor: colors[i % colors.length],
+      points: agentData.map(u => ({x: parseTs(u.timestamp), y: u.estimated_cost_usd || 0})),
+      color: colors[i % colors.length],
       pointRadius: 2,
-      tension: 0.1
     };
   });
-  costChart = new Chart(ctx, {
-    type: 'line',
-    data: { datasets },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      scales: {
-        x: { type: 'time', time: { tooltipFormat: 'HH:mm:ss' }, ticks: { color: '#8b949e', maxTicksLimit: 10 }, grid: { color: '#21262d' } },
-        y: { title: { display: true, text: 'USD', color: '#8b949e' }, ticks: { color: '#8b949e', callback: v => '$' + v.toFixed(2) }, grid: { color: '#21262d' } }
-      },
-      plugins: { legend: { labels: { color: '#e6edf3' } } }
-    }
+  costChart = TokenSpyCharts.line(canvas, {
+    legendEl: document.getElementById('cost-legend'),
+    series,
+    yFormatter: v => '$' + v.toFixed(2),
+    xFormatter: formatTimeTick,
   });
 }
 
 function renderHistoryChart(usage) {
-  const ctx = document.getElementById('history-chart').getContext('2d');
+  const canvas = document.getElementById('history-chart');
   if (historyChart) historyChart.destroy();
   const sorted = [...usage].reverse();
   const colors = ['#58a6ff', '#f0883e', '#3fb950', '#a371f7', '#da3633', '#e6edf3'];
   const bgColors = ['rgba(88,166,255,0.08)', 'rgba(240,136,62,0.08)', 'rgba(63,185,80,0.08)', 'rgba(163,113,247,0.08)', 'rgba(218,54,51,0.08)', 'rgba(230,237,243,0.08)'];
   const agents = [...new Set(usage.map(u => u.agent))];
-  const datasets = agents.map((agent, i) => {
+  const series = agents.map((agent, i) => {
     const agentData = sorted.filter(u => u.agent === agent);
     return {
       label: agent,
-      data: agentData.map(u => ({x: parseTs(u.timestamp), y: u.conversation_history_chars})),
-      borderColor: colors[i % colors.length],
+      points: agentData.map(u => ({x: parseTs(u.timestamp), y: u.conversation_history_chars || 0})),
+      color: colors[i % colors.length],
+      fillColor: bgColors[i % bgColors.length],
       pointRadius: 1,
-      tension: 0.1,
-      fill: true,
-      backgroundColor: bgColors[i % bgColors.length]
     };
   });
-  historyChart = new Chart(ctx, {
-    type: 'line',
-    data: { datasets },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      scales: {
-        x: { type: 'time', time: { tooltipFormat: 'HH:mm:ss' }, ticks: { color: '#8b949e', maxTicksLimit: 10 }, grid: { color: '#21262d' } },
-        y: { title: { display: true, text: 'chars', color: '#8b949e' }, ticks: { color: '#8b949e', callback: v => v >= 1000 ? (v/1000).toFixed(0) + 'K' : v }, grid: { color: '#21262d' } }
-      },
-      plugins: {
-        legend: { labels: { color: '#e6edf3' } },
-        annotation: { annotations: {
-          autoReset: { type: 'line', yMin: window._scl || 200000, yMax: window._scl || 200000, borderColor: '#f0883e', borderWidth: 2, borderDash: [6,3], label: { display: true, content: fmt(window._scl || 200000) + ' (~' + fmt(Math.round((window._scl || 200000)/4)) + ' tok) auto-reset', color: '#f0883e', position: 'start' } },
-          danger: { type: 'line', yMin: (window._scl || 200000) * 2.5, yMax: (window._scl || 200000) * 2.5, borderColor: '#da3633', borderWidth: 1, borderDash: [6,3], label: { display: true, content: fmt((window._scl || 200000) * 2.5) + ' (~' + fmt(Math.round((window._scl || 200000)*2.5/4)) + ' tok) danger', color: '#da3633', position: 'start' } }
-        } }
-      }
-    }
+  historyChart = TokenSpyCharts.line(canvas, {
+    legendEl: document.getElementById('history-legend'),
+    series,
+    yFormatter: v => v >= 1000 ? (v/1000).toFixed(0) + 'K' : String(Math.round(v)),
+    xFormatter: formatTimeTick,
+    thresholdLines: [
+      { value: window._scl || 200000, color: '#f0883e', label: fmt(window._scl || 200000) + ' (~' + fmt(Math.round((window._scl || 200000)/4)) + ' tok) auto-reset' },
+      { value: (window._scl || 200000) * 2.5, color: '#da3633', label: fmt((window._scl || 200000) * 2.5) + ' (~' + fmt(Math.round((window._scl || 200000)*2.5/4)) + ' tok) danger' },
+    ],
   });
 }
 
 function renderTokensChart(usage) {
-  const ctx = document.getElementById('tokens-chart').getContext('2d');
+  const canvas = document.getElementById('tokens-chart');
   if (tokensChart) tokensChart.destroy();
   const sorted = [...usage].reverse();
-  const labels = sorted.map(u => parseTs(u.timestamp).toLocaleTimeString());
-  tokensChart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        { label: 'Input', data: sorted.map(u => u.input_tokens), backgroundColor: '#58a6ff', stack: 'tokens' },
-        { label: 'Output', data: sorted.map(u => u.output_tokens), backgroundColor: '#f0883e', stack: 'tokens' },
-        { label: 'Cache Read', data: sorted.map(u => u.cache_read_tokens), backgroundColor: '#3fb950', stack: 'cache' },
-        { label: 'Cache Write', data: sorted.map(u => u.cache_write_tokens), backgroundColor: '#da3633', stack: 'cache' },
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      scales: {
-        x: { display: true, ticks: { maxTicksLimit: 12, color: '#8b949e' }, grid: { color: '#21262d' } },
-        y: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } },
-      },
-      plugins: { legend: { labels: { color: '#e6edf3' } } },
-    }
+  const labels = sorted.map(u => parseTs(u.timestamp));
+  tokensChart = TokenSpyCharts.stackedBar(canvas, {
+    legendEl: document.getElementById('tokens-legend'),
+    labels,
+    labelFormatter: formatTimeTick,
+    datasets: [
+      { label: 'Input', data: sorted.map(u => u.input_tokens || 0), color: '#58a6ff' },
+      { label: 'Output', data: sorted.map(u => u.output_tokens || 0), color: '#f0883e' },
+      { label: 'Cache Read', data: sorted.map(u => u.cache_read_tokens || 0), color: '#3fb950' },
+      { label: 'Cache Write', data: sorted.map(u => u.cache_write_tokens || 0), color: '#da3633' },
+    ],
   });
 }
 
 function renderBreakdownChart(usage) {
-  const ctx = document.getElementById('breakdown-chart').getContext('2d');
+  const canvas = document.getElementById('breakdown-chart');
   if (breakdownChart) breakdownChart.destroy();
   let cacheRead = 0, cacheWrite = 0, input = 0, output = 0;
   usage.forEach(u => {
@@ -2128,29 +2118,22 @@ function renderBreakdownChart(usage) {
   });
   const total = cacheRead + cacheWrite + input + output || 1;
   const pct = v => (v / total * 100).toFixed(1) + '%';
-  breakdownChart = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: [
-        'Cache Read ' + pct(cacheRead),
-        'Cache Write ' + pct(cacheWrite),
-        'Input ' + pct(input),
-        'Output ' + pct(output),
-      ],
-      datasets: [{ data: [cacheRead, cacheWrite, input, output], backgroundColor: ['#3fb950', '#da3633', '#58a6ff', '#f0883e'], borderColor: '#161b22', borderWidth: 2 }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { position: 'right', labels: { color: '#e6edf3', padding: 12, font: { size: 12 } } },
-        tooltip: { callbacks: { label: (c) => { const v = c.raw; const p = (v / total * 100).toFixed(1); return c.label.split(' ')[0] + ' ' + c.label.split(' ')[1] + ': ' + fmt(v) + ' tokens (' + p + '%)'; } } },
-      },
-    }
+  breakdownChart = TokenSpyCharts.donut(canvas, {
+    legendEl: document.getElementById('breakdown-legend'),
+    labels: [
+      'Cache Read ' + pct(cacheRead),
+      'Cache Write ' + pct(cacheWrite),
+      'Input ' + pct(input),
+      'Output ' + pct(output),
+    ],
+    values: [cacheRead, cacheWrite, input, output],
+    colors: ['#3fb950', '#da3633', '#58a6ff', '#f0883e'],
+    centerText: fmt(total) + ' total',
   });
 }
 
 function renderCumulativeChart(usage) {
-  const ctx = document.getElementById('cumulative-chart').getContext('2d');
+  const canvas = document.getElementById('cumulative-chart');
   if (cumulativeChart) cumulativeChart.destroy();
   const sorted = [...usage].reverse();
   const colors = ['#58a6ff', '#f0883e', '#3fb950', '#a371f7', '#da3633'];
@@ -2173,27 +2156,20 @@ function renderCumulativeChart(usage) {
     }
   });
   const datasets = [
-    { label: 'Total', data: totalData, borderColor: '#e6edf3', borderWidth: 2, pointRadius: 0, tension: 0.1, fill: true, backgroundColor: 'rgba(230,237,243,0.05)' },
+    { label: 'Total', points: totalData, color: '#e6edf3', lineWidth: 2, pointRadius: 0, fillColor: 'rgba(230,237,243,0.05)' },
     ...agents.map((agent, i) => ({
       label: agent,
-      data: agentData[agent],
-      borderColor: colors[i % colors.length],
-      borderWidth: 1.5,
+      points: agentData[agent],
+      color: colors[i % colors.length],
+      lineWidth: 1.5,
       pointRadius: 0,
-      tension: 0.1
     }))
   ];
-  cumulativeChart = new Chart(ctx, {
-    type: 'line',
-    data: { datasets },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      scales: {
-        x: { type: 'time', time: { tooltipFormat: 'MMM d, HH:mm' }, ticks: { color: '#8b949e', maxTicksLimit: 10 }, grid: { color: '#21262d' } },
-        y: { title: { display: true, text: 'USD', color: '#8b949e' }, ticks: { color: '#8b949e', callback: v => '$' + v.toFixed(2) }, grid: { color: '#21262d' } }
-      },
-      plugins: { legend: { labels: { color: '#e6edf3' } } }
-    }
+  cumulativeChart = TokenSpyCharts.line(canvas, {
+    legendEl: document.getElementById('cumulative-legend'),
+    series: datasets,
+    yFormatter: v => '$' + v.toFixed(2),
+    xFormatter: formatTimeTick,
   });
 }
 
@@ -2344,7 +2320,6 @@ document.getElementById('hours-select').addEventListener('change', loadAll);
 if(_getApiKey()){loadAll()}
 setInterval(function(){if(_getApiKey())loadAll()}, 30000);
 </script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
 </body>
 </html>"""
 
@@ -2352,6 +2327,11 @@ setInterval(function(){if(_getApiKey())loadAll()}, 30000);
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard():
     return DASHBOARD_HTML
+
+
+@app.get("/dashboard-assets/charts.js")
+def dashboard_charts_asset():
+    return FileResponse(Path(__file__).with_name("dashboard_charts.js"), media_type="application/javascript")
 
 
 # ── SSE Token Events Stream ─────────────────────────────────────────────────

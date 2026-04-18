@@ -58,4 +58,13 @@ grep -q 'MINIO_TELEMETRY_DISABLED.*1' extensions/services/langfuse/compose.yaml.
   grep -q 'MINIO_TELEMETRY_DISABLED.*1' extensions/services/langfuse/compose.yaml 2>/dev/null || \
   { echo "[FAIL] MinIO telemetry not disabled"; exit 1; }
 
+echo "[contract] Token Spy dashboard ships offline chart assets"
+test -f extensions/services/token-spy/dashboard_charts.js || { echo "[FAIL] missing extensions/services/token-spy/dashboard_charts.js"; exit 1; }
+grep -q '/dashboard-assets/charts.js' extensions/services/token-spy/main.py || \
+  { echo "[FAIL] Token Spy dashboard missing local chart asset reference"; exit 1; }
+if grep -q 'cdn.jsdelivr.net/npm/chart.js\|cdn.jsdelivr.net/npm/chartjs-adapter-date-fns' extensions/services/token-spy/main.py; then
+  echo "[FAIL] Token Spy dashboard still depends on CDN chart assets"
+  exit 1
+fi
+
 echo "[PASS] installer contracts"
