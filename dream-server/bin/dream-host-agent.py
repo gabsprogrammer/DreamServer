@@ -1939,10 +1939,12 @@ def _launch_native_llama_server(env_path: Path, llama_bin: Path, llama_log: Path
     model_path = INSTALL_DIR / "data" / "models" / gguf_file
     reasoning = env.get("LLAMA_REASONING", "off")
     reasoning_fmt = {"off": "none", "on": "deepseek"}.get(reasoning, reasoning)
+    # Honour the unified BIND_ADDRESS knob (PR #964); empty/missing → loopback.
+    bind_addr = env.get("BIND_ADDRESS", "").strip() or "127.0.0.1"
     with open(llama_log, "a") as log_f:
         proc = subprocess.Popen(
             [str(llama_bin),
-             "--host", "127.0.0.1", "--port", "8080",
+             "--host", bind_addr, "--port", "8080",
              "--model", str(model_path),
              "--ctx-size", ctx_size,
              "--n-gpu-layers", "999",

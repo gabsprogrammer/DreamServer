@@ -533,10 +533,14 @@ elif [[ -f "$INSTALL_DIR/data/.llama-server.pid" ]]; then
                 *)    _reasoning_fmt="$_reasoning" ;;
             esac
 
+            # Honour the unified BIND_ADDRESS knob (PR #964); empty/missing → loopback.
+            _bind=$(grep '^BIND_ADDRESS=' "$ENV_FILE" 2>/dev/null | cut -d= -f2 | tr -d '"' || echo "")
+            [[ -z "$_bind" ]] && _bind="127.0.0.1"
+
             # Relaunch with new model
             log "Starting native llama-server with ${_gguf_file}..."
             "$LLAMA_SERVER_BIN" \
-                --host 127.0.0.1 --port 8080 \
+                --host "$_bind" --port 8080 \
                 --model "$_model_path" \
                 --ctx-size "$_ctx_size" \
                 --n-gpu-layers 999 \
@@ -568,7 +572,7 @@ elif [[ -f "$INSTALL_DIR/data/.llama-server.pid" ]]; then
                 fi
                 if [[ -n "${_old_model_path:-}" && -f "$_old_model_path" ]]; then
                     "$LLAMA_SERVER_BIN" \
-                        --host 127.0.0.1 --port 8080 \
+                        --host "$_bind" --port 8080 \
                         --model "$_old_model_path" \
                         --ctx-size "$_ctx_size" \
                         --n-gpu-layers 999 \

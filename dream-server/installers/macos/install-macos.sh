@@ -662,8 +662,14 @@ else
             *)    _reasoning_fmt="$_reasoning" ;;
         esac
 
+        # Honour the unified BIND_ADDRESS knob (PR #964) so --lan / dashboard
+        # toggle / manual edit reach the native llama-server too. Falls back
+        # to loopback when unset (default-secure).
+        _bind=$(grep '^BIND_ADDRESS=' "$INSTALL_DIR/.env" 2>/dev/null | cut -d= -f2 | tr -d '"' || echo "")
+        [[ -z "$_bind" ]] && _bind="127.0.0.1"
+
         "$LLAMA_SERVER_BIN" \
-            --host 127.0.0.1 --port 8080 \
+            --host "$_bind" --port 8080 \
             --model "$MODEL_FULL_PATH" \
             --ctx-size "$MAX_CONTEXT" \
             --n-gpu-layers 999 \
