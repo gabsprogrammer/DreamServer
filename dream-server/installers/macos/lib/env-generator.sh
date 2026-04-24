@@ -36,7 +36,7 @@ read_env_value() {
     local env_path="$1"
     local key="$2"
     [[ -f "$env_path" ]] || { echo ""; return 0; }
-    grep -E "^${key}=" "$env_path" 2>/dev/null | head -n 1 | cut -d'=' -f2- | tr -d '\r' || true
+    grep -E "^${key}=" "$env_path" 2>/dev/null | sed -n '1p' | cut -d'=' -f2- | tr -d '\r' || true
 }
 
 # Read SearXNG secret_key from an existing settings.yml file.
@@ -48,7 +48,7 @@ read_searxng_secret() {
     [[ -f "$settings_path" ]] || { echo ""; return 0; }
     # Expected line format: secret_key: "...."
     grep -E '^[[:space:]]*secret_key:[[:space:]]*"' "$settings_path" 2>/dev/null \
-        | head -n 1 \
+        | sed -n '1p' \
         | sed -E 's/^[[:space:]]*secret_key:[[:space:]]*"([^"]+)".*$/\1/' \
         | tr -d '\r' || true
 }

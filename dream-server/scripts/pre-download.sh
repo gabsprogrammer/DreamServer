@@ -109,7 +109,7 @@ check_dependencies() {
 
 detect_vram_gb() {
     if command -v nvidia-smi &>/dev/null; then
-        nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1 | awk '{print int($1/1024)}'
+        nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | sed -n '1p' | awk '{print int($1/1024)}'
     else
         echo "0"
     fi

@@ -155,7 +155,7 @@ read_env_value() {
     local env_file="$1"
     local key="$2"
     [[ -f "$env_file" ]] || { echo ""; return 0; }
-    grep -E "^${key}=" "$env_file" 2>/dev/null | head -n 1 | cut -d'=' -f2- | tr -d '\r' || true
+    grep -E "^${key}=" "$env_file" 2>/dev/null | sed -n '1p' | cut -d'=' -f2- | tr -d '\r' || true
 }
 
 upsert_env_value() {

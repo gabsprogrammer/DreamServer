@@ -84,7 +84,7 @@ fi
 # Check GPU if available
 echo -n "GPU availability... "
 if docker exec "$LLM_CONTAINER" nvidia-smi >/dev/null 2>&1; then
-    GPU_MEM=$(docker exec "$LLM_CONTAINER" nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -d ' ')
+    GPU_MEM=$(docker exec "$LLM_CONTAINER" nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits 2>/dev/null | sed -n '1p' | tr -d ' ')
     echo -e "${GREEN}✓ detected (${GPU_MEM}MB free)${NC}"
 else
     echo -e "${YELLOW}⚠ not detected (CPU mode)${NC}"
