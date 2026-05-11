@@ -96,7 +96,7 @@ fi
 
 # 6. Required top-level fields exist
 if command -v jq >/dev/null 2>&1; then
-    required_fields=("version" "generated_at" "autofix_hints" "capability_profile" "preflight" "runtime" "summary")
+    required_fields=("version" "generated_at" "autofix_hints" "capability_profile" "preflight" "runtime" "install" "compose" "summary")
     all_present=true
 
     for field in "${required_fields[@]}"; do
@@ -162,7 +162,25 @@ if command -v jq >/dev/null 2>&1; then
     fi
 fi
 
-# 10. Behavioral test: Verify docker detection logic
+# 10. install and compose sections expose concrete doctor checks
+if command -v jq >/dev/null 2>&1; then
+    install_ok=true
+    for expr in '.install.env_file.exists | type == "boolean"' \
+                '.install.model.exists | type == "boolean"' \
+                '.install.permissions.install_dir_writable | type == "boolean"' \
+                '.compose.config_ok | type == "boolean"' \
+                '.compose.images | type == "array"'; do
+        jq -e "$expr" "$TEMP_REPORT" >/dev/null || install_ok=false
+    done
+
+    if $install_ok; then
+        pass "dream-doctor.sh install/compose diagnostics have expected shape"
+    else
+        fail "dream-doctor.sh install/compose diagnostics missing expected fields"
+    fi
+fi
+
+# 11. Behavioral test: Verify docker detection logic
 if command -v jq >/dev/null 2>&1; then
     docker_cli=$(jq -r '.runtime.docker_cli' "$TEMP_REPORT")
     docker_daemon=$(jq -r '.runtime.docker_daemon' "$TEMP_REPORT")
@@ -194,7 +212,7 @@ if command -v jq >/dev/null 2>&1; then
     fi
 fi
 
-# 11. Behavioral test: Verify autofix_hints populate when issues exist
+# 12. Behavioral test: Verify autofix_hints populate when issues exist
 if command -v jq >/dev/null 2>&1; then
     hints_count=$(jq '.autofix_hints | length' "$TEMP_REPORT")
     docker_cli=$(jq -r '.runtime.docker_cli' "$TEMP_REPORT")

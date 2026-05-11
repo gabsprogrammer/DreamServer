@@ -14,6 +14,7 @@
 #   .\dream.ps1 config edit         # Open .env in notepad
 #   .\dream.ps1 chat "message"      # Quick chat via API
 #   .\dream.ps1 update              # Pull latest images and restart
+#   .\dream.ps1 doctor              # Run readiness diagnostics
 #   .\dream.ps1 report              # Generate Windows diagnostics bundle
 #   .\dream.ps1 version             # Show version
 #   .\dream.ps1 help                # Show help
@@ -26,7 +27,11 @@ param(
     [string]$Command = "help",
 
     [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
-    [string[]]$Arguments
+    [string[]]$Arguments,
+
+    [switch]$Json,
+
+    [string]$Report = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -41,6 +46,7 @@ $LibDir = Join-Path $ScriptDir "lib"
 . (Join-Path $LibDir "detection.ps1")
 . (Join-Path $LibDir "llm-endpoint.ps1")
 . (Join-Path $LibDir "install-report.ps1")
+. (Join-Path $LibDir "doctor.ps1")
 
 # ── Resolve install directory ──
 $InstallDir = $script:DS_INSTALL_DIR
@@ -752,6 +758,48 @@ function Invoke-Report {
     }
 }
 
+function Invoke-DoctorCommand {
+    param(
+        [string[]]$Args = @(),
+        [switch]$JsonMode,
+        [string]$ReportPath = ""
+    )
+
+    $json = [bool]$JsonMode
+    for ($i = 0; $i -lt $Args.Count; $i++) {
+        switch ($Args[$i]) {
+            "--json" { $json = $true }
+            "--report" {
+                if ($i + 1 -ge $Args.Count) {
+                    Write-AIError "--report requires a path"
+                    exit 1
+                }
+                $i++
+                $reportPath = $Args[$i]
+            }
+            default {
+                if ([string]::IsNullOrWhiteSpace($reportPath)) {
+                    $reportPath = $Args[$i]
+                }
+            }
+        }
+    }
+
+    $flags = Get-ComposeFlags
+    $oldLocation = Get-Location
+    if (Test-Path $InstallDir -PathType Container) {
+        Set-Location $InstallDir
+    }
+    try {
+        Invoke-DreamDoctor -InstallDir $InstallDir -ComposeFlags $flags -ReportPath $reportPath -Json:$json
+        $blockers = [int]$script:DreamDoctorLastBlockers
+    } finally {
+        Set-Location $oldLocation
+    }
+
+    if ($blockers -gt 0) { exit 1 }
+}
+
 function Invoke-Agent {
     param([string]$Action = "status")
 
@@ -893,6 +941,8 @@ function Show-Help {
     Write-Host "Pull latest images and restart" -ForegroundColor DarkGray
     Write-Host "    agent [action]      " -ForegroundColor Cyan -NoNewline
     Write-Host "Host agent: status|start|stop|restart|logs" -ForegroundColor DarkGray
+    Write-Host "    doctor [--json]     " -ForegroundColor Cyan -NoNewline
+    Write-Host "Run readiness diagnostics" -ForegroundColor DarkGray
     Write-Host "    report              " -ForegroundColor Cyan -NoNewline
     Write-Host "Generate Windows diagnostics bundle" -ForegroundColor DarkGray
     Write-Host "    version             " -ForegroundColor Cyan -NoNewline
@@ -933,6 +983,8 @@ switch ($Command.ToLower()) {
     }
     "chat"    { Invoke-Chat -Message ($Arguments -join " ") }
     "update"  { Invoke-Update }
+    "doctor"  { Invoke-DoctorCommand -Args $Arguments -JsonMode:$Json -ReportPath $Report }
+    "diag"    { Invoke-DoctorCommand -Args $Arguments -JsonMode:$Json -ReportPath $Report }
     "report"  { Invoke-Report }
     "agent"   {
         $action = ($Arguments | Select-Object -First 1)

@@ -6,7 +6,7 @@ Utility scripts for diagnostics, testing, validation, and operations.
 
 | Script | Description | Requires Stack? |
 |--------|-------------|-----------------|
-| `dream-doctor.sh` | JSON diagnostic report with autofix hints | No |
+| `dream-doctor.sh` | JSON diagnostic report with Docker, compose, image, env, model, permission, and health autofix hints | No |
 | `dream-preflight.sh` | Pre-install hardware/software checks | No |
 | `detect-hardware.sh` | Hardware detection (`--json` for machine output) | No |
 | `classify-hardware.sh` | GPU-to-tier classification | No |

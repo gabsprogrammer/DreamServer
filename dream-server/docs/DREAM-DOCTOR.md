@@ -24,6 +24,22 @@ scripts/dream-doctor.sh
 scripts/dream-doctor.sh /tmp/custom-dream-doctor.json
 ```
 
+### Windows
+
+```powershell
+# Run diagnostics with operator-friendly output
+.\dream.ps1 doctor
+
+# Get raw JSON report
+.\dream.ps1 doctor --json
+
+# Save report to a custom location
+.\dream.ps1 doctor --report C:\Users\you\Desktop\dream-doctor.json
+```
+
+Windows also keeps `.\dream.ps1 report` as the shareable support bundle command.
+`doctor` is the quick readiness diagnosis; `report` is the larger artifact bundle.
+
 ## Output
 
 ### Operator-Friendly Mode (default)
@@ -44,6 +60,15 @@ Runtime Environment:
   ✗ Dashboard HTTP
   ✗ WebUI HTTP
   ⚠ DGX Spark llama-server CUDA arch: DGX Spark detected, but llama-server reports CUDA archs '500,610,700,750,800,860,890,1200' without sm_121.
+
+Installation Files:
+  ✓ .env
+  ✓ model file: Qwen3.5-9B-Q4_K_M.gguf
+  ✓ writable install/model directories
+
+Compose and Images:
+  ✓ compose config
+  ✓ images resolvable: 8/8
 
 Preflight Checks:
   ✓ RAM: 16GB available
@@ -72,8 +97,18 @@ dream doctor --json > report.json
 - **runtime.dgx_spark_cuda_arch_check**: Warns when a DGX Spark / GB10
   machine is running a llama.cpp CUDA binary that does not report `sm_121`
   support in `llama-server` logs.
+- **install**: `.env`, required key, model file, and writable directory checks
+- **compose**: resolved compose flags, `docker compose config` status, and image
+  availability from `docker compose config --images`
+- **ports** (Windows): local TCP listener checks for the primary DreamServer ports
+- **health** (Windows): HTTP checks for LLM, Open WebUI, dashboard, and dashboard API
 - **summary**: Aggregate status (blockers, warnings, runtime_ready)
 - **autofix_hints**: Prioritized remediation actions
+
+By default, Linux/macOS doctor checks remote Docker manifests for images
+discovered from compose when the Docker daemon is available. Set
+`DREAM_DOCTOR_IMAGE_MANIFEST=0` to keep the report fully local/offline and skip
+remote manifest probes.
 
 ## Exit Codes
 

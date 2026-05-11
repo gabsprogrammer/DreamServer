@@ -298,17 +298,203 @@ elif command -v python >/dev/null 2>&1; then
     PYTHON_CMD="python"
 fi
 
-"$PYTHON_CMD" - "$CAP_FILE" "$PREFLIGHT_FILE" "$REPORT_FILE" "$DOCKER_CLI" "$DOCKER_DAEMON" "$COMPOSE_CLI" "$DASHBOARD_HTTP" "$WEBUI_HTTP" "$_DASHBOARD_PORT" "$_WEBUI_PORT" "$EXT_DIAGNOSTICS" "$STT_MODEL_CACHED" "$STT_MODEL_NAME" "$STT_RECOVERY_HINT" "$DGX_SPARK_GPU" "$DGX_SPARK_GPU_NAME" "$DGX_SPARK_COMPUTE_CAP" "$LLAMA_CUDA_ARCHS" "$DGX_SPARK_CUDA_ARCH_STATUS" "$DGX_SPARK_CUDA_ARCH_MESSAGE" <<'PY'
+"$PYTHON_CMD" - "$CAP_FILE" "$PREFLIGHT_FILE" "$REPORT_FILE" "$DOCKER_CLI" "$DOCKER_DAEMON" "$COMPOSE_CLI" "$DASHBOARD_HTTP" "$WEBUI_HTTP" "$_DASHBOARD_PORT" "$_WEBUI_PORT" "$EXT_DIAGNOSTICS" "$STT_MODEL_CACHED" "$STT_MODEL_NAME" "$STT_RECOVERY_HINT" "$DGX_SPARK_GPU" "$DGX_SPARK_GPU_NAME" "$DGX_SPARK_COMPUTE_CAP" "$LLAMA_CUDA_ARCHS" "$DGX_SPARK_CUDA_ARCH_STATUS" "$DGX_SPARK_CUDA_ARCH_MESSAGE" "$ROOT_DIR" <<'PY'
 import json
+import os
 import pathlib
+import shlex
+import subprocess
 import sys
 from datetime import datetime, timezone
 
-cap_file, preflight_file, report_file, docker_cli, docker_daemon, compose_cli, dashboard_http, webui_http, dashboard_port, webui_port, ext_diagnostics_json, stt_cached, stt_model_name, stt_recovery, dgx_spark_gpu, dgx_spark_gpu_name, dgx_spark_compute_cap, llama_cuda_archs, dgx_spark_arch_status, dgx_spark_arch_message = sys.argv[1:]
+cap_file, preflight_file, report_file, docker_cli, docker_daemon, compose_cli, dashboard_http, webui_http, dashboard_port, webui_port, ext_diagnostics_json, stt_cached, stt_model_name, stt_recovery, dgx_spark_gpu, dgx_spark_gpu_name, dgx_spark_compute_cap, llama_cuda_archs, dgx_spark_arch_status, dgx_spark_arch_message, root_dir_arg = sys.argv[1:]
 
 cap = json.load(open(cap_file, "r", encoding="utf-8"))
 pre = json.load(open(preflight_file, "r", encoding="utf-8"))
 ext_diagnostics = json.loads(ext_diagnostics_json)
+root_dir = pathlib.Path(root_dir_arg)
+
+def read_env(path):
+    env = {}
+    if not path.exists():
+        return env
+    for raw in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if (
+            not key
+            or not (key[0].isalpha() or key[0] == "_")
+            or not all(ch.isalnum() or ch == "_" for ch in key)
+        ):
+            continue
+        value = value.strip().strip('"').strip("'")
+        env[key] = value
+    return env
+
+def run_cmd(args, timeout=15, cwd=None):
+    try:
+        proc = subprocess.run(
+            args,
+            cwd=str(cwd or root_dir),
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout,
+            check=False,
+        )
+        return {
+            "ok": proc.returncode == 0,
+            "exit_code": proc.returncode,
+            "stdout": proc.stdout[-4000:],
+            "stderr": proc.stderr[-4000:],
+            "timed_out": False,
+        }
+    except subprocess.TimeoutExpired as exc:
+        return {
+            "ok": False,
+            "exit_code": 124,
+            "stdout": (exc.stdout or "")[-4000:] if isinstance(exc.stdout, str) else "",
+            "stderr": (exc.stderr or "")[-4000:] if isinstance(exc.stderr, str) else "",
+            "timed_out": True,
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "exit_code": -1,
+            "stdout": "",
+            "stderr": str(exc),
+            "timed_out": False,
+        }
+
+def is_writable_dir(path):
+    if not path.exists() or not path.is_dir():
+        return False
+    probe = path / ".dream-doctor-write-test"
+    try:
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+        return True
+    except Exception:
+        try:
+            probe.unlink(missing_ok=True)
+        except Exception:
+            pass
+        return False
+
+def resolve_compose_flags(env):
+    flags_file = root_dir / ".compose-flags"
+    if flags_file.exists():
+        try:
+            return shlex.split(flags_file.read_text(encoding="utf-8").strip())
+        except Exception:
+            pass
+    flags = ["--env-file", ".env"]
+    base = root_dir / "docker-compose.base.yml"
+    if base.exists():
+        flags += ["-f", "docker-compose.base.yml"]
+        backend = (env.get("GPU_BACKEND") or cap.get("runtime", {}).get("llm_backend") or "nvidia").lower()
+        overlay_map = {
+            "nvidia": "docker-compose.nvidia.yml",
+            "cpu": "docker-compose.cpu.yml",
+            "intel": "docker-compose.intel.yml",
+            "sycl": "docker-compose.intel.yml",
+            "amd": "docker-compose.amd.yml",
+            "apple": "docker-compose.apple.yml",
+        }
+        overlay = overlay_map.get(backend)
+        if overlay and (root_dir / overlay).exists():
+            flags += ["-f", overlay]
+    elif (root_dir / "docker-compose.yml").exists():
+        flags += ["-f", "docker-compose.yml"]
+    return flags
+
+def collect_install_diagnostics(env):
+    env_path = root_dir / ".env"
+    models_dir = root_dir / "data" / "models"
+    gguf_file = env.get("GGUF_FILE", "")
+    model_path = models_dir / gguf_file if gguf_file else None
+    required_keys = ["LLM_MODEL", "GGUF_FILE", "GPU_BACKEND", "CTX_SIZE"]
+    missing_keys = [key for key in required_keys if not env.get(key)]
+    model_exists = bool(model_path and model_path.exists() and model_path.is_file())
+    model_bytes = model_path.stat().st_size if model_exists else 0
+    return {
+        "env_file": {
+            "path": str(env_path),
+            "exists": env_path.exists(),
+            "readable": os.access(env_path, os.R_OK) if env_path.exists() else False,
+            "writable": os.access(env_path, os.W_OK) if env_path.exists() else False,
+            "required_keys_present": len(missing_keys) == 0,
+            "missing_required_keys": missing_keys,
+        },
+        "model": {
+            "gguf_file": gguf_file,
+            "path": str(model_path) if model_path else "",
+            "exists": model_exists,
+            "bytes": model_bytes,
+        },
+        "permissions": {
+            "install_dir_writable": is_writable_dir(root_dir),
+            "models_dir_exists": models_dir.exists(),
+            "models_dir_writable": is_writable_dir(models_dir) if models_dir.exists() else False,
+        },
+    }
+
+def collect_compose_and_images(env):
+    flags = resolve_compose_flags(env)
+    compose = {
+        "flags": flags,
+        "config_ok": False,
+        "config_exit_code": -1,
+        "config_error": "",
+        "images": [],
+    }
+    if docker_cli != "true" or not flags:
+        compose["config_error"] = "docker CLI missing or compose flags unavailable"
+        return compose
+
+    cfg = run_cmd(["docker", "compose", *flags, "config", "--quiet"], timeout=30)
+    compose["config_ok"] = cfg["ok"]
+    compose["config_exit_code"] = cfg["exit_code"]
+    compose["config_error"] = cfg["stderr"] or cfg["stdout"]
+
+    image_cfg = run_cmd(["docker", "compose", *flags, "config", "--images"], timeout=30)
+    raw_images = []
+    if image_cfg["ok"]:
+        raw_images = [line.strip() for line in image_cfg["stdout"].splitlines() if line.strip()]
+    else:
+        compose["images_error"] = image_cfg["stderr"] or image_cfg["stdout"]
+
+    seen = set()
+    images = []
+    manifest_checks = os.environ.get("DREAM_DOCTOR_IMAGE_MANIFEST", "1") != "0"
+    for image in raw_images:
+        if image in seen:
+            continue
+        seen.add(image)
+        item = {"image": image, "status": "unchecked", "source": "compose"}
+        if docker_daemon != "true":
+            item["reason"] = "docker daemon unavailable"
+        else:
+            local = run_cmd(["docker", "image", "inspect", image], timeout=8)
+            if local["ok"]:
+                item["status"] = "local"
+            elif manifest_checks:
+                remote = run_cmd(["docker", "manifest", "inspect", image], timeout=20)
+                item["status"] = "remote" if remote["ok"] else "unavailable"
+                if not remote["ok"]:
+                    item["reason"] = "manifest inspect failed"
+            else:
+                item["reason"] = "manifest checks disabled"
+        images.append(item)
+    compose["images"] = images
+    return compose
+
+env_map = read_env(root_dir / ".env")
+install_diag = collect_install_diagnostics(env_map)
+compose_diag = collect_compose_and_images(env_map)
 
 report = {
     "version": "1",
@@ -333,12 +519,18 @@ report = {
             "message": dgx_spark_arch_message,
         },
     },
+    "install": install_diag,
+    "compose": compose_diag,
     "extensions": ext_diagnostics,
     "summary": {
         "preflight_blockers": pre.get("summary", {}).get("blockers", 0),
         "preflight_warnings": pre.get("summary", {}).get("warnings", 0),
         "runtime_warnings": 1 if dgx_spark_arch_status == "warn" else 0,
         "runtime_ready": (docker_daemon == "true" and compose_cli == "true"),
+        "env_ready": install_diag["env_file"]["exists"] and install_diag["env_file"]["required_keys_present"],
+        "model_ready": install_diag["model"]["exists"],
+        "compose_config_ok": compose_diag["config_ok"],
+        "docker_images_unavailable": sum(1 for i in compose_diag["images"] if i.get("status") == "unavailable"),
         "extensions_total": len(ext_diagnostics),
         "extensions_healthy": sum(1 for e in ext_diagnostics if e.get("health_status") == "healthy"),
         "extensions_issues": sum(1 for e in ext_diagnostics if len(e.get("issues", [])) > 0),
@@ -363,6 +555,28 @@ if runtime["docker_daemon"] and not runtime["dashboard_http"]:
     fix_hints.append(f"Run installer/start command, then verify dashboard on http://127.0.0.1:{dashboard_port}.")
 if runtime["docker_daemon"] and not runtime["webui_http"]:
     fix_hints.append(f"Verify Open WebUI container and port {webui_port} mapping.")
+
+env_diag = report["install"]["env_file"]
+if not env_diag["exists"]:
+    fix_hints.append("Run the installer to generate .env, or restore .env from backup.")
+elif not env_diag["required_keys_present"]:
+    fix_hints.append("Regenerate .env or add missing required keys: " + ", ".join(env_diag["missing_required_keys"]))
+
+model_diag = report["install"]["model"]
+if model_diag["gguf_file"] and not model_diag["exists"]:
+    fix_hints.append(f"Model file missing: {model_diag['path']}. Re-run the installer or model download step.")
+
+perms = report["install"]["permissions"]
+if not perms["install_dir_writable"]:
+    fix_hints.append(f"Fix ownership/permissions for install directory: {root_dir}")
+if perms["models_dir_exists"] and not perms["models_dir_writable"]:
+    fix_hints.append(f"Fix ownership/permissions for model directory: {root_dir / 'data' / 'models'}")
+
+if not report["compose"]["config_ok"]:
+    fix_hints.append("Run `docker compose ... config` using the reported compose flags and fix the first YAML/env error.")
+missing_images = [i["image"] for i in report["compose"]["images"] if i.get("status") == "unavailable"]
+if missing_images:
+    fix_hints.append("Docker image tag unavailable: " + ", ".join(missing_images[:3]))
 
 # STT model cache: service up but model missing is a common silent failure
 if stt_cached == "false" and stt_recovery:
@@ -436,6 +650,26 @@ ext_issues = summary.get("extensions_issues", 0)
 
 if ext_total > 0:
     print(f"  Extensions:    {ext_healthy}/{ext_total} healthy, {ext_issues} with issues")
+
+install = data.get("install", {})
+if install:
+    env_file = install.get("env_file", {})
+    model = install.get("model", {})
+    env_ready = env_file.get("exists") and env_file.get("required_keys_present")
+    model_ready = model.get("exists") if model.get("gguf_file") else None
+    print(f"  Env file:      {'ready' if env_ready else 'needs attention'}")
+    if model_ready is None:
+        print("  Model file:    not configured")
+    else:
+        print(f"  Model file:    {'present' if model_ready else 'missing'}")
+
+compose = data.get("compose", {})
+if compose:
+    images = compose.get("images") or []
+    unavailable = [i for i in images if i.get("status") == "unavailable"]
+    print(f"  Compose:       {'ok' if compose.get('config_ok') else 'needs attention'}")
+    if images:
+        print(f"  Images:        {len(images) - len(unavailable)}/{len(images)} resolvable")
 
 dgx_check = data.get("runtime", {}).get("dgx_spark_cuda_arch_check", {})
 if dgx_check.get("status") == "warn":

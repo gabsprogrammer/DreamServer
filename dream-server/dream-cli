@@ -1529,6 +1529,49 @@ elif dgx_status == 'warn':
 
 print()
 
+# Install file checks
+install = report.get('install', {})
+env_file = install.get('env_file', {})
+model = install.get('model', {})
+perms = install.get('permissions', {})
+if install:
+    print(f"{CYAN}Installation Files:{NC}")
+    env_ok = env_file.get('exists') and env_file.get('readable') and env_file.get('required_keys_present')
+    print(f"  {GREEN if env_ok else RED} {'✓' if env_ok else '✗'}{NC} .env")
+    if env_file.get('missing_required_keys'):
+        print(f"    missing: {', '.join(env_file.get('missing_required_keys', []))}")
+        has_failures = True
+    model_ok = model.get('exists') or not model.get('gguf_file')
+    print(f"  {GREEN if model_ok else RED} {'✓' if model_ok else '✗'}{NC} model file: {model.get('gguf_file') or 'not configured'}")
+    if not model_ok:
+        has_failures = True
+    perm_ok = perms.get('install_dir_writable', False) and (not perms.get('models_dir_exists') or perms.get('models_dir_writable', False))
+    print(f"  {GREEN if perm_ok else RED} {'✓' if perm_ok else '✗'}{NC} writable install/model directories")
+    if not perm_ok:
+        has_failures = True
+    print()
+
+# Compose and image checks
+compose = report.get('compose', {})
+if compose:
+    images = compose.get('images', [])
+    unavailable = [i for i in images if i.get('status') == 'unavailable']
+    compose_ok = compose.get('config_ok', False)
+    print(f"{CYAN}Compose and Images:{NC}")
+    print(f"  {GREEN if compose_ok else RED} {'✓' if compose_ok else '✗'}{NC} compose config")
+    if not compose_ok:
+        has_failures = True
+    if images:
+        ok_images = len([i for i in images if i.get('status') in {'local', 'remote'}])
+        print(f"  {GREEN if not unavailable else RED} {'✓' if not unavailable else '✗'}{NC} images resolvable: {ok_images}/{len(images)}")
+        if unavailable:
+            has_failures = True
+            for item in unavailable[:3]:
+                print(f"    unavailable: {item.get('image')}")
+    else:
+        print(f"  {YELLOW}?{NC} images: none discovered from compose")
+    print()
+
 # Preflight checks
 preflight = report.get('preflight', {})
 pf_checks = preflight.get('checks', [])
@@ -1561,6 +1604,10 @@ blocker_count = summary.get('preflight_blockers', 0)
 warning_count = summary.get('preflight_warnings', 0)
 runtime_warning_count = summary.get('runtime_warnings', 0)
 runtime_ready = summary.get('runtime_ready', False)
+env_ready = summary.get('env_ready', True)
+model_ready = summary.get('model_ready', True)
+compose_config_ok = summary.get('compose_config_ok', True)
+images_unavailable = summary.get('docker_images_unavailable', 0)
 
 print(f"{CYAN}Summary:{NC}")
 if blocker_count > 0:
@@ -1569,7 +1616,9 @@ if warning_count > 0:
     print(f"  {YELLOW}⚠{NC} {warning_count} warning(s) found")
 if runtime_warning_count > 0:
     print(f"  {YELLOW}⚠{NC} {runtime_warning_count} runtime warning(s) found")
-if blocker_count == 0 and warning_count == 0 and runtime_warning_count == 0 and runtime_ready:
+if images_unavailable > 0:
+    print(f"  {RED}✗{NC} {images_unavailable} unavailable Docker image(s)")
+if blocker_count == 0 and warning_count == 0 and runtime_warning_count == 0 and runtime_ready and env_ready and model_ready and compose_config_ok and images_unavailable == 0:
     print(f"  {GREEN}✓{NC} All checks passed")
 
 print()
@@ -1583,7 +1632,7 @@ if hints:
     print()
 
 # Exit code: 1 if blockers or runtime failures, 0 otherwise
-if has_failures or blocker_count > 0:
+if has_failures or blocker_count > 0 or not env_ready or not model_ready or not compose_config_ok or images_unavailable > 0:
     sys.exit(1)
 else:
     sys.exit(0)
