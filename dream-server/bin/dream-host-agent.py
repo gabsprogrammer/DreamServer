@@ -50,7 +50,7 @@ logger = logging.getLogger("dream-host-agent")
 # the API key to stop core services like llama-server or dashboard-api.
 _FALLBACK_CORE_IDS = frozenset({
     "dashboard-api", "dashboard", "llama-server", "open-webui",
-    "litellm", "langfuse", "n8n", "openclaw", "opencode",
+    "litellm", "langfuse", "hermes", "hermes-proxy", "n8n", "openclaw", "opencode",
     "perplexica", "searxng", "qdrant", "tts", "whisper",
     "embeddings", "token-spy", "comfyui", "ape", "privacy-shield",
 })
@@ -71,7 +71,7 @@ EXTENSIONS_DIR: Path = Path()
 _service_locks: dict[str, threading.Lock] = collections.defaultdict(threading.Lock)
 _ALLOWED_CORE_RECREATE_IDS = frozenset({
     "llama-server", "open-webui", "litellm", "langfuse", "n8n",
-    "openclaw", "opencode", "perplexica", "searxng", "qdrant",
+    "hermes", "hermes-proxy", "openclaw", "opencode", "perplexica", "searxng", "qdrant",
     "tts", "whisper", "embeddings", "token-spy", "comfyui",
     "ape", "privacy-shield",
 })

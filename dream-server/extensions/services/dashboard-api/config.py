@@ -234,6 +234,8 @@ SIDEBAR_ICONS = {
     "open-webui": "MessageSquare",
     "n8n": "Network",
     "openclaw": "Bot",
+    "hermes": "Bot",
+    "hermes-proxy": "Shield",
     "opencode": "Code",
     "perplexica": "Search",
     "comfyui": "Image",
@@ -268,7 +270,7 @@ def _load_core_service_ids() -> frozenset:
     # Fallback to hardcoded list
     return frozenset({
         "dashboard-api", "dashboard", "llama-server", "open-webui",
-        "litellm", "langfuse", "n8n", "openclaw", "opencode",
+        "litellm", "langfuse", "hermes", "hermes-proxy", "n8n", "openclaw", "opencode",
         "perplexica", "searxng", "qdrant", "tts", "whisper",
         "embeddings", "token-spy", "comfyui", "ape", "privacy-shield",
     })
