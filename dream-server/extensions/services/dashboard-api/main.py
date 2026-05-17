@@ -56,6 +56,7 @@ from routers import (
     auth as auth_router,
     magic_link,
     tailscale,
+    usage,
 )
 from settings import (
     _ENV_ASSIGNMENT_RE, _ENV_COMMENTED_ASSIGNMENT_RE, _SETTINGS_APPLY_ALLOWED_SERVICES, _parse_env_text, _read_env_map_from_path,
@@ -620,6 +621,7 @@ app.include_router(templates.router)
 app.include_router(auth_router.router)
 app.include_router(magic_link.router)
 app.include_router(tailscale.router)
+app.include_router(usage.router)
 
 
 # ================================================================
