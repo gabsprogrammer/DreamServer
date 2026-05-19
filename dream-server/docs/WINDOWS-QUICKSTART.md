@@ -66,7 +66,9 @@ The installer automatically uses bootstrap mode when applicable — a small mode
 | `-Workflows` | Enable n8n automation |
 | `-Rag` | Enable Qdrant vector DB |
 | `-Recommended` | Enable LiteLLM + SearXNG + Token Spy support services |
-| `-Hermes` / `-NoHermes` | Enable or disable Hermes Agent |
+| `-NoRecommended` | Disable LiteLLM + SearXNG + Token Spy support services |
+| `-Hermes` | Enable Hermes Agent |
+| `-NoHermes` | Disable Hermes Agent |
 | `-NoBootstrap` | Wait for the full model before launching |
 | `-OpenClaw` | Enable deprecated OpenClaw legacy agent framework |
 | `-Comfyui` | Enable ComfyUI image generation |
