@@ -256,6 +256,13 @@ class TestValidateCoreRecreateIds:
         assert ok is True
         assert error == ""
 
+    @pytest.mark.parametrize("service_id", ["hermes", "hermes-proxy"])
+    def test_accepts_hermes_core_recreate_services(self, monkeypatch, service_id):
+        monkeypatch.setattr(_mod, "CORE_SERVICE_IDS", {service_id})
+        ok, error = validate_core_recreate_ids([service_id])
+        assert ok is True
+        assert error == ""
+
     def test_rejects_non_core_service(self, monkeypatch):
         monkeypatch.setattr(_mod, "CORE_SERVICE_IDS", {"dashboard-api"})
         ok, error = validate_core_recreate_ids(["llama-server"])
