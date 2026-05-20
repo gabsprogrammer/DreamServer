@@ -91,6 +91,12 @@ llama-server runs natively with Metal GPU acceleration; all other services run i
 .\install.ps1   # Auto-detects GPU, launches all services via Docker Desktop + WSL2
 ```
 
+Windows installs keep the cloned repo separate from the runtime directory. The
+installer writes `.env`, models, logs, and compose state to
+`$env:USERPROFILE\dream-server` by default (or `$env:DREAM_HOME`). After
+installing, run `.\dream.ps1` or manual `docker compose` commands from that
+runtime directory, not from the source checkout.
+
 See [`docs/WINDOWS-QUICKSTART.md`](docs/WINDOWS-QUICKSTART.md) for details.
 
 ---
