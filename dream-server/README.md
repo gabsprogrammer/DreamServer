@@ -106,8 +106,8 @@ See [`docs/WINDOWS-QUICKSTART.md`](docs/WINDOWS-QUICKSTART.md) for details.
 | **LiteLLM** | Multi-model API gateway | 4000 | Recommended |
 | **Token Spy** | Token usage monitor | 3005 | Recommended |
 | **SearXNG** | Self-hosted web search | 8888 | Recommended |
-| **Hermes Agent** | Local-first autonomous/browser agent | 9120 via auth proxy; 9119 internal | Optional |
-| **OpenClaw** | Autonomous AI agent framework | 7860 | Optional |
+| **Hermes Agent** | Default local-first autonomous/browser agent | 9120 via auth proxy; 9119 internal | Default agent |
+| **OpenClaw** | Deprecated legacy autonomous agent, opt-in during migration | 7860 | Deprecated optional |
 | **APE** | Agent Policy Engine for policy/audit controls | 7890 | Optional |
 | **OpenCode** | Browser IDE / coding assistant | 3003 | Optional host service |
 | **Perplexica** | Deep research engine | 3004 | Optional |
@@ -124,50 +124,55 @@ See [`docs/WINDOWS-QUICKSTART.md`](docs/WINDOWS-QUICKSTART.md) for details.
 
 ## Hardware Tiers
 
-The installer **automatically detects your GPU** and selects the right configuration. `MODEL_PROFILE=qwen` is the default; `MODEL_PROFILE=gemma4` and `MODEL_PROFILE=auto` are also supported by the tier map where those GGUFs are available.
+The installer **automatically detects your GPU**, assigns a hardware tier, then uses the versioned catalog selector to choose the best installable GGUF for the detected memory envelope. Linux and macOS call `scripts/select-model.py`; Windows uses the PowerShell selector in `installers/windows/lib/tier-map.ps1`. Both read `config/model-library.json`, and the final choice is written to `.env` as `LLM_MODEL`, `GGUF_FILE`, `MAX_CONTEXT`, and `MODEL_RECOMMENDATION_*`.
 
-When Hermes is enabled, installers keep the bootstrap model at 64K context and promote the full local model context to 128K. The table contexts below are the base tier choices used for core-only or `--no-hermes` installs.
+`MODEL_PROFILE=qwen` is the default non-Gemma catalog profile, so the effective model can be Qwen, Phi, or DeepSeek depending on fit. `MODEL_PROFILE=gemma4` and `MODEL_PROFILE=auto` are also supported where the tier map has Gemma 4 GGUFs available. When Hermes is enabled, installers keep the bootstrap model at 64K context and promote the full local model context to 128K where supported.
+
+The examples below are current catalog-selector outputs for common hardware envelopes. Exact installs can differ with detected VRAM/RAM, host architecture, existing downloads, or explicit profile overrides. Throughput still needs a local benchmark after first launch.
 
 ### AMD Strix Halo (Unified Memory)
 
-| Tier | Unified VRAM | Qwen profile | Gemma 4 profile | Context | Example Hardware |
-|------|-------------|--------------|-----------------|---------|-----------------|
-| SH_LARGE | 90GB+ | qwen3-coder-next (80B MoE, 3B active) | gemma-4-31b-it | 128K | Ryzen AI MAX+ 395 (96GB VRAM config) |
-| SH_COMPACT | 64-89GB | qwen3-30b-a3b (30B MoE, 3B active) | gemma-4-26b-a4b-it | 128K Qwen / 64K Gemma | Ryzen AI MAX+ 395 (64GB VRAM config) |
+| Tier / envelope | Current default catalog pick | Context | Example hardware |
+|------|--------------|---------|-----------------|
+| SH_COMPACT / 64GB unified RAM | qwen3.6-35b-a3b | 128K | Ryzen AI MAX+ 395 (64GB) |
+| SH_LARGE / 96GB unified RAM | deepseek-r1-distill-llama-70b | 32K | Ryzen AI MAX+ 395 (96GB) |
+| SH_LARGE / 124GB unified RAM | qwen3.6-35b-a3b | 128K | Ryzen AI MAX+ 395 (128GB class) |
 
-Both tiers use `qwen2.5:7b` as a bootstrap model for instant startup. The full model downloads in the background via GGUF from HuggingFace.
+Unified-memory hosts are routed away from qwen3-coder-next when that model would otherwise be selected, because current repo policy documents correctness issues on those backends. Bootstrap mode uses `qwen3.5-2b` for instant startup; the full model downloads in the background via GGUF from HuggingFace.
 
 **Inference backend:** selected by the platform installer and support matrix. Linux AMD paths use ROCm-capable containers; Windows Strix Halo uses the Windows-specific accelerated path.
 
 ### NVIDIA (Discrete GPU)
 
-| Tier | VRAM | Qwen profile | Gemma 4 profile | Context | Example GPUs |
-|------|------|--------------|-----------------|---------|--------------|
-| NV_ULTRA | 90GB+ | qwen3-coder-next | gemma-4-31b-it | 128K | Multi-GPU A100/H100 |
-| 0 (Lightweight) | <8GB or CPU fallback | qwen3.5-2b | qwen3.5-2b | 8K | Any GPU or CPU-only |
-| 1 (Entry) | 8-11GB | qwen3.5-9b | gemma-4-e2b-it | 16K | RTX 4060, RTX 3060 12GB |
-| 2 (Prosumer) | 12-20GB | qwen3.5-9b | gemma-4-e4b-it | 32K | RTX 3090, RTX 4080 |
-| 3 (Pro) | 20-40GB | qwen3-30b-a3b | gemma-4-26b-a4b-it | 32K Qwen / 16K Gemma | RTX 4090, A6000 |
-| 4 (Enterprise) | 40GB+ | qwen3-30b-a3b | gemma-4-31b-it | 128K Qwen / 64K Gemma | A100, H100, multi-GPU |
+| Tier / envelope | Current default catalog pick | Context | Example GPUs |
+|------|--------------|---------|--------------|
+| 0 / 8GB CPU fallback | qwen3.5-2b | 8K | Low-RAM CPU-only |
+| 1 / 8GB discrete VRAM | qwen3.5-9b | 32K | RTX 4060, RTX 3060 12GB |
+| 2 / 12GB discrete VRAM | phi-4 | 16K | RTX 4070-class cards |
+| 3 / 24GB discrete VRAM | qwen3.5-27b | 32K | RTX 4090, A6000 |
+| 4 / 48GB discrete VRAM | deepseek-r1-distill-llama-70b | 32K | A6000 Ada, L40S |
+| NV_ULTRA / 90GB+ amd64 discrete VRAM | qwen3-coder-next | 128K | Multi-GPU A100/H100 |
+| NV_ULTRA / 90GB+ arm64 unified memory | qwen3.6-35b-a3b | 128K | DGX Spark / GB10-class hosts |
 
 ### Apple Silicon (Unified Memory, Metal)
 
-| Tier | Unified RAM | Qwen profile | Gemma 4 profile | Context | Example Hardware |
-|------|-------------|--------------|-----------------|---------|-----------------|
-| 0 (Lightweight) | <16GB | qwen3.5-2b | qwen3.5-2b | 8K | M1/M2 base (8GB) |
-| 1 (Entry) | 16-24GB | qwen3.5-9b | gemma-4-e2b-it | 16K | M4 Mac Mini (16GB) |
-| 2 (Prosumer) | 32GB | qwen3.5-9b | gemma-4-e4b-it | 32K | M4 Pro Mac Mini, M3 Max MacBook Pro |
-| 3 (Pro) | 48GB | qwen3-30b-a3b | gemma-4-26b-a4b-it | 32K Qwen / 16K Gemma | M4 Pro (48GB), M2 Max (48GB) |
-| 4 (Enterprise) | 64GB+ | qwen3-30b-a3b | gemma-4-31b-it | 128K Qwen / 64K Gemma | M2 Ultra Mac Studio, M4 Max (64GB+) |
+| Tier / envelope | Current default catalog pick | Context | Example hardware |
+|------|--------------|---------|-----------------|
+| 0 / 8GB unified RAM | phi-4-mini | 128K | M1/M2 base (8GB) |
+| 1 / 16GB unified RAM | qwen3.5-9b | 32K | M4 Mac Mini (16GB) |
+| 2 / 32GB unified RAM | phi-4 | 16K | M4 Pro Mac Mini, M3 Max MacBook Pro |
+| 3 / 48GB unified RAM | qwen3.5-27b | 32K | M4 Pro (48GB), M2 Max (48GB) |
+| 4 / 64GB+ unified RAM | qwen3.6-35b-a3b | 128K | M2 Ultra Mac Studio, M4 Max (64GB+) |
 
 ### Intel Arc (Linux, SYCL)
 
-| Tier | VRAM | Qwen profile | Gemma 4 profile | Context | Example Hardware |
-|------|------|--------------|-----------------|---------|------------------|
-| ARC_LITE | 6-11GB | qwen3.5-4b | gemma-4-e2b-it | 16K | Arc A380, Arc A750 |
-| ARC | 12GB+ | qwen3.5-9b | gemma-4-e4b-it | 32K | Arc A770 16GB, newer Arc GPUs |
+| Tier / envelope | Current default catalog pick | Context | Example hardware |
+|------|--------------|---------|------------------|
+| ARC_LITE / 6GB discrete VRAM | phi-4-mini | 128K | Arc A380 |
+| ARC_LITE / 8GB discrete VRAM | qwen3.5-9b | 32K | Arc A750 |
+| ARC / 16GB discrete VRAM | phi-4 | 16K | Arc A770 16GB, newer Arc GPUs |
 
-Override with: `./install.sh --tier 3`
+Gemma 4 profile tiers remain in the installer tier maps: E2B on entry hardware, E4B on midrange hardware, 26B-A4B on pro hardware, and 31B on large/ultra hardware. Override with: `./install.sh --tier 3`.
 
 See [docs/HARDWARE-GUIDE.md](docs/HARDWARE-GUIDE.md) for buying recommendations.
 
@@ -187,12 +192,12 @@ See [docs/HARDWARE-GUIDE.md](docs/HARDWARE-GUIDE.md) for buying recommendations.
 │               llama-server backend              │
 │     Linux host :11434 / Docker :8080/v1       │
 │     native macOS/Windows host :8080/v1        │
-│        qwen3-coder-next / qwen3-30b-a3b         │
+│        catalog-selected local GGUF model        │
 └─────────────────────────────────────────────────┘
          │                              │
 ┌────────▼────────┐            ┌───────▼────────┐
-│ Hermes/OpenClaw │            │    Dashboard    │
-│ (Agents)        │            │ (Status :3001)  │
+│ Hermes Agent    │            │    Dashboard    │
+│ (default agent) │            │ (Status :3001)  │
 └─────────────────┘            └────────────────┘
 
 ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
@@ -212,7 +217,7 @@ See [docs/HARDWARE-GUIDE.md](docs/HARDWARE-GUIDE.md) for buying recommendations.
 ┌─────────────────────▼───────────────────────────┐
 │               llama-server (CUDA)               │
 │     Linux host :11434 / Docker :8080/v1          │
-│            qwen3-30b-a3b                        │
+│        catalog-selected local GGUF model        │
 └─────────────────────────────────────────────────┘
          │                              │
 ┌────────▼────────┐            ┌───────▼────────┐
@@ -273,13 +278,13 @@ The installer generates `.env` automatically. Key settings:
 
 ```bash
 # NVIDIA
-LLM_MODEL=qwen3-30b-a3b                   # Model (auto-set by installer)
+LLM_MODEL=qwen3.5-27b                     # Example catalog-selected model
 CTX_SIZE=32768                             # Context window
 MODEL_PROFILE=qwen                         # qwen, gemma4, or auto
 OLLAMA_PORT=11434                          # Host API port for llama-server
 
 # AMD Strix Halo
-LLM_MODEL=qwen3-coder-next                # or qwen3-30b-a3b for compact tier
+LLM_MODEL=qwen3.6-35b-a3b                 # Catalog-selected; varies by RAM/arch
 CTX_SIZE=131072                            # Context window
 GPU_BACKEND=amd                            # Set automatically by installer
 
@@ -370,7 +375,7 @@ dream mode status                        # Show current mode
 | Hardware auto-detect + model selection | **NVIDIA + AMD Strix Halo + Apple Silicon + Intel Arc + CPU/cloud fallback** | No | No |
 | AMD APU / unified memory support | **Platform-specific accelerated backend selected by installer** | Partial (Vulkan) | No |
 | Inference engine | **llama-server** (all GPUs) | llama.cpp | llama.cpp |
-| Autonomous AI agent | **Hermes Agent / OpenClaw** | No | No |
+| Autonomous AI agent | **Hermes Agent default; OpenClaw legacy opt-in** | No | No |
 | Workflow automation | **n8n (400+ integrations)** | No | No |
 | LLM usage monitoring | **Open WebUI built-in** | No | No |
 | Multi-GPU | **Yes** (NVIDIA) | Partial | Partial |

@@ -145,8 +145,8 @@ See the [macOS Quickstart](dream-server/docs/MACOS-QUICKSTART.md) for details.
 - **Kokoro** — text-to-speech
 
 ### Agents & Automation
-- **Hermes Agent** — optional local-first autonomous/browser agent with memory, skills, and a magic-link-gated proxy
-- **OpenClaw** — optional autonomous AI agent framework
+- **Hermes Agent** — default local-first autonomous/browser agent with memory, skills, and a magic-link-gated proxy
+- **OpenClaw** — deprecated legacy autonomous agent, still opt-in during the migration window
 - **n8n** — workflow automation with 400+ integrations (Slack, email, databases, APIs)
 - **APE** — Agent Policy Engine for auditing and governing autonomous tool calls
 - **OpenCode** — browser-based AI coding assistant wired to the local stack
@@ -172,48 +172,53 @@ See the [macOS Quickstart](dream-server/docs/MACOS-QUICKSTART.md) for details.
 
 ## Hardware Auto-Detection
 
-The installer detects your GPU and picks the optimal model automatically. No manual configuration is required for the default path.
+The installer detects your GPU and first assigns a deterministic hardware tier. Linux and macOS then run the versioned catalog selector (`dream-server/scripts/select-model.py`), while Windows uses the PowerShell catalog selector in `dream-server/installers/windows/lib/tier-map.ps1`; both read `dream-server/config/model-library.json` to choose the best installable GGUF for the detected memory envelope. The final choice is written to `.env` as `LLM_MODEL`, `GGUF_FILE`, `MAX_CONTEXT`, and `MODEL_RECOMMENDATION_*`.
 
-The current model map supports `MODEL_PROFILE=qwen` by default, plus `MODEL_PROFILE=gemma4` and `MODEL_PROFILE=auto` for Gemma 4 tiers where supported. Override tier selection with `./install.sh --tier 3`; override the model family with `MODEL_PROFILE=gemma4 ./install.sh` or `MODEL_PROFILE=auto ./install.sh`.
+`MODEL_PROFILE=qwen` is the default non-Gemma catalog profile, so the effective pick can be Qwen, Phi, or DeepSeek depending on what fits best. `MODEL_PROFILE=gemma4` forces Gemma 4 where available, and `MODEL_PROFILE=auto` uses Gemma 4 on NVIDIA, Apple Silicon, and Intel Arc tiers. Override tier selection with `./install.sh --tier 3`; override the model family with `MODEL_PROFILE=gemma4 ./install.sh` or `MODEL_PROFILE=auto ./install.sh`.
 
-When Hermes is enabled, which is the default agent path, installers keep the first-run bootstrap model at a 64K context floor and promote the full local model context to 128K. That avoids Hermes's hard 64K minimum while preserving the under-2-minute first chat experience. Core-only or `--no-hermes` installs keep the smaller tier contexts shown below.
+When Hermes is enabled, which is the default agent path, installers keep the first-run bootstrap model at a 64K context floor and promote the full local model context to 128K where the selected model supports it. That avoids Hermes's hard 64K minimum while preserving the under-2-minute first chat experience. The examples below are current catalog-selector outputs for common hardware envelopes; exact installs can differ with detected VRAM/RAM, host architecture, existing downloads, or explicit profile overrides. Throughput still needs a local benchmark after first launch.
 
 ### NVIDIA
 
-| Tier | VRAM | Qwen profile | Gemma 4 profile | Context | Example GPUs |
-|------|------|--------------|-----------------|---------|--------------|
-| 0 | < 8 GB or CPU-only fallback | Qwen3.5 2B (Q4_K_M) | Qwen3.5 2B (bootstrap-friendly minimum) | 8K | Any GPU or CPU-only |
-| 1 | 8–11 GB | Qwen3.5 9B (Q4_K_M) | Gemma 4 E2B IT (Q4_K_M) | 16K | RTX 4060, RTX 3060 12GB |
-| 2 | 12–20 GB | Qwen3.5 9B (Q4_K_M) | Gemma 4 E4B IT (Q4_K_M) | 32K | RTX 3090, RTX 4080 |
-| 3 | 20–40 GB | Qwen3 30B-A3B MoE (Q4_K_M) | Gemma 4 26B-A4B IT (Q4_K_M) | 32K Qwen / 16K Gemma | RTX 4090, A6000 |
-| 4 | 40+ GB | Qwen3 30B-A3B MoE (Q4_K_M) | Gemma 4 31B IT (Q4_K_M) | 128K Qwen / 64K Gemma | A100, H100, multi-GPU |
-| NV_ULTRA | 90+ GB | Qwen3 Coder Next (Q4_K_M) | Gemma 4 31B IT (Q4_K_M) | 128K | Multi-GPU A100/H100 |
+| Tier / envelope | Current default catalog pick | Context | Example hardware |
+|------|--------------|---------|--------------|
+| 0 / 8 GB CPU fallback | Qwen3.5 2B (Q4_K_M) | 8K | Low-RAM CPU-only |
+| 1 / 8 GB discrete VRAM | Qwen3.5 9B (Q4_K_M) | 32K | RTX 4060, RTX 3060 12GB |
+| 2 / 12 GB discrete VRAM | Phi-4 14B (Q4_K_M) | 16K | RTX 4070-class cards |
+| 3 / 24 GB discrete VRAM | Qwen3.5 27B (Q4_K_M) | 32K | RTX 4090, A6000 |
+| 4 / 48 GB discrete VRAM | DeepSeek R1 Distill Llama 70B (Q4_K_M) | 32K | A6000 Ada, L40S |
+| NV_ULTRA / 90+ GB amd64 discrete VRAM | Qwen3 Coder Next (Q4_K_M) | 128K | Multi-GPU A100/H100 |
+| NV_ULTRA / 90+ GB arm64 unified memory | Qwen3.6 35B-A3B (UD-Q4_K_M) | 128K | DGX Spark / GB10-class hosts |
 
 ### AMD Strix Halo (Unified Memory)
 
-| Tier | Unified RAM | Qwen profile | Gemma 4 profile | Context | Hardware |
-|------|-------------|--------------|-----------------|---------|----------|
-| SH_COMPACT | 64–89 GB | Qwen3 30B-A3B MoE (Q4_K_M) | Gemma 4 26B-A4B IT (Q4_K_M) | 128K Qwen / 64K Gemma | Ryzen AI MAX+ 395 (64GB) |
-| SH_LARGE | 90+ GB | Qwen3 Coder Next (Q4_K_M) | Gemma 4 31B IT (Q4_K_M) | 128K | Ryzen AI MAX+ 395 (96GB) |
+| Tier / envelope | Current default catalog pick | Context | Hardware |
+|------|--------------|---------|----------|
+| SH_COMPACT / 64 GB unified RAM | Qwen3.6 35B-A3B (UD-Q4_K_M) | 128K | Ryzen AI MAX+ 395 (64GB) |
+| SH_LARGE / 96 GB unified RAM | DeepSeek R1 Distill Llama 70B (Q4_K_M) | 32K | Ryzen AI MAX+ 395 (96GB) |
+| SH_LARGE / 124 GB unified RAM | Qwen3.6 35B-A3B (UD-Q4_K_M) | 128K | Ryzen AI MAX+ 395 (128GB class) |
+
+The selector routes unified-memory hosts away from Qwen3 Coder Next when that model would otherwise be selected, because current repo policy documents correctness issues on those backends.
 
 ### Apple Silicon (Unified Memory, Metal)
 
-| Tier | Unified RAM | Qwen profile | Gemma 4 profile | Context | Example Hardware |
-|------|-------------|--------------|-----------------|---------|-----------------|
-| 0 | < 16 GB | Qwen3.5 2B (Q4_K_M) | Qwen3.5 2B (bootstrap-friendly minimum) | 8K | M1/M2 base (8GB) |
-| 1 | 16–24 GB | Qwen3.5 9B (Q4_K_M) | Gemma 4 E2B IT (Q4_K_M) | 16K | M4 Mac Mini (16GB) |
-| 2 | 32 GB | Qwen3.5 9B (Q4_K_M) | Gemma 4 E4B IT (Q4_K_M) | 32K | M4 Pro Mac Mini, M3 Max MacBook Pro |
-| 3 | 48 GB | Qwen3 30B-A3B MoE (Q4_K_M) | Gemma 4 26B-A4B IT (Q4_K_M) | 32K Qwen / 16K Gemma | M4 Pro (48GB), M2 Max (48GB) |
-| 4 | 64+ GB | Qwen3 30B-A3B MoE (Q4_K_M) | Gemma 4 31B IT (Q4_K_M) | 128K Qwen / 64K Gemma | M2 Ultra Mac Studio, M4 Max (64GB+) |
+| Tier / envelope | Current default catalog pick | Context | Example hardware |
+|------|--------------|---------|-----------------|
+| 0 / 8 GB unified RAM | Phi-4 Mini (Q4_K_M) | 128K | M1/M2 base (8GB) |
+| 1 / 16 GB unified RAM | Qwen3.5 9B (Q4_K_M) | 32K | M4 Mac Mini (16GB) |
+| 2 / 32 GB unified RAM | Phi-4 14B (Q4_K_M) | 16K | M4 Pro Mac Mini, M3 Max MacBook Pro |
+| 3 / 48 GB unified RAM | Qwen3.5 27B (Q4_K_M) | 32K | M4 Pro (48GB), M2 Max (48GB) |
+| 4 / 64+ GB unified RAM | Qwen3.6 35B-A3B (UD-Q4_K_M) | 128K | M2 Ultra Mac Studio, M4 Max (64GB+) |
 
 ### Intel Arc (Linux, SYCL)
 
-| Tier | VRAM | Qwen profile | Gemma 4 profile | Context | Example Hardware |
-|------|------|--------------|-----------------|---------|------------------|
-| ARC_LITE | 6–11 GB | Qwen3.5 4B (Q4_K_M) | Gemma 4 E2B IT (Q4_K_M) | 16K | Arc A380, Arc A750 |
-| ARC | 12+ GB | Qwen3.5 9B (Q4_K_M) | Gemma 4 E4B IT (Q4_K_M) | 32K | Arc A770 16GB, newer Arc GPUs |
+| Tier / envelope | Current default catalog pick | Context | Example hardware |
+|------|--------------|---------|------------------|
+| ARC_LITE / 6 GB discrete VRAM | Phi-4 Mini (Q4_K_M) | 128K | Arc A380 |
+| ARC_LITE / 8 GB discrete VRAM | Qwen3.5 9B (Q4_K_M) | 32K | Arc A750 |
+| ARC / 16 GB discrete VRAM | Phi-4 14B (Q4_K_M) | 16K | Arc A770 16GB, newer Arc GPUs |
 
-Override tier selection: `./install.sh --tier 3`
+Gemma 4 profile tiers remain in the installer tier maps: E2B on entry hardware, E4B on midrange hardware, 26B-A4B on pro hardware, and 31B on large/ultra hardware.
 
 ---
 
@@ -332,7 +337,7 @@ Other tools get you part of the way. Dream Server gets you the whole way.
 | One-command install | Everything, auto-configured | LLM + chat only | LLM only |
 | Hardware auto-detect + model selection | NVIDIA + AMD Strix Halo + Apple Silicon + Intel Arc + CPU/cloud fallback | No | No |
 | AMD APU unified memory support | Platform-specific accelerated backend, selected by installer | Partial (Vulkan) | No |
-| Autonomous AI agents | Hermes Agent / OpenClaw | No | No |
+| Autonomous AI agents | Hermes Agent default; OpenClaw legacy opt-in | No | No |
 | Workflow automation | n8n (400+ integrations) | No | No |
 | Voice (STT + TTS) | Whisper + Kokoro | No | No |
 | Image generation | ComfyUI | No | No |
