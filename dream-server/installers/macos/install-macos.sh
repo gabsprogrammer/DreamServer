@@ -157,6 +157,9 @@ if [[ -f "${SOURCE_ROOT}/installers/lib/compose-failure-report.sh" ]]; then
     source "${SOURCE_ROOT}/installers/lib/compose-failure-report.sh"
 fi
 source "${SOURCE_ROOT}/lib/safe-env.sh"
+if [[ -f "${SOURCE_ROOT}/lib/python-cmd.sh" ]]; then
+    source "${SOURCE_ROOT}/lib/python-cmd.sh"
+fi
 source "${SOURCE_ROOT}/installers/lib/readiness-summary.sh"
 
 # ── File-local helpers ──
@@ -224,6 +227,72 @@ _require_docker_cpu_budget() {
         exit 1
     fi
     ai_ok "Docker CPU budget: ${docker_ncpu} (>=${min_cpus} required for ${workload})"
+}
+
+_set_installer_python_cmd() {
+    local pycmd="$1"
+    export DREAM_PYTHON_CMD="$pycmd"
+    # python-cmd.sh caches the first runnable interpreter. Keep the cache aligned
+    # when this installer creates a private venv after the first detection.
+    if declare -p _ds_python_cmd_cached >/dev/null 2>&1; then
+        _ds_python_cmd_cached="$pycmd"
+    fi
+}
+
+_ensure_macos_pyyaml() {
+    local pycmd=""
+    if declare -f ds_detect_python_cmd >/dev/null 2>&1; then
+        pycmd="$(ds_detect_python_cmd 2>/dev/null || true)"
+    fi
+    if [[ -z "$pycmd" ]]; then
+        pycmd="$(command -v python3 2>/dev/null || true)"
+    fi
+
+    if [[ -z "$pycmd" ]]; then
+        ai_err "python3 not available — required for compose resolver"
+        exit 1
+    fi
+
+    if "$pycmd" -c 'import yaml' >/dev/null 2>&1; then
+        _set_installer_python_cmd "$pycmd"
+        ai_ok "PyYAML available for $pycmd"
+        return 0
+    fi
+
+    ai "Installing PyYAML (required by compose resolver)..."
+    if "$pycmd" -m pip install --user --quiet --no-warn-script-location pyyaml 2>&1 | tee -a "$DS_LOG_FILE" >/dev/null \
+       && "$pycmd" -c 'import yaml' >/dev/null 2>&1; then
+        _set_installer_python_cmd "$pycmd"
+        ai_ok "PyYAML installed (python3 -m pip --user)"
+        return 0
+    fi
+
+    ai_warn "PyYAML install via --user failed; trying a private Dream Server installer venv."
+    local venv_dir="${INSTALL_DIR}/.installer-venv"
+    local venv_py="${venv_dir}/bin/python"
+    mkdir -p "$INSTALL_DIR"
+    if ! "$pycmd" -m venv "$venv_dir" 2>&1 | tee -a "$DS_LOG_FILE" >/dev/null; then
+        ai_err "Failed to create installer Python venv at $venv_dir."
+        ai "  Your Python may be missing the venv module."
+        ai "  Try: brew install python"
+        ai "  Then re-run this installer."
+        exit 1
+    fi
+
+    if "$venv_py" -m pip install --quiet --no-warn-script-location pyyaml 2>&1 | tee -a "$DS_LOG_FILE" >/dev/null \
+       && "$venv_py" -c 'import yaml' >/dev/null 2>&1; then
+        _set_installer_python_cmd "$venv_py"
+        ai_ok "PyYAML installed in private installer venv"
+        return 0
+    fi
+
+    ai_err "Failed to install PyYAML for the macOS installer."
+    ai "  Log file: $DS_LOG_FILE"
+    ai "  Manual recovery:"
+    ai "    $pycmd -m pip install --user pyyaml"
+    ai "  Or:"
+    ai "    $pycmd -m venv $venv_dir && $venv_py -m pip install pyyaml"
+    exit 1
 }
 
 # ── Resolve install directory ──
@@ -400,24 +469,7 @@ ai_ok "Disk space OK"
 # the system python; macOS does not. Without PyYAML, every extension install
 # fails at compose resolution with a cryptic "ModuleNotFoundError: No module
 # named 'yaml'" returned through the dashboard-api as state=error.
-if command -v python3 >/dev/null 2>&1; then
-    if python3 -c 'import yaml' >/dev/null 2>&1; then
-        ai_ok "PyYAML available"
-    else
-        ai "Installing PyYAML (required by compose resolver)..."
-        if python3 -m pip install --user --quiet --no-warn-script-location pyyaml 2>&1 | tee -a "$DS_LOG_FILE" >/dev/null \
-           && python3 -c 'import yaml' >/dev/null 2>&1; then
-            ai_ok "PyYAML installed (python3 -m pip --user)"
-        else
-            ai_err "Failed to install PyYAML for $(command -v python3)."
-            ai_err "Run manually: python3 -m pip install --user pyyaml"
-            exit 1
-        fi
-    fi
-else
-    ai_err "python3 not available — required for compose resolver"
-    exit 1
-fi
+_ensure_macos_pyyaml
 
 # Ollama conflict detection
 check_ollama_conflict
