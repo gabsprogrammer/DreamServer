@@ -57,6 +57,9 @@ jobs:
       - name: Dream Doctor Tests
         run: bash tests/test-dream-doctor.sh
 
+      - name: Dream Doctor Install Diagnosis Tests
+        run: bash tests/test-dream-doctor-install-diagnoses.sh
+
       - name: Windows Report Command Tests
         run: bash tests/test-windows-report-command.sh
 

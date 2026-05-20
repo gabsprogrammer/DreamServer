@@ -1770,11 +1770,42 @@ if pf_checks:
             print(f"  {YELLOW}?{NC} {name}: {message}")
     print()
 
+# Evidence-ranked diagnoses
+diagnoses = report.get('diagnoses', [])
+if diagnoses:
+    print(f"{CYAN}Diagnoses:{NC}")
+    severity_colors = {
+        'blocker': RED,
+        'warn': YELLOW,
+        'info': CYAN,
+    }
+    for diagnosis in diagnoses[:5]:
+        severity = diagnosis.get('severity', 'info')
+        color = severity_colors.get(severity, CYAN)
+        diag_id = diagnosis.get('id', 'DS-UNKNOWN')
+        confidence = diagnosis.get('confidence', 'unknown')
+        title = diagnosis.get('title', 'Unknown diagnosis')
+        print(f"  {color}{severity.upper()}{NC} {diag_id}: {title} ({confidence} confidence)")
+        evidence = diagnosis.get('evidence') or []
+        if evidence:
+            first = evidence[0]
+            print(f"    evidence: {first.get('source', 'unknown')} — {first.get('detail', '')}")
+        next_steps = diagnosis.get('next_steps') or []
+        if next_steps:
+            print(f"    next: {next_steps[0]}")
+        if severity == 'blocker':
+            has_failures = True
+    if len(diagnoses) > 5:
+        print(f"    ... {len(diagnoses) - 5} more diagnosis item(s) in the JSON report")
+    print()
+
 # Summary
 summary = report.get('summary', {})
 blocker_count = summary.get('preflight_blockers', 0)
 warning_count = summary.get('preflight_warnings', 0)
 runtime_warning_count = summary.get('runtime_warnings', 0)
+diagnosis_blocker_count = summary.get('diagnoses_blockers', 0)
+diagnosis_warning_count = summary.get('diagnoses_warnings', 0)
 runtime_ready = summary.get('runtime_ready', False)
 
 print(f"{CYAN}Summary:{NC}")
@@ -1784,7 +1815,11 @@ if warning_count > 0:
     print(f"  {YELLOW}⚠{NC} {warning_count} warning(s) found")
 if runtime_warning_count > 0:
     print(f"  {YELLOW}⚠{NC} {runtime_warning_count} runtime warning(s) found")
-if blocker_count == 0 and warning_count == 0 and runtime_warning_count == 0 and runtime_ready:
+if diagnosis_blocker_count > 0:
+    print(f"  {RED}✗{NC} {diagnosis_blocker_count} diagnosis blocker(s) found")
+if diagnosis_warning_count > 0:
+    print(f"  {YELLOW}⚠{NC} {diagnosis_warning_count} diagnosis warning(s) found")
+if blocker_count == 0 and warning_count == 0 and runtime_warning_count == 0 and diagnosis_blocker_count == 0 and diagnosis_warning_count == 0 and runtime_ready:
     print(f"  {GREEN}✓{NC} All checks passed")
 
 print()
