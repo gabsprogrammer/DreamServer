@@ -305,10 +305,16 @@ result=$(_classify_id "0xFFFF" "Unknown GPU" amd 8192)
   || { echo "[FAIL] unknown GPU crashed"; exit 1; }
 
 echo "[contract] macOS compose resolver installs PyYAML into checked python3"
-grep -q "python3 -c 'import yaml'" installers/macos/install-macos.sh \
+grep -q '_macos_python_imports_yaml python3' installers/macos/install-macos.sh \
   || { echo "[FAIL] macOS installer does not verify PyYAML with python3"; exit 1; }
-grep -q 'python3 -m pip install --user .*pyyaml' installers/macos/install-macos.sh \
-  || { echo "[FAIL] macOS installer must install PyYAML via python3 -m pip, not a possibly unrelated pip3"; exit 1; }
+grep -q 'python3 -m venv "\$venv_dir"' installers/macos/install-macos.sh \
+  || { echo "[FAIL] macOS installer must isolate PyYAML in an installer venv"; exit 1; }
+grep -q 'export DREAM_PYTHON_CMD="\$venv_python"' installers/macos/install-macos.sh \
+  || { echo "[FAIL] macOS installer must route compose resolver to the venv Python"; exit 1; }
+if grep -q 'python3 -m pip install --user .*pyyaml' installers/macos/install-macos.sh; then
+  echo "[FAIL] macOS installer must not use pip --user for PyYAML; Homebrew Python rejects it under PEP 668"
+  exit 1
+fi
 
 echo "[contract] Hermes context defaults are installer-wide"
 bash tests/test-installer-context-parity.sh

@@ -189,6 +189,46 @@ _compute_launchd_path() {
     printf '%s' "$path_out"
 }
 
+_macos_python_imports_yaml() {
+    local pycmd="${1:-python3}"
+    "$pycmd" -c 'import yaml' >/dev/null 2>&1
+}
+
+_ensure_macos_pyyaml_runtime() {
+    if ! command -v python3 >/dev/null 2>&1; then
+        ai_err "python3 not available — required for compose resolver"
+        exit 1
+    fi
+
+    if _macos_python_imports_yaml python3; then
+        export DREAM_PYTHON_CMD="${DREAM_PYTHON_CMD:-python3}"
+        ai_ok "PyYAML available"
+        return 0
+    fi
+
+    if $DRY_RUN; then
+        ai_warn "PyYAML is not importable by python3 (dry-run: would create installer Python venv)."
+        return 0
+    fi
+
+    local venv_dir="${INSTALL_DIR}/.venv/installer-python"
+    local venv_python="${venv_dir}/bin/python"
+
+    ai "Installing PyYAML in isolated installer Python runtime..."
+    mkdir -p "$(dirname "$venv_dir")"
+    if python3 -m venv "$venv_dir" 2>&1 | tee -a "$DS_LOG_FILE" >/dev/null \
+       && "$venv_python" -m pip install --quiet --no-warn-script-location pyyaml 2>&1 | tee -a "$DS_LOG_FILE" >/dev/null \
+       && _macos_python_imports_yaml "$venv_python"; then
+        export DREAM_PYTHON_CMD="$venv_python"
+        ai_ok "PyYAML available in installer venv"
+        return 0
+    fi
+
+    ai_err "Failed to install PyYAML for the macOS compose resolver."
+    ai_err "Run manually: python3 -m venv '${venv_dir}' && '${venv_python}' -m pip install pyyaml"
+    exit 1
+}
+
 _require_docker_cpu_budget() {
     local min_cpus="${1:-6}"
     local max_pin="${2:-4}"
@@ -396,28 +436,11 @@ ai_ok "Disk space OK"
 
 # PyYAML — required by scripts/resolve-compose-stack.sh for the compose
 # security scan (it parses every extension/overlay manifest before letting
-# user composes through). Linux distros generally bundle python3-yaml with
-# the system python; macOS does not. Without PyYAML, every extension install
-# fails at compose resolution with a cryptic "ModuleNotFoundError: No module
-# named 'yaml'" returned through the dashboard-api as state=error.
-if command -v python3 >/dev/null 2>&1; then
-    if python3 -c 'import yaml' >/dev/null 2>&1; then
-        ai_ok "PyYAML available"
-    else
-        ai "Installing PyYAML (required by compose resolver)..."
-        if python3 -m pip install --user --quiet --no-warn-script-location pyyaml 2>&1 | tee -a "$DS_LOG_FILE" >/dev/null \
-           && python3 -c 'import yaml' >/dev/null 2>&1; then
-            ai_ok "PyYAML installed (python3 -m pip --user)"
-        else
-            ai_err "Failed to install PyYAML for $(command -v python3)."
-            ai_err "Run manually: python3 -m pip install --user pyyaml"
-            exit 1
-        fi
-    fi
-else
-    ai_err "python3 not available — required for compose resolver"
-    exit 1
-fi
+# user composes through). Homebrew Python on macOS is externally managed, so
+# installing into python3 with `pip --user` can fail under PEP 668. Keep the
+# resolver dependency in a Dream-owned venv and point shared Python helpers at
+# that interpreter through DREAM_PYTHON_CMD.
+_ensure_macos_pyyaml_runtime
 
 # Ollama conflict detection
 check_ollama_conflict
